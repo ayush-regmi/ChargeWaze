@@ -1,0 +1,136 @@
+# =========================
+# Agentic / tool-local files
+# Keep AI-assistant instructions out of the public repo.
+# Each contributor keeps their own local copy of CLAUDE.md and AGENTS.md.
+# =========================
+CLAUDE.md
+AGENTS.md
+.cursor/
+.cursorignore
+.cursorrules
+.claude/
+.claude.json
+.aider*
+.continue/
+.windsurf/
+.codex/
+GEMINI.md
+
+# =========================
+# Secrets / env
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Node / Next.js (apps/web, packages/*)
+# =========================
+node_modules/
+.yarn/
+.next/
+out/
+dist/
+build/
+coverage/
+.turbo/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+.npmrc.local
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# =========================
+# Python / FastAPI (services/api, ml/)
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# venvs
+.venv/
+venv/
+env/
+# NOTE: .python-version is committed per-project (e.g. services/api/.python-version)
+# so uv and pyenv pick up the right Python version. Do not ignore it.
+
+# Build / packaging
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+
+# Caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyre/
+.pytype/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# =========================
+# ML artifacts
+# ml/models holds trained binaries — keep only the .gitkeep.
+# =========================
+ml/models/*
+!ml/models/.gitkeep
+
+# Common model / data formats anywhere under ml/
+ml/**/*.pkl
+ml/**/*.joblib
+ml/**/*.bin
+ml/**/*.pt
+ml/**/*.pth
+ml/**/*.onnx
+ml/**/*.h5
+ml/**/*.safetensors
+ml/**/*.parquet
+ml/**/*.feather
+ml/**/data/
+ml/**/datasets/
+
+# =========================
+# Databases / dumps
+# =========================
+*.sqlite
+*.sqlite3
+*.db
+*.sql.gz
+*.dump
+
+# =========================
+# Editor / OS
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# =========================
+# Logs / temp
+# =========================
+*.log
+logs/
+tmp/
+.tmp/
