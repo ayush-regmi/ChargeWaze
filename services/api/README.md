@@ -1,0 +1,27 @@
+# chargewise-api
+
+FastAPI backend for Chargewise (modular monolith). See [`../../docs/architecture.md`](../../docs/architecture.md) for module layout and the broader architecture, and [`../../docs/api-contracts.md`](../../docs/api-contracts.md) for the public API surface.
+
+## Setup
+
+```bash
+# From services/api/
+uv sync
+cp ../../.env.example .env   # fill in local values; never commit .env
+uv run fastapi dev app/main.py
+```
+
+Run tests, lint, and types:
+
+```bash
+uv run pytest
+uv run ruff check
+uv run mypy app
+```
+
+Database migrations:
+
+```bash
+uv run alembic upgrade head
+uv run alembic downgrade -1
+```

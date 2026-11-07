@@ -1,0 +1,30 @@
+# Local development Postgres used ONLY for running Alembic migrations and
+# the backend test suite against a Postgres-flavored engine. Real Chargewise
+# development uses hosted Supabase (ADR 0001, ADR 0006).
+#
+# Usage:
+#   docker compose up -d
+#   DATABASE_URL="postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise" \
+#     uv run --project services/api alembic upgrade head
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chargewise-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chargewise
+      POSTGRES_PASSWORD: chargewise
+      POSTGRES_DB: chargewise
+    ports:
+      - "5432:5432"
+    volumes:
+      - chargewise-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chargewise -d chargewise"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  chargewise-postgres-data:

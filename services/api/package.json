@@ -1,0 +1,14 @@
+{
+  "name": "@chargewise/api",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Chargewise FastAPI backend. Scripts shim into uv so turbo can orchestrate Python tasks alongside the JS workspaces.",
+  "scripts": {
+    "dev": "uv run fastapi dev app/main.py",
+    "build": "echo 'no-op: Python backend has no build step'",
+    "lint": "uv run ruff check .",
+    "test": "uv run pytest",
+    "typecheck": "uv run mypy app",
+    "clean": "rm -rf .venv .pytest_cache .ruff_cache .mypy_cache"
+  }
+}
