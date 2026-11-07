@@ -3,16 +3,32 @@ name = "chargewise-api"
 version = "0.0.0"
 description = "Chargewise FastAPI backend (modular monolith)."
 requires-python = ">=3.12"
-readme = "../../README.md"
+readme = "README.md"
 license = { text = "UNLICENSED" }
 authors = [{ name = "Chargewise" }]
 
 # Real dependencies (FastAPI, Pydantic, SQLAlchemy, Alembic, Supabase client, etc.)
 # are added in Phase 1 via `uv add <package>`. See docs/development-roadmap.md.
-dependencies = []
+dependencies = [
+    "alembic>=1.20.1",
+    "fastapi[standard]>=0.162.0",
+    "httpx>=0.28.1",
+    "psycopg[binary]>=3.3.8",
+    "pydantic-settings>=2.16.2",
+    "pyjwt[crypto]>=2.15.1",
+    "sqlalchemy>=2",
+]
 
 [dependency-groups]
-dev = []
+dev = [
+    "cryptography>=50.0.2",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1.post1",
+    "ruff>=0.17.4",
+    "sqlalchemy[mypy]>=2.1.8",
+    "types-psycopg2>=2.9.21.20261030",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -40,7 +56,14 @@ known-first-party = ["app"]
 minversion = "8.0"
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
-filterwarnings = ["error"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "error",
+    # Starlette emits this during TestClient teardown on current versions.
+    "ignore::DeprecationWarning:starlette",
+    "ignore::DeprecationWarning:httpx",
+]
 
 [tool.uv]
 # Dev dependencies get added later with `uv add --group dev <package>`.

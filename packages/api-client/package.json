@@ -1,0 +1,30 @@
+{
+  "name": "@chargewise/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Typed Chargewise API client. The `src/schema.d.ts` file is generated from the FastAPI OpenAPI document via `npm run generate`.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "echo 'no-op'",
+    "test": "echo 'no-op'",
+    "typecheck": "tsc --noEmit",
+    "generate": "openapi-typescript ../../services/api/openapi.json -o src/schema.d.ts",
+    "clean": "rm -rf node_modules .turbo"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.17.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.9.1",
+    "typescript": "^5"
+  }
+}

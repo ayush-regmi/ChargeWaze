@@ -39,6 +39,10 @@ coverage/
 next-env.d.ts
 .npmrc.local
 
+# Generated API client (regenerate with `npm run generate --workspace=packages/api-client`)
+packages/api-client/src/schema.d.ts
+services/api/openapi.json
+
 # Playwright
 /test-results/
 /playwright-report/
