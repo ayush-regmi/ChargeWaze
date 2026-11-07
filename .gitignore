@@ -43,11 +43,11 @@ next-env.d.ts
 packages/api-client/src/schema.d.ts
 services/api/openapi.json
 
-# Playwright
-/test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
+# Playwright (per workspace)
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
 
 # =========================
 # Python / FastAPI (services/api, ml/)

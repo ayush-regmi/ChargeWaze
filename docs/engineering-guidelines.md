@@ -69,17 +69,26 @@ If the docs contradict each other, flag it in your PR and propose a fix before w
 
 Tooling is **npm workspaces + Turborepo** on the JS side and **`uv`** on the Python side. See [`adr/0005-npm-turborepo-uv-tooling.md`](adr/0005-npm-turborepo-uv-tooling.md).
 
-Setup:
+### Setup (once per machine)
 
 - Install Node (see [`.nvmrc`](../.nvmrc)) and `npm`.
-- Install `uv` (`brew install uv` on macOS).
-- From the repo root, run `npm install` once to populate `node_modules` from the lockfile.
+- `brew install uv` on macOS, or use the official uv installer elsewhere.
+- Install Docker (only needed for the local Postgres used by the backend test suite; day-to-day dev points at hosted Supabase).
+- From the repo root: `npm install`.
+- Copy [`services/api/.env.example`](../services/api/.env.example) → `services/api/.env` and fill in Supabase values.
+- Copy [`apps/web/.env.example`](../apps/web/.env.example) → `apps/web/.env.local` and fill in `NEXT_PUBLIC_*` values.
 
-Common tasks (expand as workspaces land):
+### Daily tasks
 
-- Root (runs through Turborepo): `npm run dev`, `npm run build`, `npm run lint`, `npm run test`, `npm run typecheck`. Each one calls `turbo run <task>` across workspaces.
-- Workspace-specific: `npm run <script> --workspace=apps/web` (or `packages/api-client`).
-- Backend (from [`services/api/`](../services/api)): `uv sync`, `uv run pytest`, `uv run ruff check`, `uv run alembic upgrade head`, `uv run fastapi dev app/main.py`.
+- Root (runs through Turborepo across all workspaces):
+  - `npm run dev` — start every long-running dev server.
+  - `npm run build` / `npm run lint` / `npm run test` / `npm run typecheck`.
+- Workspace-scoped:
+  - Frontend: `npm run dev --workspace=apps/web`, `npm run test --workspace=apps/web`, `npm run test:e2e --workspace=apps/web`.
+  - Backend (from [`services/api/`](../services/api)): `uv sync --group dev`, `uv run fastapi dev app/main.py`, `uv run pytest`, `uv run ruff check`, `uv run mypy app`.
+  - Migrations: `uv run alembic upgrade head`, `uv run alembic downgrade -1`.
+- Generated typed API client: `uv run --project services/api python services/api/scripts/export_openapi.py && npm run generate --workspace=packages/api-client`.
+- Local Postgres: `docker compose up -d` (see [`../docker-compose.yml`](../docker-compose.yml)).
 
 Never guess commands — run them to confirm they work before adding them here or to a PR description.
 

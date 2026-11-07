@@ -56,7 +56,9 @@ Start here, in this order:
 ## Current status
 
 - [x] Starter branch with specs and ADRs
-- [ ] Phase 1 — Foundation (monorepo tooling, auth, `GET /api/v1/me`)
+- [x] Phase 1 slice 1 — monorepo scaffolds (Next.js app shell, FastAPI `/health`, typed API client)
+- [x] Phase 1 slice 2 — Supabase Auth (email/password + Google; Apple behind a flag) with `GET /api/v1/me`
+- [ ] Phase 1 slice 3 — CI green on `main`
 - [ ] Phase 2 — Vehicle integration (Smartcar V3 Connect + webhooks)
 - [ ] Phase 3 — Maps and chargers
 - [ ] Phase 4 — Charging-aware trip planner
@@ -67,12 +69,23 @@ See [`docs/development-roadmap.md`](docs/development-roadmap.md) for per-phase c
 
 ## Local development
 
-Coming in Phase 1. Once the scaffolds exist:
+Setup once per machine:
 
-- Copy `.env.example` to `.env` and fill in real values. **Never commit `.env`.**
-- Backend commands live under `services/api/`, driven by **`uv`** (FastAPI + SQLAlchemy + Alembic). Install uv with `brew install uv` on macOS.
-- Frontend and shared JS workspaces use **npm workspaces + Turborepo**. From the repo root, run `npm install` once, then use `npm run dev`, `npm run lint`, `npm run test`, `npm run typecheck` (each one calls `turbo run <task>`).
-- Tooling rationale: [`docs/adr/0005-npm-turborepo-uv-tooling.md`](docs/adr/0005-npm-turborepo-uv-tooling.md).
+1. Install Node (see [`.nvmrc`](.nvmrc)) and `npm`.
+2. `brew install uv` on macOS (or use the official uv installer).
+3. Install Docker if you want the local Postgres container (hosted Supabase handles day-to-day dev).
+4. From the repo root, run `npm install`.
+5. Copy [`services/api/.env.example`](services/api/.env.example) → `services/api/.env` and fill in your Supabase values.
+6. Copy [`apps/web/.env.example`](apps/web/.env.example) → `apps/web/.env.local` and fill in `NEXT_PUBLIC_*` values.
+
+Daily commands:
+
+- Everything through Turborepo: `npm run dev`, `npm run build`, `npm run lint`, `npm run test`, `npm run typecheck`.
+- Frontend only: `npm run dev --workspace=apps/web`.
+- Backend only (from `services/api/`): `uv run fastapi dev app/main.py`.
+- Regenerate the typed API client: `uv run --project services/api python services/api/scripts/export_openapi.py && npm run generate --workspace=packages/api-client`.
+
+**Never commit `.env*` files** other than the `.env.example` templates. See [`docs/engineering-guidelines.md`](docs/engineering-guidelines.md) for the full contributor workflow and [`docs/adr/0005-npm-turborepo-uv-tooling.md`](docs/adr/0005-npm-turborepo-uv-tooling.md) for the tooling rationale.
 
 ## Notes for contributors (human and AI)
 
