@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { AuthForm } from "@/components/auth/auth-form";
 import { env } from "@/lib/env";
@@ -12,11 +13,13 @@ export default function SignUpPage() {
           You will receive a confirmation email if required by your project.
         </p>
       </div>
-      <AuthForm
-        mode="sign-up"
-        googleEnabled={env.googleAuthEnabled}
-        appleEnabled={env.appleAuthEnabled}
-      />
+      <Suspense>
+        <AuthForm
+          mode="sign-up"
+          googleEnabled={env.googleAuthEnabled}
+          appleEnabled={env.appleAuthEnabled}
+        />
+      </Suspense>
       <p className="text-sm text-neutral-600 dark:text-neutral-400">
         Already have an account?{" "}
         <Link
