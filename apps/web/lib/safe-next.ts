@@ -33,5 +33,27 @@ export function safeNextPath(
     return fallback;
   }
 
-  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+  const path = `${resolved.pathname}${resolved.search}${resolved.hash}`;
+
+  // Dot segments are removed during parsing, so an input like ``/.//evil``
+  // passes the origin check above but normalizes to ``//evil``, which the
+  // caller would read as a protocol-relative URL. Validate the *output*: it
+  // must not start with ``//`` and must resolve back to itself on our origin.
+  if (path.startsWith("//") || !isSameOriginPath(path)) {
+    return fallback;
+  }
+
+  return path;
+}
+
+function isSameOriginPath(path: string): boolean {
+  try {
+    const reparsed = new URL(path, PROBE_ORIGIN);
+    return (
+      reparsed.origin === PROBE_ORIGIN &&
+      `${reparsed.pathname}${reparsed.search}${reparsed.hash}` === path
+    );
+  } catch {
+    return false;
+  }
 }

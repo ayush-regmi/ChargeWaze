@@ -25,8 +25,26 @@ describe("safeNextPath", () => {
     "https://evil.example",
     "http:evil.example",
     "javascript:alert(1)",
+    // Dot segments that normalize into a protocol-relative URL.
+    "/.//evil.example",
+    "/x/..//evil.example",
+    "/%2e//evil.example",
+    "/./\\evil.example",
+    "/.//evil.example/path?q=1#h",
   ])("rejects %j", (input) => {
     expect(safeNextPath(input)).toBe(DEFAULT_NEXT_PATH);
+  });
+
+  it.each([
+    "/dashboard",
+    "/trips?id=42",
+    "/.//evil.example",
+    "/x/..//evil.example",
+    "//evil.example",
+  ])("never returns a value that leaves the origin for %j", (input) => {
+    const out = safeNextPath(input);
+    expect(out.startsWith("//")).toBe(false);
+    expect(new URL(out, "http://localhost:3000").origin).toBe("http://localhost:3000");
   });
 
   it("uses a custom fallback", () => {
