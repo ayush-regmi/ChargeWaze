@@ -43,6 +43,8 @@ If the docs contradict each other, flag it in your PR and propose a fix before w
 
 ## Security
 
+- Every migration that creates a table in `public` also enables row level security. Supabase exposes `public` through its Data API with the browser's publishable key; `tests/test_migrations.py` fails CI if a table is missing RLS.
+- Redirect targets taken from the URL (such as `?next=`) go through `safeNextPath()` in `apps/web/lib/safe-next.ts`. Never redirect to a raw query-string value.
 - Never commit secrets or credentials. The only committed env files are the templates [`services/api/.env.example`](../services/api/.env.example) and [`apps/web/.env.example`](../apps/web/.env.example).
 - Smartcar secrets (`SMARTCAR_CLIENT_SECRET`, `SMARTCAR_WEBHOOK_SECRET`, the Mapbox secret token) never go into `NEXT_PUBLIC_*` env vars or the browser bundle.
 - Check ownership for every user-owned resource (`vehicles`, `planned_trips`, `observed_trips`, `vehicle_telemetry`). "Not owned by the caller" returns 404, not 403 with a leak.
@@ -74,7 +76,7 @@ Tooling is **npm workspaces + Turborepo** on the JS side and **`uv`** on the Pyt
 
 - Install Node (see [`.nvmrc`](../.nvmrc)) and `npm`.
 - `brew install uv` on macOS, or use the official uv installer elsewhere.
-- Install Docker (only needed for the local Postgres used by the backend test suite; day-to-day dev points at hosted Supabase).
+- Install Docker. The backend test suite needs the local Postgres container (`docker compose up -d`); day-to-day dev points at hosted Supabase.
 - From the repo root: `npm install`.
 - Copy [`services/api/.env.example`](../services/api/.env.example) → `services/api/.env` and fill in Supabase values.
 - Copy [`apps/web/.env.example`](../apps/web/.env.example) → `apps/web/.env.local` and fill in `NEXT_PUBLIC_*` values.

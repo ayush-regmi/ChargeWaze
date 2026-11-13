@@ -33,6 +33,8 @@ jobs:
 
     env:
       DATABASE_URL: postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise
+      # pytest creates and resets this separate database (tests/conftest.py).
+      TEST_DATABASE_URL: postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise_test
 
     steps:
       - uses: actions/checkout@v5

@@ -2,35 +2,46 @@
 
 Builds a FastAPI app bound to:
 
-- An in-memory SQLite database with the ORM models created from
-  ``Base.metadata`` (sufficient for user-model tests; the production schema
-  is managed by Alembic migrations exercised in CI against Postgres).
+- A real Postgres test database (``TEST_DATABASE_URL``, default: the
+  docker-compose container) migrated with Alembic, so tests exercise the same
+  schema, constraints and RLS settings as Supabase. Each test runs inside a
+  transaction that is rolled back afterwards.
 - A ``JwtVerifier`` configured with a locally generated ES256 keypair whose
   public key is served through an in-memory ``PyJWKClient`` stub.
 """
 
 from __future__ import annotations
 
+import os
 import time
 import uuid
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import jwt
 import pytest
+from alembic.config import Config as AlembicConfig
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from jwt.algorithms import ECAlgorithm
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy import Connection, Engine, create_engine, make_url, text
+from sqlalchemy.engine import URL
+from sqlalchemy.orm import Session
 
-from app.db.session import Base, get_db
+from alembic import command
+from app.db.session import get_db
 from app.main import create_app
 from app.modules.auth import dependencies as auth_deps
 from app.modules.auth.dependencies import JwtVerifier
+
+API_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_TEST_DATABASE_URL = (
+    "postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise_test"
+)
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 AUDIENCE = "authenticated"
 TEST_USER_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
@@ -73,21 +84,86 @@ def key_material() -> _KeyMaterial:
     return _KeyMaterial()
 
 
-@pytest.fixture()
-def app_with_db(key_material: _KeyMaterial) -> Iterator[FastAPI]:
-    engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
-        future=True,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    TestingSession = sessionmaker(
-        bind=engine, autoflush=False, autocommit=False, expire_on_commit=False
-    )
+def _test_database_url() -> URL:
+    """Resolve the test DB URL and refuse anything that isn't local.
 
+    Tests drop and recreate the ``public`` schema, so pointing them at
+    Supabase (``DATABASE_URL`` in ``services/api/.env``) would wipe real data.
+    That is why this reads ``TEST_DATABASE_URL`` and never ``DATABASE_URL``.
+    """
+
+    url = make_url(os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_DATABASE_URL))
+    if url.host not in LOCAL_HOSTS:
+        raise pytest.UsageError(
+            f"TEST_DATABASE_URL must point at a local Postgres, got host {url.host!r}."
+        )
+    if not url.database or not url.database.endswith("_test"):
+        raise pytest.UsageError(
+            "TEST_DATABASE_URL must name a database ending in '_test' "
+            f"(got {url.database!r}); the suite resets its schema."
+        )
+    return url
+
+
+def _ensure_database_exists(url: URL) -> None:
+    admin = create_engine(url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    try:
+        with admin.connect() as conn:
+            exists = conn.execute(
+                text("SELECT 1 FROM pg_database WHERE datname = :name"),
+                {"name": url.database},
+            ).scalar()
+            if not exists:
+                conn.execute(text(f'CREATE DATABASE "{url.database}"'))
+    finally:
+        admin.dispose()
+
+
+@pytest.fixture(scope="session")
+def db_engine() -> Iterator[Engine]:
+    """Fresh, fully migrated Postgres database shared by the whole run."""
+
+    url = _test_database_url()
+    _ensure_database_exists(url)
+    engine = create_engine(url)
+
+    with engine.begin() as conn:
+        conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
+        alembic_cfg = AlembicConfig(str(API_ROOT / "alembic.ini"))
+        alembic_cfg.attributes["connection"] = conn
+        command.upgrade(alembic_cfg, "head")
+
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture()
+def db_connection(db_engine: Engine) -> Iterator[Connection]:
+    """A connection inside an outer transaction that is always rolled back."""
+
+    conn = db_engine.connect()
+    outer = conn.begin()
+    try:
+        yield conn
+    finally:
+        outer.rollback()
+        conn.close()
+
+
+@pytest.fixture()
+def app_with_db(key_material: _KeyMaterial, db_connection: Connection) -> Iterator[FastAPI]:
     def _override_get_db() -> Iterator[Session]:
-        session = TestingSession()
+        # ``create_savepoint`` turns the app's ``commit()`` calls into savepoint
+        # releases, so the outer rollback in ``db_connection`` still undoes them.
+        session = Session(
+            bind=db_connection,
+            join_transaction_mode="create_savepoint",
+            autoflush=False,
+            expire_on_commit=False,
+        )
         try:
             yield session
         finally:
@@ -101,8 +177,6 @@ def app_with_db(key_material: _KeyMaterial) -> Iterator[FastAPI]:
         yield app
     finally:
         app.dependency_overrides.clear()
-        Base.metadata.drop_all(engine)
-        engine.dispose()
 
 
 @pytest.fixture()
