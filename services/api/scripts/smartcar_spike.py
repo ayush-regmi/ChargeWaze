@@ -339,14 +339,16 @@ def cmd_webhook(env: dict[str, str]) -> None:
             received = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             print(f"[{received}] {etype} signature_ok={sig_ok} header_present={bool(got)}")
 
+            # Reject unsigned requests first, VERIFY included: answering an unsigned
+            # challenge would let anyone use us as an HMAC oracle and forge signatures.
+            if not sig_ok:
+                self._reply(401, {"error": "bad signature"})
+                return
             if etype == "VERIFY":
                 challenge = str((payload.get("data") or {}).get("challenge", ""))
                 answer = hmac.new(key, challenge.encode(), hashlib.sha256).hexdigest()
                 self._reply(200, {"challenge": answer})
                 save("redacted", "webhook_verify.json", redact(payload))
-                return
-            if not sig_ok:
-                self._reply(401, {"error": "bad signature"})
                 return
 
             n = sum(1 for _ in log.open()) + 1 if log.exists() else 1

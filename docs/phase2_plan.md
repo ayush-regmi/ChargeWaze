@@ -224,7 +224,7 @@ F4 and F5 don't touch the same files and could run in parallel once F3 lands; we
 **Backend**
 - `POST /api/v1/webhooks/smartcar` (no Supabase auth). Steps exactly per arch §5:
   1. Read the **raw body** (before JSON parsing) and verify the signature. Fail → 401 `WEBHOOK_SIGNATURE_INVALID`, nothing persisted, nothing logged except the reason.
-  2. If it's a verification/challenge event (if V3 has one), answer the challenge and return.
+  2. If `eventType == "VERIFY"`, answer `{"challenge": hmac_hex(management_token, data.challenge)}` and return. Only reached after step 1 passes: never answer an unsigned challenge (it would act as an HMAC oracle for forging signatures).
   3. Parse with the F2 Pydantic schema; malformed → 400 (signed but bad payload won't fix itself on retry).
   4. Look up the vehicle by `smartcar_vehicle_id`. Unknown or `disconnected` → 200 `{accepted: false}` (D12).
   5. In **one DB transaction**: insert one `vehicle_telemetry` row per signal with `INSERT … ON CONFLICT DO NOTHING` on the dedup index; then update `vehicles.latest_state` per signal only where incoming `recorded_at` ≥ stored (D5). Use `SELECT … FOR UPDATE` on the vehicle row so concurrent deliveries don't lose updates.
@@ -240,6 +240,7 @@ F4 and F5 don't touch the same files and could run in parallel once F3 lands; we
 **Tests** (`tests/test_webhook_smartcar.py`) — these are the roadmap's required ones:
 - Invalid signature → 401, zero rows written.
 - Missing signature header → 401.
+- Unsigned / badly signed `VERIFY` → 401, no challenge answer returned.
 - Valid event → telemetry rows + `latest_state` updated.
 - **Duplicate** event delivered twice → same row count, 200 both times.
 - **Out-of-order**: newer event then older event → `latest_state` keeps the newer values; both rows stored in `vehicle_telemetry`.
