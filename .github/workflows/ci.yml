@@ -37,7 +37,7 @@ jobs:
       TEST_DATABASE_URL: postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise_test
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -103,7 +103,7 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'pull_request'
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
