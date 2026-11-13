@@ -6,23 +6,6 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 import { createApi } from "@/lib/api";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 
-type Preferences = {
-  units: string;
-  reserve_soc: number;
-  preferred_charge_to: number;
-  max_detour_minutes: number;
-  preferred_networks: string[];
-  primary_vehicle_id: string | null;
-};
-
-type MeBody = {
-  id: string;
-  display_name: string | null;
-  email: string | null;
-  created_at: string;
-  preferences: Preferences;
-};
-
 export default function ProfilePage() {
   return (
     <Suspense
@@ -45,13 +28,10 @@ async function ProfileDetails() {
   }
 
   const api = createApi({ accessToken: session.access_token });
-  const result = await api.GET("/api/v1/me");
+  const { data: me, error } = await api.GET("/api/v1/me");
 
-  // openapi-fetch returns a discriminated union { data } | { error }. Narrow
-  // with `in` so TypeScript selects the right branch cleanly.
-  if (!("data" in result) || result.data === undefined) {
-    const detail =
-      "error" in result ? JSON.stringify(result.error) : "unknown error";
+  if (!me) {
+    const detail = error ? JSON.stringify(error) : "unknown error";
     return (
       <section className="mx-auto max-w-2xl space-y-4">
         <h1 className="text-2xl font-semibold">Profile</h1>
@@ -60,7 +40,6 @@ async function ProfileDetails() {
     );
   }
 
-  const me = result.data as unknown as MeBody;
   const createdAt = new Date(me.created_at).toLocaleString();
 
   return (
