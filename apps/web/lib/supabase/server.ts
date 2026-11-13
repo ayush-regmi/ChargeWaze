@@ -6,7 +6,7 @@ import { env } from "@/lib/env";
 /**
  * Supabase client for Server Components, Route Handlers, and Server Actions.
  * Reads and writes cookies through Next.js' async cookies API so that
- * middleware-refreshed sessions stay in sync.
+ * proxy-refreshed sessions stay in sync.
  */
 export async function createClient() {
   const cookieStore = await cookies();
@@ -22,7 +22,7 @@ export async function createClient() {
           );
         } catch {
           // `cookies().set` can throw in some Server Component contexts.
-          // Middleware handles refresh, so this is safe to ignore here.
+          // The proxy handles refresh, so this is safe to ignore here.
         }
       },
     },

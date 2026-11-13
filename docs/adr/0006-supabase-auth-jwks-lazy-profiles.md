@@ -19,7 +19,7 @@ Supabase Auth is already in the stack (ADR 0001). Modern Supabase projects sign 
 
 ## Decision
 
-1. **Session issuance** happens in Supabase Auth. The Next.js app uses `@supabase/ssr` to maintain the session via secure cookies, and relies on middleware to refresh and gate routes.
+1. **Session issuance** happens in Supabase Auth. The Next.js app uses `@supabase/ssr` to maintain the session via secure cookies, and relies on `proxy.ts` (formerly middleware) to refresh and gate routes.
 2. **Backend JWT verification** uses `PyJWT`'s `PyJWKClient` against `SUPABASE_JWKS_URL`. HS256 via `SUPABASE_JWT_SECRET` stays as a fallback for legacy projects. The JWKS client caches keys automatically; the backend never calls Supabase per request.
 3. **Required claims:** signature valid, `exp` not expired, `aud == SUPABASE_JWT_AUDIENCE` (default `authenticated`). Missing or malformed claims produce `401 UNAUTHENTICATED` in the Chargewise error envelope.
 4. **Profiles are created lazily.** The first authenticated request to `GET /api/v1/me` upserts `profiles` (keyed by the Supabase `sub` UUID) and seeds a default `user_preferences` row in the same transaction. No webhooks from Supabase into the backend; no service-role calls on the hot path.

@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
+import { Suspense } from "react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { createApi } from "@/lib/api";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
-
-export const dynamic = "force-dynamic";
 
 type Preferences = {
   units: string;
@@ -23,7 +23,18 @@ type MeBody = {
   preferences: Preferences;
 };
 
-export default async function ProfilePage() {
+export default function ProfilePage() {
+  return (
+    <Suspense
+      fallback={<p className="text-sm text-neutral-500">Loading profile…</p>}
+    >
+      <ProfileDetails />
+    </Suspense>
+  );
+}
+
+async function ProfileDetails() {
+  await connection();
   const supabase = await createSupabaseClient();
   const {
     data: { session },

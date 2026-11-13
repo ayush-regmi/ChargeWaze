@@ -7,7 +7,7 @@ import { TopBar } from "@/components/nav/top-bar";
 /**
  * Chrome shared by every signed-in app route: top bar, desktop sidebar on
  * medium screens and up, mobile tab bar on narrow screens. Slice 2 wraps this
- * layout with an auth guard via `middleware.ts`.
+ * layout with an auth guard via `proxy.ts`.
  */
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (

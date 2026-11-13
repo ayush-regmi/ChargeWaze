@@ -275,7 +275,7 @@ Rules:
 
 - Latency target for `POST /api/v1/routes/plan`: ~3 s for a trip under ~500 mi using the deterministic optimizer; document measured numbers in roadmap deliverables.
 - Smartcar quota: assume a modest free-tier plan; cache the latest state in `vehicles` so Dashboard reads never require a live Smartcar call.
-- Secrets live only in deployment-provider secret stores or `.env` files that are gitignored; `.env.example` is the only committed template.
+- Secrets live only in deployment-provider secret stores or `.env` files that are gitignored; the per-app `.env.example` files (`services/api/`, `apps/web/`) are the only committed templates.
 
 ## 11. Open architectural questions
 
