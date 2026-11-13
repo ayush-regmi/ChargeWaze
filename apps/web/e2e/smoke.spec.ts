@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test.describe("signed-out smoke", () => {
   test("/profile redirects to /sign-in", async ({ page }) => {
     const response = await page.goto("/profile");
-    // Middleware issues a 3xx to /sign-in.
+    // The proxy issues a 3xx to /sign-in.
     expect(page.url()).toMatch(/\/sign-in/);
     expect(response?.status()).toBeLessThan(500);
     await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();

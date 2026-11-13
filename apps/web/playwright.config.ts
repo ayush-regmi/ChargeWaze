@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * Playwright smoke suite.
  *
- * The default run only exercises the sign-in route and middleware redirect —
+ * The default run only exercises the sign-in route and proxy redirect —
  * no real Supabase credentials required. A credentialed end-to-end flow
  * (email sign-up, Google, Apple) runs in a separate manually triggered
  * workflow with secrets, documented in docs/development-roadmap.md.

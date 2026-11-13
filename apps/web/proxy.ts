@@ -8,7 +8,7 @@ import { env } from "@/lib/env";
  * from authenticated app routes. Follows the pattern in the Supabase +
  * Next.js App Router guide.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(env.supabaseUrl, env.supabaseAnonKey, {
