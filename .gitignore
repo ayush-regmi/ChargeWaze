@@ -1,11 +1,12 @@
 # =========================
 # Agentic / tool-local files
-# Keep AI-assistant instructions out of the public repo.
-# Each contributor keeps their own local copy of CLAUDE.md and AGENTS.md.
+# CLAUDE.md, AGENTS.md, and .cursor/rules/ are committed (ADR 0007).
+# Personal overrides and tool state stay local.
 # =========================
-CLAUDE.md
-AGENTS.md
-.cursor/
+CLAUDE.local.md
+AGENTS.local.md
+.cursor/*
+!.cursor/rules/
 .cursorignore
 .cursorrules
 .claude/
