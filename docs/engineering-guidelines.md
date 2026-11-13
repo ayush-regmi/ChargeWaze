@@ -1,6 +1,6 @@
 # Chargewise Engineering Guidelines
 
-These are the rules every human contributor follows. They mirror the private `CLAUDE.md` / `AGENTS.md` files that AI coding assistants load locally — this file is the public, committed version.
+These are the rules every contributor follows, human or AI. This file is the single source of truth; [`CLAUDE.md`](../CLAUDE.md) and [`AGENTS.md`](../AGENTS.md) point AI assistants here (see [ADR 0007](adr/0007-commit-agent-instructions.md)).
 
 Before you start a task:
 
@@ -24,7 +24,8 @@ If the docs contradict each other, flag it in your PR and propose a fix before w
 ## Architecture
 
 - Business logic lives inside FastAPI, not Next.js.
-- The browser never calls private provider APIs directly. All third-party calls (Smartcar, Mapbox server-side, AFDC, weather) go through adapters in [`services/api/app/integrations/`](../services/api).
+- The browser never calls private provider APIs directly. All third-party calls (Smartcar, Mapbox server-side, AFDC, weather) go through adapters in [`services/api/app/integrations/`](../services/api). Nothing else imports vendor SDKs directly.
+- Smartcar is V3 only. Ignore V2 tutorials and per-vehicle refresh-token patterns.
 - Chargewise is a modular monolith. Modules depend down, not across. See [`architecture.md`](architecture.md#3-module-layout-modular-monolith).
 - REST endpoints live under `/api/v1/*`. Breaking changes land under a new major version, not in place. See [`api-contracts.md`](api-contracts.md).
 - API schemas stay consistent across endpoints (timestamps, units, error envelope, freshness fields).
@@ -42,7 +43,7 @@ If the docs contradict each other, flag it in your PR and propose a fix before w
 
 ## Security
 
-- Never commit secrets or credentials. The only committed env file is [`.env.example`](../.env.example).
+- Never commit secrets or credentials. The only committed env files are the templates [`services/api/.env.example`](../services/api/.env.example) and [`apps/web/.env.example`](../apps/web/.env.example).
 - Smartcar secrets (`SMARTCAR_CLIENT_SECRET`, `SMARTCAR_WEBHOOK_SECRET`, the Mapbox secret token) never go into `NEXT_PUBLIC_*` env vars or the browser bundle.
 - Check ownership for every user-owned resource (`vehicles`, `planned_trips`, `observed_trips`, `vehicle_telemetry`). "Not owned by the caller" returns 404, not 403 with a leak.
 - Validate Smartcar webhook signatures before persisting anything. See [`architecture.md`](architecture.md#5-webhook-ingestion-rules).
@@ -101,4 +102,4 @@ Never guess commands — run them to confirm they work before adding them here o
 
 ## Agent-assisted development
 
-Local, gitignored files (`CLAUDE.md`, `AGENTS.md`, `.cursor/`, `.claude/`) carry the same rules for AI assistants. If you add a new rule here, update those local files too so agents follow the same guidance.
+[`CLAUDE.md`](../CLAUDE.md), [`AGENTS.md`](../AGENTS.md), and `.cursor/rules/` are committed and link here instead of repeating these rules. Add or change rules in this file only. Personal agent overrides go in gitignored `CLAUDE.local.md` / `AGENTS.local.md`.

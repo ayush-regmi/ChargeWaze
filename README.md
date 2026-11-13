@@ -4,7 +4,7 @@ A full-stack EV intelligence and route-planning platform. Chargewise combines co
 
 > Given my vehicle's current battery level, where I want to go, the weather, and available charging infrastructure, what is the most efficient and reliable way to complete my trip?
 
-**Status: specification phase (branch `starter`).** This branch contains the specs, ADRs, and a committed repo skeleton. No application code has been written yet.
+**Status: Phase 1 complete.** The monorepo scaffolds, Supabase Auth, `GET /api/v1/me`, and CI are on `main`. Phase 2 (Smartcar V3 vehicle integration) is next.
 
 ## MVP demo flow
 
@@ -23,11 +23,11 @@ Full acceptance criteria are in [`docs/product-requirements.md`](docs/product-re
 ```
 chargewise/
 ├── apps/
-│   └── web/                 # Next.js + TypeScript frontend (empty — Phase 1)
+│   └── web/                 # Next.js + TypeScript frontend (.env.example inside)
 ├── services/
-│   └── api/                 # FastAPI backend, modular monolith (empty — Phase 1)
+│   └── api/                 # FastAPI backend, modular monolith (.env.example inside)
 ├── packages/
-│   └── api-client/          # Typed client generated from FastAPI's OpenAPI (empty — Phase 1)
+│   └── api-client/          # Typed client generated from FastAPI's OpenAPI
 ├── ml/
 │   ├── notebooks/
 │   ├── training/
@@ -37,7 +37,8 @@ chargewise/
 ├── fixtures/
 │   ├── smartcar/            # Mocked Smartcar responses + signed webhook payloads
 │   └── routes/              # Mapbox / AFDC fixtures
-├── .env.example
+├── CLAUDE.md                # Agent instructions (points to docs/engineering-guidelines.md)
+├── AGENTS.md
 └── README.md
 ```
 
@@ -55,10 +56,10 @@ Start here, in this order:
 
 ## Current status
 
-- [x] Starter branch with specs and ADRs
+- [x] Specs and ADRs
 - [x] Phase 1 slice 1 — monorepo scaffolds (Next.js app shell, FastAPI `/health`, typed API client)
 - [x] Phase 1 slice 2 — Supabase Auth (email/password + Google; Apple behind a flag) with `GET /api/v1/me`
-- [ ] Phase 1 slice 3 — CI green on `main`
+- [x] Phase 1 slice 3 — CI green on `main`
 - [ ] Phase 2 — Vehicle integration (Smartcar V3 Connect + webhooks)
 - [ ] Phase 3 — Maps and chargers
 - [ ] Phase 4 — Charging-aware trip planner
@@ -90,5 +91,5 @@ Daily commands:
 ## Notes for contributors (human and AI)
 
 - Repository-wide engineering rules live in [`docs/engineering-guidelines.md`](docs/engineering-guidelines.md). Read it before your first PR.
-- AI assistants pick up the same rules from local `CLAUDE.md` / `AGENTS.md` files. Those files are intentionally **gitignored** so each contributor keeps their own copy; the committed source of truth is [`docs/engineering-guidelines.md`](docs/engineering-guidelines.md).
+- AI assistants load the committed [`CLAUDE.md`](CLAUDE.md) / [`AGENTS.md`](AGENTS.md), which point back to the guidelines rather than copying them (see [ADR 0007](docs/adr/0007-commit-agent-instructions.md)). Personal overrides go in a gitignored `CLAUDE.local.md`.
 - Secrets never leave backend code. In particular, no Smartcar secret ever ends up in a `NEXT_PUBLIC_*` env var or the browser bundle.

@@ -6,8 +6,8 @@ FastAPI backend for Chargewise (modular monolith). See [`../../docs/architecture
 
 ```bash
 # From services/api/
-uv sync
-cp ../../.env.example .env   # fill in local values; never commit .env
+uv sync --group dev
+cp .env.example .env   # fill in local values; never commit .env
 uv run fastapi dev app/main.py
 ```
 

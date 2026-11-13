@@ -1,13 +1,13 @@
 # Chargewise — Development Roadmap
 
-Status: **Draft (specification phase)** · Last updated: 2026-11-06
+Status: **Phase 1 complete; Phase 2 next** · Last updated: 2026-11-12
 
 Delivery plan for Chargewise. Estimates assume part-time development with Claude Code / Cursor and real testing. They are planning estimates, not deadlines.
 
 ## 0. Immediate actions (do these first, in order)
 
 1. **Verify Smartcar V3 end-to-end against the real 2026 Toyota bZ.** Confirm which signals the manufacturer actually exposes, make one real authorized read, and persist one normalized record. If V3 doesn't deliver what the PRD assumes, the rest of the plan needs to change before Phase 1 starts.
-2. **Finalize the starter spec.** This repo (branch `starter`) — `CLAUDE.md`, the five `docs/*.md` files, and the ADRs — is the deliverable for this phase.
+2. **Finalize the starter spec.** Done: `CLAUDE.md`, the five `docs/*.md` files, and the ADRs are on `main`.
 3. **Build vertical slice 1** (Phase 1 ends here): a user can sign in, navigate the app, and call an authenticated FastAPI endpoint.
 4. **Build vertical slice 2** (Phase 2 ends here): the Toyota is connected, telemetry flows via webhooks, and the Dashboard shows real battery state.
 5. **Map routing before charging-aware routing.** Get plain Mapbox directions and station search working before adding the optimizer.
@@ -18,7 +18,9 @@ Do not start ML training, complex animations, or a React Native app until the co
 
 Each phase ends when its **completion criteria** are satisfied. "Done" means tests run and pass, not "it rendered once".
 
-### Phase 1 — Foundation (Weeks 1–2)
+### Phase 1 — Foundation (Weeks 1–2) — complete
+
+Status: done. Merged in [PR #1](https://github.com/ayush-regmi/ChargeWise/pull/1) with CI green on `main`; verified against hosted Supabase on 2026-11-12. A follow-up migration enables Row Level Security (no policies) on every `public` table, so Supabase's Data API cannot read Chargewise tables with the publishable key. FastAPI connects as the table owner and is unaffected.
 
 **Scope**
 
@@ -27,7 +29,7 @@ Each phase ends when its **completion criteria** are satisfied. "Done" means tes
 - FastAPI app with health check, CORS config, Supabase JWT verification, and the `auth` and `users` modules.
 - Supabase project created; `profiles` and `user_preferences` tables managed via Alembic.
 - First `GET /api/v1/me` wired end-to-end.
-- Local dev scripts, `.env.example` consumed, committed `.env` prohibited.
+- Local dev scripts, per-app `.env.example` templates consumed, committed `.env` prohibited.
 - CI (GitHub Actions): lint, type-check, pytest, Vitest, Alembic up/down round-trip, Playwright smoke on the auth flow.
 
 **Completion criteria**
