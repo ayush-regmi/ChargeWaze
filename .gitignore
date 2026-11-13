@@ -139,3 +139,6 @@ Thumbs.db
 logs/
 tmp/
 .tmp/
+
+# Smartcar spike output (contains real vehicle/user IDs)
+services/api/scripts/spike_out/
