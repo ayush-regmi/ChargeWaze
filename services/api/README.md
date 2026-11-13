@@ -11,7 +11,10 @@ cp .env.example .env   # fill in local values; never commit .env
 uv run fastapi dev app/main.py
 ```
 
-Run tests, lint, and types:
+Run tests, lint, and types. The tests need the local Postgres container
+(`docker compose up -d` from the repo root). They create and reset a
+`chargewise_test` database and refuse to run against any non-local host, so
+they can never touch Supabase. Override with `TEST_DATABASE_URL` if needed.
 
 ```bash
 uv run pytest

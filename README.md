@@ -74,7 +74,7 @@ Setup once per machine:
 
 1. Install Node (see [`.nvmrc`](.nvmrc)) and `npm`.
 2. `brew install uv` on macOS (or use the official uv installer).
-3. Install Docker if you want the local Postgres container (hosted Supabase handles day-to-day dev).
+3. Install Docker. The backend test suite runs against the local Postgres container (`docker compose up -d`); hosted Supabase handles day-to-day dev.
 4. From the repo root, run `npm install`.
 5. Copy [`services/api/.env.example`](services/api/.env.example) → `services/api/.env` and fill in your Supabase values.
 6. Copy [`apps/web/.env.example`](apps/web/.env.example) → `apps/web/.env.local` and fill in `NEXT_PUBLIC_*` values.

@@ -26,8 +26,8 @@ from sqlalchemy.sql import func
 
 from app.db.session import Base
 
-# JSONB on Postgres, portable JSON on SQLite (used by tests when no Postgres
-# container is available). Postgres production migrations still land JSONB.
+# JSONB on Postgres. The JSON fallback only matters for non-Postgres engines;
+# the test suite runs on Postgres (see tests/conftest.py).
 JSON_TYPE = JSON().with_variant(JSONB(), "postgresql")
 # Native uuid on Postgres, 32-char string on SQLite.
 UUID_TYPE = Uuid(as_uuid=True)
