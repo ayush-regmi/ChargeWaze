@@ -11,26 +11,23 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    JSON,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Integer,
     Numeric,
     String,
-    Uuid,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.db.session import Base
+from app.db.types import JSON_TYPE, UUID_TYPE
 
-# JSONB on Postgres. The JSON fallback only matters for non-Postgres engines;
-# the test suite runs on Postgres (see tests/conftest.py).
-JSON_TYPE = JSON().with_variant(JSONB(), "postgresql")
-# Native uuid on Postgres, 32-char string on SQLite.
-UUID_TYPE = Uuid(as_uuid=True)
+# ``user_preferences.primary_vehicle_id`` references ``vehicles.id``. Loading the
+# vehicle models here registers that table on ``Base.metadata`` wherever these
+# models are used, or SQLAlchemy raises NoReferencedTableError at flush time.
+from app.modules.vehicles import models as _vehicles_models  # noqa: F401
 
 
 class Profile(Base):
@@ -78,7 +75,17 @@ class UserPreferences(Base):
     preferred_networks: Mapped[list[str]] = mapped_column(
         JSON_TYPE, nullable=False, default=list, server_default="[]"
     )
-    primary_vehicle_id: Mapped[uuid.UUID | None] = mapped_column(UUID_TYPE, nullable=True)
+    # FK into the vehicles module (added in migration 20261113_01). SET NULL so
+    # deleting a vehicle row never deletes the user's preferences.
+    primary_vehicle_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID_TYPE,
+        ForeignKey(
+            "vehicles.id",
+            ondelete="SET NULL",
+            name="user_preferences_primary_vehicle_id_fkey",
+        ),
+        nullable=True,
+    )
 
     profile: Mapped[Profile] = relationship("Profile", back_populates="preferences")
 

@@ -1,6 +1,6 @@
 # Chargewise — Database Design
 
-Status: **Draft (specification phase)** · Last updated: 2026-11-06
+Status: **Draft (specification phase)** · Last updated: 2026-11-13
 
 Postgres schema for the modular monolith. Owned by the backend only; the frontend never connects to the database directly. Managed with SQLAlchemy models and Alembic migrations under [`services/api/alembic/`](../services/api/alembic/).
 
@@ -48,6 +48,7 @@ erDiagram
         uuid user_id FK
         text smartcar_vehicle_id
         text smartcar_user_id
+        text smartcar_connection_id
         text make
         text model
         int year
@@ -55,6 +56,7 @@ erDiagram
         jsonb supported_signals
         jsonb latest_state
         timestamptz connected_at
+        timestamptz disconnected_at
         boolean is_simulated
     }
     vehicle_specs {
@@ -169,18 +171,21 @@ Constraints:
 | `id` | `uuid` PK | |
 | `user_id` | `uuid` FK → `profiles.id` ON DELETE CASCADE | |
 | `smartcar_vehicle_id` | `text` | Nullable for simulated vehicles. |
-| `smartcar_user_id` | `text` | Nullable for simulated vehicles. |
-| `make` | `text` | |
-| `model` | `text` | |
-| `year` | `int` | |
-| `connection_status` | `text` | `'connected'`, `'disconnected'`, `'pending'`. |
-| `supported_signals` | `jsonb` | Array of signal codes returned by Smartcar for this vehicle. |
-| `latest_state` | `jsonb` | Cached snapshot: `{ recorded_at, received_at, signals: {...} }`. Updated by the webhook ingestor. |
+| `smartcar_user_id` | `text` | Nullable for simulated vehicles. Smartcar V3 stores no per-user tokens; the application token + this ID are enough ([`smartcar-v3-notes.md`](smartcar-v3-notes.md)). |
+| `smartcar_connection_id` | `text` | Nullable. Smartcar V3 connection ID, used by disconnect (`DELETE /v3/connections/{id}`). |
+| `make` | `text` | Not null. |
+| `model` | `text` | Not null. |
+| `year` | `int` | Not null. |
+| `connection_status` | `text` | `'connected'`, `'disconnected'`, `'pending'`. Default `'pending'`. |
+| `supported_signals` | `jsonb` | Array of signal codes returned by Smartcar for this vehicle. Default `[]`. |
+| `latest_state` | `jsonb` | Cached snapshot: `{ recorded_at, received_at, signals: {...} }`. Updated by the webhook ingestor. `NULL` until the first event arrives. |
 | `connected_at` | `timestamptz` | Nullable. |
+| `disconnected_at` | `timestamptz` | Nullable. Set on disconnect, cleared on reconnect. |
 | `is_simulated` | `boolean` | Default `false`. |
 
-Indexes:
-- `UNIQUE (user_id, smartcar_vehicle_id) WHERE smartcar_vehicle_id IS NOT NULL` — prevents duplicate connects of the same real vehicle.
+Constraints and indexes:
+- `CHECK (connection_status IN ('connected', 'disconnected', 'pending'))`.
+- `UNIQUE (user_id, smartcar_vehicle_id) WHERE smartcar_vehicle_id IS NOT NULL` — prevents duplicate connects of the same real vehicle. Reconnecting a disconnected vehicle reactivates its existing row.
 - `INDEX (user_id, connection_status)`.
 
 ### 3.4 `vehicle_specs`
@@ -190,9 +195,9 @@ One-to-one with `vehicles`. Separated so vendor-provided and user-configured spe
 | Column | Type | Notes |
 |---|---|---|
 | `vehicle_id` | `uuid` PK FK → `vehicles.id` ON DELETE CASCADE | |
-| `usable_capacity_kwh` | `numeric(6,2)` | User-editable; defaults seeded per make/model. |
-| `connectors` | `jsonb` | e.g. `["NACS", "J1772", "CCS1"]`. |
-| `charging_curve` | `jsonb` | Piecewise `[{soc, power_kw}, ...]`. |
+| `usable_capacity_kwh` | `numeric(6,2)` | User-editable; defaults seeded per make/model from a static catalog. `NULL` when unknown (never guessed). `CHECK (> 0)`. |
+| `connectors` | `jsonb` | e.g. `["NACS", "J1772", "CCS1"]`. Default `[]`. |
+| `charging_curve` | `jsonb` | Piecewise `[{soc, power_kw}, ...]`. Default `[]`. |
 
 ### 3.5 `vehicle_telemetry`
 
@@ -204,11 +209,11 @@ Append-only log of every signal reading.
 | `vehicle_id` | `uuid` FK → `vehicles.id` ON DELETE CASCADE | |
 | `recorded_at` | `timestamptz` | Provider timestamp. |
 | `received_at` | `timestamptz` | Server receive time. Default `now()`. |
-| `source` | `text` | `'smartcar'`, `'manual'`, `'simulated'`. |
+| `source` | `text` | `'smartcar'`, `'manual'`, `'simulated'` (`CHECK`). |
 | `source_event_id` | `text` | Smartcar event ID for deduplication; nullable for manual. |
 | `signal_code` | `text` | e.g. `soc`, `odometer`, `range`, `charging_status`. |
-| `value` | `numeric` | Raw numeric. For booleans use 0/1 and document in a code table. |
-| `unit` | `text` | e.g. `percent`, `km`, `kwh`. |
+| `value` | `numeric` | Raw numeric. For booleans use 0/1 and document in a code table. Nullable when the signal has no numeric value (kept in `raw_payload`). |
+| `unit` | `text` | e.g. `percent`, `km`, `kwh`. Nullable. |
 | `raw_payload` | `jsonb` | Full normalized signal entry for auditability. |
 | `is_simulated` | `boolean` | Default `false`. |
 
