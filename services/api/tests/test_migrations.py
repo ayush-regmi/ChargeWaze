@@ -25,3 +25,22 @@ def test_every_public_table_has_rls_enabled(db_connection: Connection) -> None:
         )
     ).scalars().all()
     assert missing == [], f"Tables without row level security: {missing}"
+
+
+def test_models_match_migrated_schema(db_connection: Connection) -> None:
+    """Models and migrations must describe the same schema.
+
+    Catches a column, index or constraint that was added to one but not the other.
+    """
+
+    from alembic.autogenerate import compare_metadata
+    from alembic.migration import MigrationContext
+
+    import app.modules.users.models  # noqa: F401  (registers every model)
+    from app.db.session import Base
+
+    context = MigrationContext.configure(
+        db_connection, opts={"compare_type": True, "compare_server_default": False}
+    )
+    diff = compare_metadata(context, Base.metadata)
+    assert diff == [], f"Schema drift between models and migrations: {diff}"
