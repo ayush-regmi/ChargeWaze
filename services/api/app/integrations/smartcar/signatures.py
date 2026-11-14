@@ -12,9 +12,13 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import re
 from collections.abc import Mapping
 
 SIGNATURE_HEADER = "SC-Signature"
+# Hex SHA-256 digest. Anything else (including non-ASCII) is rejected before
+# compare_digest, which raises TypeError on non-ASCII str input.
+_SIGNATURE_RE = re.compile(r"[0-9a-fA-F]{64}")
 
 
 def compute_signature(raw_body: bytes, management_token: str) -> str:
@@ -36,8 +40,11 @@ def verify_webhook_signature(
     provided = _get_header(headers, SIGNATURE_HEADER)
     if not provided:
         return False
+    candidate = provided.strip()
+    if not _SIGNATURE_RE.fullmatch(candidate):
+        return False
     expected = compute_signature(raw_body, management_token)
-    return hmac.compare_digest(expected, provided.strip().lower())
+    return hmac.compare_digest(expected, candidate.lower())
 
 
 def verify_challenge_response(challenge: str, management_token: str) -> str:

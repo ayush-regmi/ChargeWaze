@@ -7,13 +7,21 @@ changes don't break parsing.
 
 from __future__ import annotations
 
+import copy
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ModelWrapValidatorHandler,
+    PrivateAttr,
+    model_validator,
+)
 from pydantic.alias_generators import to_camel
 
 logger = logging.getLogger(__name__)
@@ -147,6 +155,31 @@ class SignalMeta(_SmartcarModel):
     retrieved_at: datetime | int | float | str | None = None
 
 
+class _KeepsRawPayload(_SmartcarModel):
+    """Keeps an untouched copy of the input dict.
+
+    The typed fields drop anything we don't model (e.g. ``meta.ingestedAt``,
+    an error's ``detail``/``resolution``); ``raw_payload`` is what Smartcar
+    actually sent, for ``vehicle_telemetry.raw_payload``.
+    """
+
+    _raw_payload: dict[str, Any] = PrivateAttr(default_factory=dict)
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _keep_raw_payload(cls, data: Any, handler: ModelWrapValidatorHandler[Any]) -> Any:
+        model = handler(data)
+        if isinstance(data, dict):
+            model._raw_payload = copy.deepcopy(data)
+        return model
+
+    @property
+    def raw_payload(self) -> dict[str, Any]:
+        if self._raw_payload:
+            return copy.deepcopy(self._raw_payload)
+        return self.model_dump(mode="json", by_alias=True, exclude_none=True)
+
+
 class _RestSignalAttributes(_SmartcarModel):
     # Optional so a redacted placeholder (no code/status) parses and is skipped.
     code: str | None = None
@@ -156,7 +189,7 @@ class _RestSignalAttributes(_SmartcarModel):
     body: dict[str, Any] | None = None
 
 
-class RestSignal(_SmartcarModel):
+class RestSignal(_KeepsRawPayload):
     id: str
     attributes: _RestSignalAttributes
     meta: SignalMeta = Field(default_factory=SignalMeta)
@@ -172,7 +205,7 @@ class SignalsResponse(_SmartcarModel):
         return self.included.get("vehicle")
 
 
-class WebhookSignal(_SmartcarModel):
+class WebhookSignal(_KeepsRawPayload):
     code: str
     name: str | None = None
     group: str | None = None
@@ -330,7 +363,7 @@ def _raw_from_rest(signal: RestSignal) -> _RawSignal | None:
         body=attrs.body,
         oem_updated_at=parse_timestamp(signal.meta.oem_updated_at),
         retrieved_at=parse_timestamp(signal.meta.retrieved_at),
-        raw=signal.model_dump(mode="json", by_alias=True, exclude_none=True),
+        raw=signal.raw_payload,
     )
 
 
@@ -348,7 +381,7 @@ def _raw_from_webhook(signal: WebhookSignal) -> _RawSignal:
         body=signal.body,
         oem_updated_at=parse_timestamp(signal.meta.oem_updated_at),
         retrieved_at=parse_timestamp(signal.meta.retrieved_at),
-        raw=signal.model_dump(mode="json", by_alias=True, exclude_none=True),
+        raw=signal.raw_payload,
     )
 
 

@@ -112,6 +112,33 @@ def test_unmapped_signals_keep_raw_payload(bz_signals: list[NormalizedSignal]) -
     assert trunk.raw["attributes"]["status"]["error"]["code"] == "VEHICLE_NOT_CAPABLE"
 
 
+def test_raw_is_the_untouched_rest_payload(bz_signals: list[NormalizedSignal]) -> None:
+    """Fields we don't model (ingestedAt, error detail/resolution) survive in raw."""
+
+    original = {s["id"]: s for s in fixture_json("signals_bz.json")["data"]}
+    for signal in bz_signals:
+        assert signal.raw == original[signal.smartcar_code]
+    trunk = _by_code(bz_signals)["closure-reartrunk"]
+    assert trunk.raw["meta"]["ingestedAt"] == "2026-11-13T21:55:07.991Z"
+    assert trunk.raw["attributes"]["status"]["error"]["resolution"] == {
+        "type": "UNKNOWN_RESOLUTION_TYPE"
+    }
+
+
+def test_raw_is_the_untouched_rest_payload_from_json_bytes() -> None:
+    response = SignalsResponse.model_validate_json(fixture_bytes("signals_bz.json"))
+    original = {s["id"]: s for s in fixture_json("signals_bz.json")["data"]}
+    for signal in normalize_signals(response):
+        assert signal.raw == original[signal.smartcar_code]
+
+
+def test_raw_is_a_copy() -> None:
+    response = SignalsResponse.model_validate(fixture_json("signals_bz.json"))
+    first = normalize_signals(response)[0]
+    first.raw["mutated"] = True
+    assert "mutated" not in normalize_signals(response)[0].raw
+
+
 def test_supported_signals_for_bz(bz_signals: list[NormalizedSignal]) -> None:
     assert supported_signal_codes(bz_signals) == [
         "cable_connected",
@@ -238,6 +265,8 @@ def test_unknown_webhook_signal_is_preserved() -> None:
     assert not unknown.is_known
     assert unknown.value is None
     assert unknown.raw["body"] == {"value": "SOMETHING"}
+    original = fixture_json("webhook_unknown_signal.json")["data"]["signals"]
+    assert [s.raw for s in normalize_signals(event.vehicle_state())] == original
     assert by_code["tractionbattery-stateofcharge"].code == "soc"
 
 

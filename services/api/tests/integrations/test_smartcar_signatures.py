@@ -87,3 +87,21 @@ def test_verify_challenge_response_matches_documented_hmac() -> None:
 
 def test_compute_signature_is_hex_sha256() -> None:
     assert len(compute_signature(b"abc", "k")) == 64
+
+
+def test_malformed_signatures_are_rejected_without_raising() -> None:
+    body, signature = _signed("webhook_vehicle_state.json")
+    for bad in (
+        signature[:-1] + "é",  # non-ASCII: compare_digest would raise TypeError
+        "é" * 64,
+        signature[:-2],  # too short
+        signature + "00",  # too long
+        "z" * 64,  # not hex
+    ):
+        assert not verify_webhook_signature(body, {"SC-Signature": bad}, TEST_MANAGEMENT_TOKEN)
+
+
+def test_signature_with_surrounding_whitespace_is_accepted() -> None:
+    body, signature = _signed("webhook_vehicle_state.json")
+    headers = {"SC-Signature": f"  {signature} "}
+    assert verify_webhook_signature(body, headers, TEST_MANAGEMENT_TOKEN)
