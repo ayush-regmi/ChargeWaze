@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     app_env: AppEnv = "development"
     app_public_demo_mode: bool = False
     allowed_origins: str = "http://localhost:3000"
+    # Where backend-owned redirects (e.g. the Smartcar callback) send the browser.
+    frontend_base_url: str = "http://localhost:3000"
 
     # ---- Database ----
     database_url: str = "postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise"

@@ -52,6 +52,11 @@ def create_app() -> FastAPI:
     _register_v1_routers(v1)
     app.include_router(v1)
 
+    # ---- Internal, non-versioned routes (excluded from OpenAPI) ----
+    from app.modules.vehicles.router import callback_router
+
+    app.include_router(callback_router)
+
     return app
 
 
@@ -65,7 +70,7 @@ def _register_v1_routers(v1: APIRouter) -> None:
 
     import importlib
 
-    for module_path in ("app.modules.users.router",):
+    for module_path in ("app.modules.users.router", "app.modules.vehicles.router"):
         try:
             mod = importlib.import_module(module_path)
         except ImportError:

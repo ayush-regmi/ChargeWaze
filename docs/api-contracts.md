@@ -38,8 +38,10 @@ Reserved codes (grow this list as the API grows):
 | `FORBIDDEN` | 403 | Authenticated but not allowed. |
 | `NOT_FOUND` | 404 | Resource does not exist for the caller. |
 | `VALIDATION_ERROR` | 422 | Request body failed Pydantic validation. |
-| `CONFLICT` | 409 | Duplicate connect, already-saved trip, etc. |
+| `CONFLICT` | 409 | Already-saved trip, etc. (not used for vehicle connect; see §3.3). |
 | `SMARTCAR_UNREACHABLE` | 502/504 | Smartcar failed or timed out. |
+| `SMARTCAR_ERROR` | 502 | Smartcar rejected the request; Smartcar's error code is in `details`. |
+| `SMARTCAR_NOT_CONFIGURED` | 503 | Smartcar credentials, application ID or state secret are not set on the server. |
 | `MAPBOX_UNREACHABLE` | 502/504 | Mapbox failed or timed out. |
 | `STATIONS_UNREACHABLE` | 502/504 | AFDC/OCM failed or timed out. |
 | `ROUTE_INFEASIBLE` | 200 | Returned by `/routes/plan` when no feasible plan exists (see §3.7). |
@@ -114,7 +116,7 @@ Lists only the caller's vehicles.
 
 ### 3.3 `POST /api/v1/vehicles/connect`
 
-Starts a Smartcar Connect flow and returns the authorization URL the frontend redirects the user to. The backend stores a short-lived state nonce tied to the authenticated user.
+Starts a Smartcar Connect flow and returns the authorization URL the frontend redirects the user to. The `state` is a short-lived signed token tied to the authenticated user (no server-side storage).
 
 **Request**
 ```json
@@ -130,9 +132,20 @@ Starts a Smartcar Connect flow and returns the authorization URL the frontend re
 }
 ```
 
-The Smartcar redirect comes back to a backend-owned callback (not a frontend route), which exchanges the code, persists the Smartcar connection, subscribes the webhook, and then 302s back to `redirect_after`. The callback endpoint is **not** part of the public v1 surface — it is an internal URL. Any failure (duplicate connect, authorization denied) surfaces to the frontend as a query-string flag that the Garage page reads.
+`redirect_after` is optional (default `/garage`) and must be a same-origin path: absolute URLs, `//host`, backslashes, control characters, `//` inside the path and dot segments are rejected with `VALIDATION_ERROR`. `state` is a signed 10-minute token; the frontend doesn't need to store it.
 
-**Errors:** `CONFLICT` for a duplicate connect; `UNAUTHENTICATED` without a JWT.
+The Smartcar redirect comes back to a backend-owned callback (`GET /integrations/smartcar/callback`), which is **not** part of the public v1 surface and is excluded from OpenAPI. With `response_type=none` there is no code exchange: the callback verifies `state`, lists the Smartcar user's connections (accepting only those whose `externalId` is the caller's profile ID), stores or reactivates the vehicles, and 302s to `redirect_after` with a `connect` query flag the Garage page reads:
+
+| `connect` | Meaning |
+|---|---|
+| `success` | At least one vehicle was added or reconnected. |
+| `already_connected` | Every authorized vehicle was already connected to this user. |
+| `denied` | The user declined in Smartcar (`error=access_denied`). |
+| `error` | Bad/expired `state`, Smartcar unreachable, no matching connection, or the vehicle is connected to another account. |
+
+Webhook subscription is not done here yet; see F5 in [`phase2_plan.md`](phase2_plan.md).
+
+**Errors:** `UNAUTHENTICATED` without a JWT; `VALIDATION_ERROR` for an unsafe `redirect_after`; `SMARTCAR_NOT_CONFIGURED` (503) if the Smartcar application ID or state secret isn't set. Duplicates never return `CONFLICT` (they can only be detected after authorization).
 
 ### 3.4 `GET /api/v1/vehicles/{id}`
 

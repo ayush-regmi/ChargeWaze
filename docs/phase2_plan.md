@@ -46,7 +46,7 @@ The docs disagree or are silent in a few places. Per `CLAUDE.md` these need a de
 | # | Issue | Where | Recommendation |
 |---|---|---|---|
 | D1 | **Where the Smartcar connection credential lives.** Architecture §4 says the backend exchanges the code "for the Smartcar user token", but `database-design.md` has no table or column for tokens. Under V3 we may only need the application token + `sc-user-id`, or we may need to store per-user tokens. | arch §4, db §3.3 | Decide from the spike (F0). If tokens must be stored, add a `smartcar_connections` table (one row per Chargewise user × Smartcar user) with tokens **encrypted at rest** (Fernet key from env), and document it in `database-design.md`. |
-| D2 | **Connect `state` nonce storage.** API §3.3 says "the backend stores a short-lived state nonce", but there's no table. | api §3.3 | Stateless signed state: a short-lived (10 min) HS256 JWT signed with a new `SMARTCAR_STATE_SECRET`, carrying `user_id`, `redirect_after` and a random `nonce`. Uses PyJWT (already a dependency). No table needed. *(Post-F0: there is no code exchange to make `state` single-use; a replayed `state` within its 10 min lifetime can only re-run the callback for the same user, which D3's duplicate check makes harmless. F3 revisits this.)* |
+| D2 | **Connect `state` nonce storage.** API §3.3 says "the backend stores a short-lived state nonce", but there's no table. | api §3.3 | Stateless signed state: a short-lived (10 min) HS256 JWT signed with a new `SMARTCAR_STATE_SECRET`, carrying `user_id`, `redirect_after` and a random `nonce`. Uses PyJWT (already a dependency). No table needed. *(Post-F0: there is no code exchange to make `state` single-use; a replayed `state` within its 10 min lifetime can only re-run the callback for the same user, which D3's duplicate check makes harmless. **F3 resolution:** the callback only accepts connections whose `externalId` matches the `state` user, so a valid `state` can't be paired with someone else's Smartcar `user_id`.)* |
 | D3 | **Duplicate connect error.** API §3.3 lists `CONFLICT` on `POST /vehicles/connect`, but we can only know it's a duplicate in the callback, after Smartcar returns vehicle IDs. | api §3.3 | `POST /connect` never returns `CONFLICT`. The callback redirects to `/garage?connect=already_connected` (and `connect=denied`, `connect=error`, `connect=success`). Update the contract text. |
 | D4 | **Reconnecting a disconnected vehicle.** Disconnect is a soft delete, but `UNIQUE (user_id, smartcar_vehicle_id)` blocks inserting the same car again. | db §3.3 | Reconnect **reactivates** the existing row (`connection_status='connected'`, new `connected_at`, re-subscribe webhook). Duplicate only means "already connected *and* status is connected". |
 | D5 | **Out-of-order semantics.** Arch §5 says "latest state is the row with the maximum `recorded_at`". Telemetry is stored per signal, and one webhook may carry only some signals. | arch §5, api §3.5 | Apply the rule **per signal**: `latest_state.signals.<code>` only moves forward if the incoming `recorded_at` is ≥ the stored one for that signal. Store a per-signal `recorded_at` in `latest_state`; the top-level `recorded_at` in the API response is the max across signals. Add per-signal `recorded_at` to the `/state` response as an additive field. |
@@ -171,30 +171,32 @@ F4 and F5 don't touch the same files and could run in parallel once F3 lands; we
 
 ### F3 — Connect flow (Garage slice, part 1)
 
+*Updated 2026-11-14 at implementation: there is no code exchange (`response_type=none`), webhook subscription moved to F5 (as in F2), and the callback checks `externalId` so a valid `state` can't be paired with another person's Smartcar `user_id`.*
+
 **Backend** (`modules/vehicles/`)
 - `POST /api/v1/vehicles/connect` (auth required)
-  - Body `{ "redirect_after": "/garage" }`; `redirect_after` must be a same-origin relative path (same rules as `safeNextPath`, re-implemented server-side; default `/garage`).
-  - Returns `{ authorization_url, state, expires_at }` per api §3.3.
-- `GET /integrations/smartcar/callback` (internal, not under `/api/v1`, excluded from the OpenAPI client)
-  1. Verify the signed `state` (D2); expired/invalid → redirect `?connect=error`.
-  2. If Smartcar returned `error` (user denied) → `?connect=denied`.
-  3. Exchange code → Smartcar user + vehicle IDs.
-  4. For each vehicle: if already `connected` for this user → mark duplicate; if `disconnected` → reactivate (D4); else insert `vehicles` (status `pending`) + `vehicle_specs` from the catalog (D8), fetch attributes and `supported_signals` **from Smartcar's response, not hard-coded** (PRD §4.4).
-  5. Subscribe the webhook; on success set `connected`, `connected_at`. On failure leave `pending` and redirect `?connect=error` (row can be retried).
-  6. Redirect to the frontend: `FRONTEND_BASE_URL + redirect_after + ?connect=success|already_connected`.
-- New setting `frontend_base_url`.
-- Mount the vehicles router in `main.py`.
+  - Body `{ "redirect_after": "/garage" }` (optional); `redirect_after` must be a same-origin path (`redirects.py`, stricter than `safeNextPath`: rejects instead of normalizing). Unsafe → 422 `VALIDATION_ERROR`.
+  - Returns `{ authorization_url, state, expires_at }` per api §3.3. Creates the caller's profile row if missing. 503 `SMARTCAR_NOT_CONFIGURED` if `SMARTCAR_STATE_SECRET` is shorter than 32 bytes.
+- `GET /integrations/smartcar/callback` (internal, not under `/api/v1`, excluded from OpenAPI)
+  1. Verify the signed `state` (D2: HS256, 10 min, `iss`/`aud` checked); invalid/expired → `/garage?connect=error`.
+  2. Smartcar `error=access_denied` → `?connect=denied`; any other `error` → `?connect=error`.
+  3. Missing `user_id`, or an `external_id` that isn't the `state` user → `error`.
+  4. `list_connections(user_id)`; keep only `ACTIVE` connections whose `user.externalId` is the `state` user. None → `error`.
+  5. Per vehicle: active on another Chargewise user → refused; already `connected` for this user → duplicate; `disconnected`/`pending` → reactivate the same row (D4); else insert `vehicles` (`connected`) + `vehicle_specs` from the catalog (D8). Make/model/year come from the connection; `supported_signals` from a best-effort `get_signals` (often `[]` right after Connect; F5/F6 recompute).
+  6. Redirect to `FRONTEND_BASE_URL + redirect_after` with `connect=success` (anything added), `already_connected` (all duplicates) or `error`. Smartcar unreachable → `error`, nothing written.
+  - Logs carry outcomes and counts only, never Smartcar IDs.
+- New setting `frontend_base_url`. Webhook enrolment until F5: Smartcar Dashboard auto-subscribe.
+- Fixed in passing: the `VALIDATION_ERROR` handler crashed on custom-validator errors (non-serializable `ctx`) and used a deprecated Starlette constant.
 
 **Frontend** (`apps/web`)
-- Garage page: "Add vehicle" button → server action calls `POST /vehicles/connect` with the user's token → `redirect(authorization_url)`.
-- Read `?connect=` and show a banner: success, already connected, denied, error. Unknown values ignored.
+- Garage page: "Add vehicle" form → server action calls `POST /vehicles/connect` with the user's token → `redirect(authorization_url)`; failure → `?connect=error`.
+- `ConnectBanner` reads `?connect=`: success, already connected, denied, error. Unknown values render nothing.
 
 **Tests**
-- pytest: connect returns a URL with a valid signed state; rejects unauthenticated; rejects absolute/protocol-relative `redirect_after`.
-- pytest callback (fake Smartcar client): happy path creates vehicle + specs + subscribes; denied; bad state; expired state; duplicate → `already_connected` with no new row; reconnect after disconnect reactivates the same row; webhook subscribe failure leaves `pending`.
-- Vitest: banner renders the right text for each `connect` value.
+- pytest: connect URL + signed state, default redirect, unauthenticated, unsafe `redirect_after` cases, missing secret; callback happy path, profile auto-create, `redirect_after` query/fragment kept, empty signals, signal read failure, denied, other error, bad/tampered/expired state, missing `user_id`, `external_id` mismatch, **connection belonging to another Chargewise user**, inactive connection, Smartcar unreachable, duplicate, reconnect reactivates the same row, car active on another user, forged unsafe redirect, no Smartcar IDs in logs. Unit tests for redirect rules, state and catalog lookup.
+- Vitest: banner for each `connect` value; unknown values (incl. `__proto__`) render nothing.
 
-**Acceptance:** with Smartcar test mode, a user can click Add Vehicle, authorize, and land back on Garage with a success banner and a `vehicles` row; duplicate and denied paths show the right banner.
+**Acceptance:** with a real Smartcar app, a user can click Add Vehicle, authorize, and land back on Garage with a success banner and a `vehicles` row; duplicate and denied paths show the right banner. *(Manual check with the Toyota still to do.)*
 
 ---
 
