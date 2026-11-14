@@ -1,0 +1,739 @@
+{
+  "data": [
+    {
+      "attributes": {
+        "code": "closure-reartrunk",
+        "group": "Closure",
+        "name": "RearTrunk",
+        "status": {
+          "error": {
+            "code": "VEHICLE_NOT_CAPABLE",
+            "description": "Deprecated. Use detail",
+            "detail": "The vehicle is incapable of performing your request.",
+            "resolution": {
+              "type": "UNKNOWN_RESOLUTION_TYPE"
+            },
+            "title": "Vehicle Not Capable",
+            "type": "COMPATIBILITY"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "closure-reartrunk",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "wheel-tires",
+        "group": "Wheel",
+        "name": "Tires",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "wheel-tires",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "internalcombustionengine-range",
+        "group": "InternalCombustionEngine",
+        "name": "Range",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "internalcombustionengine-range",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "internalcombustionengine-amountremaining",
+        "group": "InternalCombustionEngine",
+        "name": "AmountRemaining",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "internalcombustionengine-amountremaining",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "closure-doors",
+        "group": "Closure",
+        "name": "Doors",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "closure-doors",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "internalcombustionengine-fuellevel",
+        "group": "InternalCombustionEngine",
+        "name": "FuelLevel",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "internalcombustionengine-fuellevel",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "body": {
+          "value": "NOT_CHARGING"
+        },
+        "code": "charge-detailedchargingstatus",
+        "group": "Charge",
+        "name": "DetailedChargingStatus",
+        "status": {
+          "value": "SUCCESS"
+        }
+      },
+      "id": "charge-detailedchargingstatus",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z",
+        "oemUpdatedAt": "2026-11-13T21:53:26.000Z",
+        "retrievedAt": "2026-11-13T21:54:44.501Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "charge-chargetimers",
+        "group": "Charge",
+        "name": "ChargeTimers",
+        "status": {
+          "error": {
+            "code": "VEHICLE_NOT_CAPABLE",
+            "description": "Deprecated. Use detail",
+            "detail": "The vehicle is incapable of performing your request.",
+            "resolution": {
+              "type": "UNKNOWN_RESOLUTION_TYPE"
+            },
+            "title": "Vehicle Not Capable",
+            "type": "COMPATIBILITY"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "charge-chargetimers",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "hvac-cabintargettemperature",
+        "group": "HVAC",
+        "name": "CabinTargetTemperature",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "hvac-cabintargettemperature",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "hvac-isreardefrosteractive",
+        "group": "HVAC",
+        "name": "IsRearDefrosterActive",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "hvac-isreardefrosteractive",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "closure-enginecover",
+        "group": "Closure",
+        "name": "EngineCover",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "closure-enginecover",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "service-records",
+        "group": "Service",
+        "name": "Records",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "service-records",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "body": {
+          "value": false
+        },
+        "code": "charge-ischarging",
+        "group": "Charge",
+        "name": "IsCharging",
+        "status": {
+          "value": "SUCCESS"
+        }
+      },
+      "id": "charge-ischarging",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z",
+        "oemUpdatedAt": "2026-11-13T21:53:26.000Z",
+        "retrievedAt": "2026-11-13T21:54:44.501Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "motion-currentspeed",
+        "group": "Motion",
+        "name": "CurrentSpeed",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "motion-currentspeed",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "closure-windows",
+        "group": "Closure",
+        "name": "Windows",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "closure-windows",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "body": {
+          "value": false
+        },
+        "code": "charge-ischargingcableconnected",
+        "group": "Charge",
+        "name": "IsChargingCableConnected",
+        "status": {
+          "value": "SUCCESS"
+        }
+      },
+      "id": "charge-ischargingcableconnected",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z",
+        "oemUpdatedAt": "2026-11-13T21:53:26.000Z",
+        "retrievedAt": "2026-11-13T21:54:44.501Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "body": {
+          "additionalValues": [],
+          "type": "DEFAULT",
+          "unit": "km",
+          "value": 230.14
+        },
+        "code": "tractionbattery-range",
+        "group": "TractionBattery",
+        "name": "Range",
+        "status": {
+          "value": "SUCCESS"
+        }
+      },
+      "id": "tractionbattery-range",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z",
+        "oemUpdatedAt": "2026-11-13T21:53:26.000Z",
+        "retrievedAt": "2026-11-13T21:54:44.501Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "body": {
+          "unit": "km",
+          "value": 24650.32
+        },
+        "code": "odometer-traveleddistance",
+        "group": "Odometer",
+        "name": "TraveledDistance",
+        "status": {
+          "value": "SUCCESS"
+        }
+      },
+      "id": "odometer-traveleddistance",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z",
+        "oemUpdatedAt": "2026-11-13T21:53:25.000Z",
+        "retrievedAt": "2026-11-13T21:54:39.183Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "hvac-issteeringheateractive",
+        "group": "HVAC",
+        "name": "IsSteeringHeaterActive",
+        "status": {
+          "error": {
+            "code": "VEHICLE_NOT_CAPABLE",
+            "description": "Deprecated. Use detail",
+            "detail": "The vehicle is incapable of performing your request.",
+            "resolution": {
+              "type": "UNKNOWN_RESOLUTION_TYPE"
+            },
+            "title": "Vehicle Not Capable",
+            "type": "COMPATIBILITY"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "hvac-issteeringheateractive",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "body": {
+          "unit": "percent",
+          "value": 61
+        },
+        "code": "tractionbattery-stateofcharge",
+        "group": "TractionBattery",
+        "name": "StateOfCharge",
+        "status": {
+          "value": "SUCCESS"
+        }
+      },
+      "id": "tractionbattery-stateofcharge",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z",
+        "oemUpdatedAt": "2026-11-13T21:53:26.000Z",
+        "retrievedAt": "2026-11-13T21:54:44.501Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "closure-islocked",
+        "group": "Closure",
+        "name": "IsLocked",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "closure-islocked",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "closure-sunroof",
+        "group": "Closure",
+        "name": "Sunroof",
+        "status": {
+          "error": {
+            "code": "VEHICLE_NOT_CAPABLE",
+            "description": "Deprecated. Use detail",
+            "detail": "The vehicle is incapable of performing your request.",
+            "resolution": {
+              "type": "UNKNOWN_RESOLUTION_TYPE"
+            },
+            "title": "Vehicle Not Capable",
+            "type": "COMPATIBILITY"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "closure-sunroof",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "redacted": "location signal removed"
+      },
+      "id": "location-preciselocation",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "charge-timetocomplete",
+        "group": "Charge",
+        "name": "TimeToComplete",
+        "status": {
+          "error": {
+            "code": "NOT_CHARGING",
+            "description": "Deprecated. Use detail",
+            "detail": "The vehicle is unable to perform your request because it is not currently charging.",
+            "resolution": {
+              "type": "UNKNOWN_RESOLUTION_TYPE"
+            },
+            "title": "Not Charging",
+            "type": "VEHICLE_STATE"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "charge-timetocomplete",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "vehicleidentification-vin",
+        "group": "VehicleIdentification",
+        "name": "VIN",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "vehicleidentification-vin",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "body": {
+          "value": false
+        },
+        "code": "charge-ischargingportflapopen",
+        "group": "Charge",
+        "name": "IsChargingPortFlapOpen",
+        "status": {
+          "value": "SUCCESS"
+        }
+      },
+      "id": "charge-ischargingportflapopen",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z",
+        "oemUpdatedAt": "2026-11-13T21:53:25.000Z",
+        "retrievedAt": "2026-11-13T21:54:39.128Z"
+      },
+      "type": "signal"
+    },
+    {
+      "attributes": {
+        "code": "hvac-isfrontdefrosteractive",
+        "group": "HVAC",
+        "name": "IsFrontDefrosterActive",
+        "status": {
+          "error": {
+            "code": "UNKNOWN",
+            "description": "Deprecated. Use detail",
+            "detail": "Your application has insufficient permissions to access the requested resource. Please prompt the user to re-authenticate using Smartcar Connect.",
+            "resolution": {
+              "type": "REAUTHENTICATE"
+            },
+            "title": "Unknown",
+            "type": "PERMISSION"
+          },
+          "value": "ERROR"
+        }
+      },
+      "id": "hvac-isfrontdefrosteractive",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "ingestedAt": "2026-11-13T21:55:07.991Z"
+      },
+      "type": "signal"
+    }
+  ],
+  "included": {
+    "vehicle": {
+      "attributes": {
+        "make": "TOYOTA",
+        "mode": "live",
+        "model": "bZ XLE AWD",
+        "powertrainType": "BEV",
+        "year": 2026
+      },
+      "id": "redacted-id-3",
+      "links": {
+        "self": "redacted"
+      },
+      "type": "vehicle"
+    }
+  },
+  "links": {
+    "self": "redacted"
+  },
+  "meta": {
+    "pageNumber": 1,
+    "pageSize": 27,
+    "totalCount": 27
+  }
+}

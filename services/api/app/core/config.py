@@ -9,9 +9,13 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AppEnv = Literal["development", "preview", "production", "test"]
+# Smartcar V3 Connect only accepts these. ``test`` (a V2 value) completes Connect
+# but authorizes no vehicle, so it is rejected at startup.
+SmartcarMode = Literal["live", "simulated"]
 
 
 class Settings(BaseSettings):
@@ -47,6 +51,27 @@ class Settings(BaseSettings):
     # Optional fallback for legacy HS256 projects. Prefer JWKS.
     supabase_jwt_secret: str = ""
     supabase_service_role_key: str = ""
+
+    # ---- Smartcar V3 (see docs/smartcar-v3-notes.md) ----
+    smartcar_client_id: str = ""
+    smartcar_client_secret: str = ""
+    # Connect ``application_id``; a different value from the client ID.
+    smartcar_application_id: str = ""
+    smartcar_redirect_uri: str = "http://localhost:8000/integrations/smartcar/callback"
+    smartcar_webhook_id: str = ""
+    # Application Management Token: the HMAC key for ``SC-Signature`` and VERIFY.
+    smartcar_management_token: str = ""
+    smartcar_mode: SmartcarMode = "live"
+    # HS256 key for the signed Connect ``state`` (phase2_plan.md D2).
+    smartcar_state_secret: str = ""
+    smartcar_api_base_url: str = "https://vehicle.api.smartcar.com/v3"
+    smartcar_auth_url: str = "https://iam.smartcar.com/oauth2/token"
+    smartcar_connect_url: str = "https://connect.smartcar.com/oauth/authorize"
+    smartcar_timeout_seconds: float = Field(default=10.0, gt=0)
+
+    # ---- Telemetry ----
+    # Readings older than this are flagged stale (phase2_plan.md D11).
+    telemetry_stale_after_minutes: int = Field(default=15, gt=0)
 
     # ---- Observability ----
     sentry_dsn_backend: str = ""

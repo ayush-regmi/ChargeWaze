@@ -1,0 +1,14 @@
+{
+  "eventId": "evt-verify-1",
+  "eventType": "VERIFY",
+  "data": {
+    "challenge": "3f1c0a6e9b2d4c7f8e5a1b0d2c3e4f5a"
+  },
+  "meta": {
+    "deliveryId": "delivery-verify-1",
+    "deliveredAt": "2026-11-15T00:00:00.000Z",
+    "webhookId": "test-webhook-id",
+    "version": "4.0",
+    "mode": "LIVE"
+  }
+}

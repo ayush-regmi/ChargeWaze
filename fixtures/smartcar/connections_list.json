@@ -1,0 +1,68 @@
+{
+  "data": [
+    {
+      "attributes": {
+        "permissions": [
+          "read_battery",
+          "read_charge",
+          "read_odometer",
+          "read_vehicle_info"
+        ],
+        "status": {
+          "name": "ACTIVE"
+        },
+        "user": {
+          "externalId": "chargewise-spike",
+          "id": "redacted-id-1"
+        },
+        "vehicle": {
+          "make": "TOYOTA",
+          "mode": "live",
+          "model": "bZ XLE AWD",
+          "powertrainType": "BEV",
+          "year": 2026
+        }
+      },
+      "id": "redacted-id-2",
+      "links": {
+        "self": "redacted"
+      },
+      "meta": {
+        "createdAt": "2026-11-13T21:54:38.268Z",
+        "updatedAt": "2026-11-13T21:54:38.264Z"
+      },
+      "relationships": {
+        "user": {
+          "data": {
+            "id": "redacted-id-1",
+            "type": "user"
+          }
+        },
+        "vehicle": {
+          "data": {
+            "id": "redacted-id-3",
+            "type": "vehicle"
+          },
+          "links": {
+            "related": "https://vehicle.api.smartcar.com/v3/vehicles/redacted-id-3"
+          }
+        }
+      },
+      "type": "connection"
+    }
+  ],
+  "links": {
+    "first": "https://vehicle.api.smartcar.com/v3/connections?page%5Bnumber%5D=1&page%5Bsize%5D=50&filter%5BuserId%5D=redacted-id-1",
+    "last": "https://vehicle.api.smartcar.com/v3/connections?page%5Bnumber%5D=1&page%5Bsize%5D=50&filter%5BuserId%5D=redacted-id-1",
+    "next": null,
+    "prev": null,
+    "self": "redacted"
+  },
+  "meta": {
+    "orderBy": "createdAt",
+    "orderDirection": "DESC",
+    "pageNumber": 1,
+    "pageSize": 50,
+    "totalCount": 1
+  }
+}

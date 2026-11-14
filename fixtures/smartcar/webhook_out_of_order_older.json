@@ -1,0 +1,46 @@
+{
+  "eventId": "evt-0001",
+  "eventType": "VEHICLE_STATE",
+  "data": {
+    "user": {
+      "id": "redacted-id-1"
+    },
+    "vehicle": {
+      "id": "redacted-id-3",
+      "make": "TOYOTA",
+      "model": "bZ XLE AWD",
+      "year": 2026
+    },
+    "signals": [
+      {
+        "code": "tractionbattery-stateofcharge",
+        "name": "StateOfCharge",
+        "group": "TractionBattery",
+        "body": {
+          "unit": "percent",
+          "value": 61
+        },
+        "meta": {
+          "oemUpdatedAt": 1794261600000,
+          "retrievedAt": 1794261620000
+        }
+      }
+    ],
+    "triggers": [
+      {
+        "type": "SIGNAL_UPDATED",
+        "signal": {
+          "code": "tractionbattery-stateofcharge"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "deliveryId": "delivery-evt-0001",
+    "deliveredAt": 1794261720000,
+    "webhookId": "test-webhook-id",
+    "version": "4.0",
+    "mode": "LIVE",
+    "sequence": 1
+  }
+}
