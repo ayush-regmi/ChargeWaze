@@ -1,11 +1,12 @@
 """Business logic for the vehicles module: Smartcar Connect completion (F3).
 
-The callback only learns which vehicles were authorized *after* the redirect,
+Completion only learns which vehicles were authorized *after* the redirect,
 by listing the Smartcar user's connections (smartcar-v3-notes.md §2-3). The
 redirect's ``user_id`` is an unauthenticated query parameter and our
 application token can read every Smartcar user's connections, so a connection
 is only accepted if its ``externalId`` (which we set to the Chargewise profile
-ID in the Connect URL) matches the user inside the signed ``state``.
+ID in the Connect URL) matches the user inside the signed ``state``. The
+router has already checked that ``state`` belongs to the signed-in user.
 
 Logging rule (arch §9): counts and outcomes only. Never Smartcar user, vehicle
 or connection IDs.

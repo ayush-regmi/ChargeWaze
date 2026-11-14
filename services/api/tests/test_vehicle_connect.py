@@ -1,7 +1,8 @@
 """Tests for the Smartcar Connect flow (Phase 2 F3).
 
-``POST /api/v1/vehicles/connect`` and the internal callback at
-``/integrations/smartcar/callback``. Smartcar is a real ``SmartcarClient``
+``POST /api/v1/vehicles/connect`` and ``POST /api/v1/vehicles/connect/complete``
+(called by the web app's ``/garage/connect/callback`` with the signed-in user's
+token). Smartcar is a real ``SmartcarClient``
 over ``httpx.MockTransport`` serving the redacted F0 fixtures, so parsing is
 exercised end to end without any network.
 """
@@ -34,8 +35,7 @@ from tests.conftest import TEST_USER_ID, make_token
 from tests.integrations.conftest import fixture_json
 
 STATE_SECRET = "test-state-secret-0123456789abcdef0123456789"
-FRONTEND = "http://web.test"
-CALLBACK = "/integrations/smartcar/callback"
+COMPLETE = "/api/v1/vehicles/connect/complete"
 SC_USER_ID = "sc-user-1"
 SC_VEHICLE_ID = "sc-vehicle-1"
 SC_CONNECTION_ID = "sc-connection-1"
@@ -98,7 +98,6 @@ def settings() -> Settings:
     return Settings(
         _env_file=None,  # type: ignore[call-arg]
         app_env="test",
-        frontend_base_url=FRONTEND,
         smartcar_client_id="test-client-id",
         smartcar_client_secret="test-client-secret",
         smartcar_application_id="test-application-id",
@@ -110,14 +109,19 @@ def settings() -> Settings:
 
 
 @pytest.fixture()
-def api(app_with_db: FastAPI, settings: Settings, smartcar: FakeSmartcar) -> Iterator[TestClient]:
+def api(
+    app_with_db: FastAPI, settings: Settings, smartcar: FakeSmartcar, key_material: Any
+) -> Iterator[TestClient]:
     sc_client = SmartcarClient.from_settings(
         settings, transport=httpx.MockTransport(smartcar.handler)
     )
     app_with_db.dependency_overrides[get_settings] = lambda: settings
     app_with_db.dependency_overrides[get_smartcar_client] = lambda: sc_client
     try:
-        yield TestClient(app_with_db, follow_redirects=False)
+        test_client = TestClient(app_with_db, follow_redirects=False)
+        # Token for TEST_USER_ID, used by _callback (completion is authenticated).
+        test_client.complete_headers = _auth(key_material)  # type: ignore[attr-defined]
+        yield test_client
     finally:
         sc_client.close()
 
@@ -149,15 +153,16 @@ def _state(user_id: uuid.UUID = TEST_USER_ID, redirect_after: str = "/garage", *
 
 
 def _callback(api: TestClient, **params: str) -> httpx.Response:
+    """Complete Connect as TEST_USER_ID with the query Smartcar redirected back with."""
+
     params.setdefault("user_id", SC_USER_ID)
-    return api.get(CALLBACK, params=params)
+    return api.post(COMPLETE, json=params, headers=api.complete_headers)  # type: ignore[attr-defined]
 
 
 def _flag(response: httpx.Response) -> tuple[str, str]:
-    assert response.status_code == 302
-    location = urlsplit(response.headers["location"])
-    assert f"{location.scheme}://{location.netloc}" == FRONTEND
-    return location.path, parse_qs(location.query)["connect"][0]
+    assert response.status_code == 200, response.text
+    body = response.json()
+    return body["redirect_after"], body["result"]
 
 
 def _vehicles(db: Session) -> list[Vehicle]:
@@ -251,10 +256,45 @@ def test_connect_without_state_secret_is_not_configured(
 # ---------------------------------------------------------------------------
 
 
-def test_callback_is_not_in_openapi(api: TestClient) -> None:
+def test_connect_endpoints_are_in_openapi(api: TestClient) -> None:
     paths = api.get("/api/v1/openapi.json").json()["paths"]
-    assert CALLBACK not in paths
     assert "/api/v1/vehicles/connect" in paths
+    assert COMPLETE in paths
+    assert not any(p.startswith("/integrations") for p in paths)
+
+
+def test_complete_requires_auth(api: TestClient, db: Session) -> None:
+    response = api.post(COMPLETE, json={"state": _state(), "user_id": SC_USER_ID})
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "UNAUTHENTICATED"
+    assert _vehicles(db) == []
+
+
+def test_complete_rejects_state_of_another_signed_in_user(
+    api: TestClient, db: Session, smartcar: FakeSmartcar
+) -> None:
+    """Attacker starts Connect, victim authorizes from the attacker's link.
+
+    The victim's browser completes with the victim's session, but ``state``
+    (and Smartcar's ``externalId``) name the attacker. Nothing may be stored.
+    """
+
+    attacker = OTHER_USER_ID
+    _ensure_profile(db, attacker)
+    smartcar.connections = [_connection(external_id=str(attacker))]
+    response = _callback(api, state=_state(user_id=attacker, redirect_after="/trips"))
+    assert _flag(response) == ("/garage", "error")
+    assert _vehicles(db) == []
+    assert not any(r.url.path.endswith("/connections") for r in smartcar.requests)
+
+
+def test_complete_requires_state(api: TestClient) -> None:
+    response = api.post(
+        COMPLETE,
+        json={"user_id": SC_USER_ID},
+        headers=api.complete_headers,  # type: ignore[attr-defined]
+    )
+    assert response.status_code == 422
 
 
 def test_callback_happy_path_creates_vehicle_and_specs(
@@ -294,11 +334,8 @@ def test_callback_creates_profile_if_missing(api: TestClient, db: Session) -> No
 
 def test_callback_keeps_redirect_after_and_its_query(api: TestClient, db: Session) -> None:
     _ensure_profile(db)
-    response = _callback(api, state=_state(redirect_after="/garage?tab=cars&connect=old#top"))
-    location = urlsplit(response.headers["location"])
-    assert location.path == "/garage"
-    assert parse_qs(location.query) == {"tab": ["cars"], "connect": ["success"]}
-    assert location.fragment == "top"
+    response = _callback(api, state=_state(redirect_after="/garage?tab=cars#top"))
+    assert _flag(response) == ("/garage?tab=cars#top", "success")
 
 
 def test_callback_empty_signals_still_connects(
@@ -336,14 +373,12 @@ def test_callback_other_connect_error(api: TestClient, db: Session) -> None:
 @pytest.mark.parametrize(
     "state",
     [
-        None,
         "not-a-jwt",
         jwt.encode({"sub": str(TEST_USER_ID)}, "wrong-secret-" * 4, algorithm="HS256"),
     ],
 )
-def test_callback_bad_state(api: TestClient, db: Session, state: str | None) -> None:
-    params = {"state": state} if state is not None else {}
-    response = _callback(api, **params)
+def test_callback_bad_state(api: TestClient, db: Session, state: str) -> None:
+    response = _callback(api, state=state)
     assert _flag(response) == ("/garage", "error")
     assert _vehicles(db) == []
 
@@ -363,7 +398,11 @@ def test_callback_expired_state(api: TestClient, db: Session) -> None:
 
 
 def test_callback_missing_user_id(api: TestClient, db: Session) -> None:
-    response = api.get(CALLBACK, params={"state": _state()})
+    response = api.post(
+        COMPLETE,
+        json={"state": _state()},
+        headers=api.complete_headers,  # type: ignore[attr-defined]
+    )
     assert _flag(response)[1] == "error"
 
 
@@ -450,7 +489,7 @@ def test_callback_refuses_vehicle_connected_to_another_user(api: TestClient, db:
     assert owners == {OTHER_USER_ID}
 
 
-def test_callback_redirect_never_leaves_frontend(api: TestClient) -> None:
+def test_callback_redirect_never_leaves_the_site(api: TestClient) -> None:
     """Even a state signed with an unsafe path (shouldn't happen) is refused."""
 
     forged = jwt.encode(

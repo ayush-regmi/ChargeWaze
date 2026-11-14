@@ -52,11 +52,6 @@ def create_app() -> FastAPI:
     _register_v1_routers(v1)
     app.include_router(v1)
 
-    # ---- Internal, non-versioned routes (excluded from OpenAPI) ----
-    from app.modules.vehicles.router import callback_router
-
-    app.include_router(callback_router)
-
     return app
 
 

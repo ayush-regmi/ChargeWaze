@@ -2,13 +2,15 @@
 
 import { useSearchParams } from "next/navigation";
 
+import type { ConnectFlag } from "@/lib/connect";
+
 /**
- * Banner for the ``?connect=`` flag the backend's Smartcar callback adds when
+ * Banner for the ``?connect=`` flag that ``/garage/connect/callback`` adds when
  * it redirects back to the Garage (docs/api-contracts.md §3.3). Unknown
  * values render nothing, so a crafted link can't inject arbitrary text.
  */
 
-export type ConnectFlag = "success" | "already_connected" | "denied" | "error";
+export type { ConnectFlag };
 
 type Banner = { tone: "success" | "info" | "error"; title: string; body: string };
 

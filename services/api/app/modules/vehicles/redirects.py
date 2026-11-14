@@ -1,7 +1,7 @@
 """Validation for the post-Connect ``redirect_after`` path.
 
-Server-side counterpart of ``apps/web/lib/safe-next.ts``. The value is echoed
-into a ``Location`` header by the Smartcar callback, so anything that a browser
+Server-side counterpart of ``apps/web/lib/safe-next.ts``. The value ends up
+in a ``Location`` header after Connect completes, so anything that a browser
 could read as another origin (``//host``, ``/\\host``, tab/newline smuggling,
 dot segments that collapse to ``//``) must be rejected. This is stricter than
 the frontend helper: instead of normalizing odd paths, it refuses them.

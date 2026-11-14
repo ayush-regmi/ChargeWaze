@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -34,4 +35,29 @@ class ConnectResponse(BaseModel):
     expires_at: datetime
 
 
-__all__ = ["ConnectRequest", "ConnectResponse"]
+ConnectFlag = Literal["success", "already_connected", "denied", "error"]
+
+
+class ConnectCompleteRequest(BaseModel):
+    """The query parameters Smartcar put on the redirect, forwarded by the web app."""
+
+    state: str = Field(min_length=1, max_length=2048)
+    user_id: str | None = Field(default=None, max_length=256)
+    external_id: str | None = Field(default=None, max_length=256)
+    error: str | None = Field(default=None, max_length=256)
+
+
+class ConnectCompleteResponse(BaseModel):
+    result: ConnectFlag
+    # Validated same-origin path to send the browser to (``/garage`` when the
+    # state couldn't be trusted).
+    redirect_after: str
+
+
+__all__ = [
+    "ConnectCompleteRequest",
+    "ConnectCompleteResponse",
+    "ConnectFlag",
+    "ConnectRequest",
+    "ConnectResponse",
+]

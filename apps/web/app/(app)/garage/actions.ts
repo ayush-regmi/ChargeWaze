@@ -7,8 +7,9 @@ import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 
 /**
  * Start Smartcar Connect: ask the backend for an authorization URL and send
- * the browser there. Smartcar returns to the backend callback, which redirects
- * back to ``/garage?connect=…``.
+ * the browser there. Smartcar returns to ``/garage/connect/callback``, which
+ * completes Connect with the signed-in user's token and redirects to
+ * ``/garage?connect=…``.
  */
 export async function startVehicleConnect(): Promise<never> {
   const supabase = await createSupabaseClient();

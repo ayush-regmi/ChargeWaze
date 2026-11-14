@@ -3,8 +3,9 @@
 Stateless: an HS256 JWT keyed with ``SMARTCAR_STATE_SECRET`` that carries the
 Chargewise user ID, the validated ``redirect_after`` path and a random nonce.
 There is no code exchange under ``response_type=none``, so ``state`` can't be
-made single-use; replaying it within its lifetime only re-runs the callback for
-the same user, and the callback is idempotent (duplicates are detected).
+made single-use. Completion requires the signed-in user to equal ``sub``, so a
+replayed ``state`` only re-runs completion for its own user, which is
+idempotent (duplicates are detected).
 """
 
 from __future__ import annotations
