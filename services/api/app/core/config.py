@@ -57,7 +57,9 @@ class Settings(BaseSettings):
     smartcar_client_secret: str = ""
     # Connect ``application_id``; a different value from the client ID.
     smartcar_application_id: str = ""
-    smartcar_redirect_uri: str = "http://localhost:8000/integrations/smartcar/callback"
+    # A *frontend* route: Connect must finish where the user's session is, so the
+    # backend can check the signed-in user is the one who started it.
+    smartcar_redirect_uri: str = "http://localhost:3000/garage/connect/callback"
     smartcar_webhook_id: str = ""
     # Application Management Token: the HMAC key for ``SC-Signature`` and VERIFY.
     smartcar_management_token: str = ""

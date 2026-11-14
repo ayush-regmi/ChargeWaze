@@ -65,7 +65,7 @@ def _register_v1_routers(v1: APIRouter) -> None:
 
     import importlib
 
-    for module_path in ("app.modules.users.router",):
+    for module_path in ("app.modules.users.router", "app.modules.vehicles.router"):
         try:
             mod = importlib.import_module(module_path)
         except ImportError:

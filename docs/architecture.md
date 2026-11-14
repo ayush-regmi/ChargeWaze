@@ -106,15 +106,15 @@ The connect flow:
 
 1. User signs into Chargewise (Supabase JWT).
 2. User selects **Add Vehicle** on the Garage page.
-3. Backend starts the Smartcar Connect flow and returns the authorization URL.
+3. Backend (`POST /api/v1/vehicles/connect`) signs a 10-minute `state` (HS256 JWT with the Chargewise user ID, the validated `redirect_after` path and a nonce) and returns a Connect URL with `response_type=none` and `external_id = profiles.id`.
 4. User authorizes vehicle access with Smartcar.
-5. Smartcar redirects to the backend's registered callback.
-6. Backend validates the connect state and exchanges it for the Smartcar user token.
-7. Backend fetches the user's connected Smartcar vehicles and associates them with the Chargewise `profiles.id`.
-8. Backend subscribes each vehicle to the Chargewise webhook.
-9. Garage displays the vehicle.
+5. Smartcar redirects the browser to the web app's `/garage/connect/callback` (`SMARTCAR_REDIRECT_URI`) with `user_id`, `state` and `external_id`. There is no code to exchange: V3 uses one application token for every user.
+6. The web app forwards that query to `POST /api/v1/vehicles/connect/complete` with the **signed-in user's** Supabase JWT. The backend verifies `state` and requires its user to be the caller. Connect has to finish where the user's session is: otherwise an attacker could start Connect on their own account, send the authorization URL to a victim, and receive the victim's car (both `state` and Smartcar's `externalId` would name the attacker).
+7. Backend lists the Smartcar user's connections and only accepts active ones whose `externalId` equals the user in `state`; the redirect's `user_id` is unauthenticated and the application token can read any Smartcar user's connections. Per connection: a car already connected to this user is a duplicate; a disconnected (or leftover pending) row is reactivated; a car active on another Chargewise user is refused; otherwise a `vehicles` row (`connected`) and `vehicle_specs` (from the static catalog, or `NULL`s) are inserted. `supported_signals` comes from a best-effort signal read and is often `[]` right after Connect; F5/F6 recompute it when data arrives.
+8. Backend returns `{ result, redirect_after }`; the web app redirects to `redirect_after` with `connect=success|already_connected|denied|error`, and the Garage shows a banner.
+9. Webhook enrolment: until F5 adds the V3 subscribe call, vehicles are enrolled by the Smartcar Dashboard's auto-subscribe setting.
 
-Smartcar V3 details (token lifetime, `sc-user-id` header usage, webhook signature algorithm) must be verified against the official Smartcar docs at implementation time — the summary above comes from a planning document, not from Smartcar's API reference.
+Verified V3 details live in [`smartcar-v3-notes.md`](smartcar-v3-notes.md).
 
 ## 5. Webhook ingestion rules
 

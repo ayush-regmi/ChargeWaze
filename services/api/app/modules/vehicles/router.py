@@ -1,0 +1,141 @@
+"""HTTP routes for the vehicles module (``docs/api-contracts.md`` §3.3).
+
+Connect is a two-step flow, both steps authenticated with the Supabase JWT:
+
+1. ``POST /vehicles/connect`` signs a ``state`` for the caller and returns the
+   Smartcar Connect URL.
+2. Smartcar redirects the browser to the web app's
+   ``/garage/connect/callback``, which forwards the query to
+   ``POST /vehicles/connect/complete`` with the *current* user's token.
+
+Step 2 requires the signed-in user to be the one inside ``state``. Without
+that, an attacker could start Connect on their own account, send the
+authorization URL to a victim, and receive the victim's car: ``state`` and
+Smartcar's ``externalId`` would both name the attacker.
+"""
+
+from __future__ import annotations
+
+import logging
+
+from fastapi import APIRouter, Depends
+from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.core.config import Settings, get_settings
+from app.core.errors import ApiError
+from app.db.session import get_db
+from app.integrations.smartcar.client import SmartcarClient, get_smartcar_client
+from app.modules.auth.dependencies import AuthenticatedUser, get_current_user
+from app.modules.users.service import get_or_create_profile
+from app.modules.vehicles.redirects import DEFAULT_REDIRECT_AFTER
+from app.modules.vehicles.schemas import (
+    ConnectCompleteRequest,
+    ConnectCompleteResponse,
+    ConnectFlag,
+    ConnectRequest,
+    ConnectResponse,
+)
+from app.modules.vehicles.service import complete_connect
+from app.modules.vehicles.state import InvalidStateError, issue_state, verify_state
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/vehicles", tags=["vehicles"])
+
+
+@router.post("/connect", response_model=ConnectResponse)
+def start_connect(
+    body: ConnectRequest | None = None,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    smartcar: SmartcarClient = Depends(get_smartcar_client),
+) -> ConnectResponse:
+    """Start Smartcar Connect and return the URL to send the browser to.
+
+    Duplicate vehicles are only detectable after the user authorizes, so this
+    never returns ``CONFLICT``; ``/connect/complete`` reports it.
+    """
+
+    request = body or ConnectRequest()
+    state, claims = issue_state(
+        user_id=current_user.user_id,
+        redirect_after=request.redirect_after,
+        secret=settings.smartcar_state_secret,
+    )
+    authorization_url = smartcar.build_connect_url(
+        state=state, external_id=str(current_user.user_id)
+    )
+    # Completion needs the profile row for the vehicles FK.
+    get_or_create_profile(db, user_id=current_user.user_id)
+    db.commit()
+    return ConnectResponse(
+        authorization_url=authorization_url, state=state, expires_at=claims.expires_at
+    )
+
+
+@router.post("/connect/complete", response_model=ConnectCompleteResponse)
+def complete_vehicle_connect(
+    body: ConnectCompleteRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    smartcar: SmartcarClient = Depends(get_smartcar_client),
+) -> ConnectCompleteResponse:
+    """Finish Connect with the query Smartcar redirected the browser back with.
+
+    Flow outcomes (denied, duplicate, bad state, Smartcar down) are a ``200``
+    with ``result`` set, so the web app can always redirect to the Garage with
+    a banner. Only a missing/invalid JWT or a malformed body is an HTTP error.
+    """
+
+    try:
+        claims = verify_state(body.state, secret=settings.smartcar_state_secret)
+    except InvalidStateError as exc:
+        logger.warning("smartcar_connect_bad_state", extra={"reason": str(exc)})
+        return _result("error")
+
+    if claims.user_id != current_user.user_id:
+        # Someone else's Connect link completed in this user's browser.
+        logger.warning("smartcar_connect_session_mismatch")
+        return _result("error")
+
+    if body.error:
+        logger.info("smartcar_connect_provider_error", extra={"smartcar_error": body.error})
+        return _result(
+            "denied" if body.error == "access_denied" else "error", claims.redirect_after
+        )
+
+    if not body.user_id or (
+        body.external_id is not None and body.external_id != str(claims.user_id)
+    ):
+        logger.warning("smartcar_connect_bad_params")
+        return _result("error", claims.redirect_after)
+
+    try:
+        result = complete_connect(db, smartcar, user_id=claims.user_id, sc_user_id=body.user_id)
+        db.commit()
+    except (ApiError, ValidationError) as exc:
+        db.rollback()
+        logger.warning(
+            "smartcar_connect_upstream_failed",
+            extra={"code": getattr(exc, "code", type(exc).__name__)},
+        )
+        return _result("error", claims.redirect_after)
+    except IntegrityError:
+        # A concurrent completion for the same car won the insert.
+        db.rollback()
+        return _result("already_connected", claims.redirect_after)
+
+    return _result(result.outcome, claims.redirect_after)
+
+
+def _result(
+    result: ConnectFlag, redirect_after: str = DEFAULT_REDIRECT_AFTER
+) -> ConnectCompleteResponse:
+    return ConnectCompleteResponse(result=result, redirect_after=redirect_after)
+
+
+__all__ = ["router"]

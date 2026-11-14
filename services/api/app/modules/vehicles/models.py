@@ -75,9 +75,7 @@ class Vehicle(Base):
     # NULL until the first webhook arrives ("Awaiting first update").
     latest_state: Mapped[dict[str, Any] | None] = mapped_column(JSON_TYPE, nullable=True)
     connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    disconnected_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    disconnected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_simulated: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )
@@ -94,9 +92,7 @@ class Vehicle(Base):
 class VehicleSpecs(Base):
     __tablename__ = "vehicle_specs"
     __table_args__ = (
-        CheckConstraint(
-            "usable_capacity_kwh > 0", name="vehicle_specs_usable_capacity_positive"
-        ),
+        CheckConstraint("usable_capacity_kwh > 0", name="vehicle_specs_usable_capacity_positive"),
     )
 
     vehicle_id: Mapped[uuid.UUID] = mapped_column(
