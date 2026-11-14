@@ -41,7 +41,7 @@ Status: done. Merged in [PR #1](https://github.com/ayush-regmi/ChargeWise/pull/1
 
 **Scope**
 
-- `integrations/smartcar` adapter: V3 application token, Connect authorization URL, callback exchange, webhook subscription, signature verification.
+- `integrations/smartcar` adapter: V3 application token, Connect authorization URL (`response_type=none`), connections listing, webhook subscription, signature verification.
 - `vehicles` module and tables (`vehicles`, `vehicle_specs`, `vehicle_telemetry`).
 - Endpoints: `POST /api/v1/vehicles/connect`, `GET /api/v1/vehicles`, `GET /api/v1/vehicles/{id}`, `GET /api/v1/vehicles/{id}/state`, `DELETE /api/v1/vehicles/{id}`, `POST /api/v1/webhooks/smartcar`.
 - Webhook ingestor: signature verification, deduplication by `source_event_id`, out-of-order handling, cached `latest_state`.

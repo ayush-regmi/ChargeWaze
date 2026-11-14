@@ -46,7 +46,7 @@ The docs disagree or are silent in a few places. Per `CLAUDE.md` these need a de
 | # | Issue | Where | Recommendation |
 |---|---|---|---|
 | D1 | **Where the Smartcar connection credential lives.** Architecture §4 says the backend exchanges the code "for the Smartcar user token", but `database-design.md` has no table or column for tokens. Under V3 we may only need the application token + `sc-user-id`, or we may need to store per-user tokens. | arch §4, db §3.3 | Decide from the spike (F0). If tokens must be stored, add a `smartcar_connections` table (one row per Chargewise user × Smartcar user) with tokens **encrypted at rest** (Fernet key from env), and document it in `database-design.md`. |
-| D2 | **Connect `state` nonce storage.** API §3.3 says "the backend stores a short-lived state nonce", but there's no table. | api §3.3 | Stateless signed state: a short-lived (10 min) HS256 JWT signed with a new `SMARTCAR_STATE_SECRET`, carrying `user_id`, `redirect_after` and a random `nonce`. Uses PyJWT (already a dependency). No table needed; the code exchange itself is single-use. |
+| D2 | **Connect `state` nonce storage.** API §3.3 says "the backend stores a short-lived state nonce", but there's no table. | api §3.3 | Stateless signed state: a short-lived (10 min) HS256 JWT signed with a new `SMARTCAR_STATE_SECRET`, carrying `user_id`, `redirect_after` and a random `nonce`. Uses PyJWT (already a dependency). No table needed. *(Post-F0: there is no code exchange to make `state` single-use; a replayed `state` within its 10 min lifetime can only re-run the callback for the same user, which D3's duplicate check makes harmless. F3 revisits this.)* |
 | D3 | **Duplicate connect error.** API §3.3 lists `CONFLICT` on `POST /vehicles/connect`, but we can only know it's a duplicate in the callback, after Smartcar returns vehicle IDs. | api §3.3 | `POST /connect` never returns `CONFLICT`. The callback redirects to `/garage?connect=already_connected` (and `connect=denied`, `connect=error`, `connect=success`). Update the contract text. |
 | D4 | **Reconnecting a disconnected vehicle.** Disconnect is a soft delete, but `UNIQUE (user_id, smartcar_vehicle_id)` blocks inserting the same car again. | db §3.3 | Reconnect **reactivates** the existing row (`connection_status='connected'`, new `connected_at`, re-subscribe webhook). Duplicate only means "already connected *and* status is connected". |
 | D5 | **Out-of-order semantics.** Arch §5 says "latest state is the row with the maximum `recorded_at`". Telemetry is stored per signal, and one webhook may carry only some signals. | arch §5, api §3.5 | Apply the rule **per signal**: `latest_state.signals.<code>` only moves forward if the incoming `recorded_at` is ≥ the stored one for that signal. Store a per-signal `recorded_at` in `latest_state`; the top-level `recorded_at` in the API response is the max across signals. Add per-signal `recorded_at` to the `/state` response as an additive field. |
@@ -134,34 +134,36 @@ F4 and F5 don't touch the same files and could run in parallel once F3 lands; we
 
 ### F2 — Smartcar adapter + fixtures
 
+*Updated 2026-11-13 after F0 — see [`smartcar-v3-notes.md`](smartcar-v3-notes.md). Connect uses `response_type=none`, so there is no code exchange; webhook subscription is deferred to F5.*
+
 **Backend:** `services/api/app/integrations/smartcar/`
-- `client.py` — `SmartcarClient` class using `httpx`. The **only** place that talks to Smartcar. Methods (final names after F0):
-  - `get_application_token()` (cached until near expiry)
-  - `build_connect_url(state, scopes)`
-  - `exchange_code(code) -> ConnectResult` (Smartcar user ID, vehicle IDs, tokens if any)
-  - `list_vehicles(sc_user_id)` / `get_vehicle_attributes(sc_user_id, vehicle_id)`
-  - `subscribe_webhook(vehicle_id)` / `unsubscribe_webhook(vehicle_id)`
-  - `disconnect(sc_user_id, vehicle_id)`
-- `signatures.py` — `verify_webhook_signature(raw_body: bytes, headers) -> bool` using the algorithm from F0, with constant-time comparison (`hmac.compare_digest`).
-- `schemas.py` — Pydantic models for Smartcar responses and webhook payloads; `normalize_signals(payload) -> list[NormalizedSignal]` mapping Smartcar signal names to our codes (`soc`, `range`, `odometer`, `charging_status`, `charging_power`) and units (`percent`, `km`, `kw`, `bool`).
-- `errors.py` — map timeouts/5xx to `ApiError("SMARTCAR_UNREACHABLE", 502/504)`.
-- Structured log line per request: provider, endpoint, duration, status (arch §9). Never log tokens or raw coordinates.
-- Settings in `core/config.py`: `smartcar_client_id`, `smartcar_client_secret`, `smartcar_redirect_uri`, `smartcar_webhook_id`, `smartcar_webhook_secret`, `smartcar_mode`, `smartcar_state_secret` (D2), `smartcar_api_base_url`, `smartcar_timeout_seconds`, `telemetry_stale_after_minutes`. Update `services/api/.env.example` (names only, no values).
+- `client.py` — `SmartcarClient` class using a synchronous `httpx.Client` (routes and DB sessions are sync). The **only** place that talks to Smartcar. Methods:
+  - `get_application_token()` — client-credentials token, cached until 60 s before expiry; no refresh token exists in V3.
+  - `build_connect_url(state, scopes, external_id)` — `application_id`, `response_type=none`, `redirect_uri`, `scope`, `state`, `mode`, `external_id`.
+  - `list_connections(sc_user_id)` — `GET /v3/connections?filter[userId]=…`, follows page numbers until `totalCount` is reached.
+  - `get_vehicle(sc_user_id, vehicle_id)` / `get_signals(sc_user_id, vehicle_id)`.
+  - `delete_connection(connection_id)` — `DELETE /v3/connections/{id}`.
+  - *Not in F2:* webhook subscribe/unsubscribe. The V3 subscribe call is unverified (notes §5); F5 checks it against the live endpoint and adds it then. Until then vehicles are enrolled via the Dashboard's auto-subscribe.
+- `signatures.py` — `verify_webhook_signature(raw_body, headers, management_token) -> bool`: hex HMAC-SHA256 of the raw body in `SC-Signature`, compared with `hmac.compare_digest`. `verify_challenge_response(challenge, management_token)` for the `VERIFY` handshake — only called after the signature check passes.
+- `schemas.py` — Pydantic models for connections, vehicles, signals and webhook payloads. `normalize_signals(...) -> list[NormalizedSignal]` maps Smartcar codes to ours (`soc`, `range`, `odometer`, `charging_status`, `charging_status_detail`, `charging_power`, `charge_limit`, `cable_connected`) and keeps the raw `body.unit`. `ERROR`/`UNAVAILABLE` signals become missing values (never a value). `recorded_at` = `oemUpdatedAt`, fallback `retrievedAt`; timestamps accept ISO-8601 or epoch ms. `supported_signal_codes(...)` excludes `VEHICLE_NOT_CAPABLE` and `UNKNOWN` errors.
+- `errors.py` — timeouts → `ApiError("SMARTCAR_UNREACHABLE", 504)`; connection errors / 5xx → `SMARTCAR_UNREACHABLE` 502; other 4xx → `SMARTCAR_ERROR` 502 with Smartcar's error code in `details`.
+- Structured log line per request: provider, method, endpoint template, duration, status (arch §9). Never log tokens, user/vehicle IDs, pagination links (they embed the user ID) or coordinates.
+- Settings in `core/config.py`: `smartcar_client_id`, `smartcar_client_secret`, `smartcar_application_id`, `smartcar_redirect_uri`, `smartcar_webhook_id`, `smartcar_management_token`, `smartcar_mode` (`live` | `simulated`, validated), `smartcar_state_secret` (D2), `smartcar_api_base_url`, `smartcar_auth_url`, `smartcar_connect_url`, `smartcar_timeout_seconds`, `telemetry_stale_after_minutes`. `SMARTCAR_WEBHOOK_SECRET` is removed from `services/api/.env.example`.
 - Dependency injection: `get_smartcar_client()` FastAPI dependency so tests can override it with a fake.
 
-**Fixtures:** `fixtures/smartcar/` (from F0's redacted real payloads)
-- `token_response.json`, `exchange_code_response.json`, `vehicles_list.json`, `vehicle_attributes_bz.json`
-- `webhook_soc_update.json` + `webhook_soc_update.signature` (signed with a test-only secret documented in the fixture README)
-- `webhook_out_of_order_older.json`, `webhook_unknown_signal.json`, `webhook_verify_challenge.json` (if V3 has a challenge)
-- `fixtures/smartcar/README.md` explaining provenance and the test secret.
+**Fixtures:** `fixtures/smartcar/`
+- From F0's redacted real responses: `connections_list.json`, `vehicle_bz.json`, `signals_bz.json`.
+- Synthetic, built from the documented shapes (labelled as such in the README until F5 captures real ones): `token_response.json`, `webhook_vehicle_state.json` + `.signature`, `webhook_out_of_order_older.json`, `webhook_unknown_signal.json`, `webhook_verify_challenge.json` + `.signature`.
+- `fixtures/smartcar/README.md` explaining provenance and the test-only management token.
 
 **Tests** (`tests/integrations/test_smartcar_*.py`), using `httpx.MockTransport` — no network:
-- Token caching and refresh.
-- Connect URL contains client ID, redirect URI, scopes, state.
-- Code exchange parses the fixture.
-- Signature: valid passes; tampered body fails; wrong secret fails; missing header fails.
-- Normalization: known signals map to codes/units; unknown signals preserved in `raw_payload`.
-- Timeout → `SMARTCAR_UNREACHABLE`.
+- Token caching and refresh; token request uses client credentials.
+- Connect URL contains application ID, `response_type=none`, redirect URI, scopes, state, mode, external ID.
+- Connections listing parses the fixture and follows pagination.
+- Signature: valid passes; tampered body fails; wrong secret fails; missing header fails. VERIFY challenge response matches the documented HMAC.
+- Normalization: the real bZ signals map to codes/units; `ERROR` signals are missing; unknown signals preserved in `raw_payload`; supported-signal rules.
+- Timeout → 504 `SMARTCAR_UNREACHABLE`; 5xx → 502.
+- Settings reject `SMARTCAR_MODE=test`.
 
 **Acceptance:** adapter fully covered by fixture tests; nothing outside `integrations/smartcar` imports `httpx` for Smartcar.
 
@@ -315,7 +317,7 @@ F4 and F5 don't touch the same files and could run in parallel once F3 lands; we
 | Layer | New tests |
 |---|---|
 | Migrations | RLS on new tables (existing test), round-trip, constraints |
-| Adapter | Token, connect URL, code exchange, signature, normalization, timeouts |
+| Adapter | Token, connect URL, connections listing, signature, normalization, timeouts |
 | Connect | Happy, denied, bad/expired state, duplicate, reconnect, subscribe failure |
 | Garage API | List, detail, ownership 404, disconnect (incl. Smartcar failure) |
 | Webhook | Invalid sig, duplicate, out-of-order, partial, unknown signal/vehicle, disconnected, DB failure |

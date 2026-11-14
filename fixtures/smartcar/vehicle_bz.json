@@ -1,0 +1,16 @@
+{
+  "data": {
+    "attributes": {
+      "make": "TOYOTA",
+      "mode": "live",
+      "model": "bZ XLE AWD",
+      "powertrainType": "BEV",
+      "year": 2026
+    },
+    "id": "redacted-id-3",
+    "links": {
+      "self": "redacted"
+    },
+    "type": "vehicle"
+  }
+}
