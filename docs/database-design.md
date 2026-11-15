@@ -231,7 +231,7 @@ Append-only log of every signal reading.
 | `signal_code` | `text` | e.g. `soc`, `odometer`, `range`, `charging_status`. |
 | `value` | `numeric` | Raw numeric. For booleans use 0/1 and document in a code table. Nullable when the signal has no numeric value (kept in `raw_payload`). |
 | `unit` | `text` | e.g. `percent`, `km`, `kwh`. Nullable. |
-| `raw_payload` | `jsonb` | Full normalized signal entry for auditability. |
+| `raw_payload` | `jsonb` | Full normalized signal entry for auditability: `{smartcar_code, outcome, error_code, text_value, retrieved_at, signal}`, where `signal` is the Smartcar entry as received. Errored and unmapped signals are stored too (with `value` `NULL`); unmapped ones keep Smartcar's code as `signal_code`. |
 | `is_simulated` | `boolean` | Default `false`. |
 
 Indexes:

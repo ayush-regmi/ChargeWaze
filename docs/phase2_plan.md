@@ -230,6 +230,16 @@ F4 and F5 don't touch the same files and could run in parallel once F3 lands; we
 
 ### F5 — Webhook ingestor (Dashboard slice, part 1)
 
+*Updated 2026-11-15 at implementation:*
+- *The vehicle is matched on the Smartcar vehicle ID and user ID together. A `pending` vehicle counts as not connected.*
+- *Errored signals (from `VEHICLE_STATE` or `VEHICLE_ERROR`) and unmapped signals are stored with `value` `NULL` and never change `latest_state`.*
+- *Text signals keep their text in `latest_state`, and booleans are stored as `true`/`false`.*
+- *`supported_signals` only grows, using the codes that report data.*
+- *A missing `eventId` gets 400. A signal with no timestamp falls back to `meta.deliveredAt`, and is skipped if that's missing too.*
+- *Unknown event types, and a `VEHICLE_ERROR` that doesn't parse, get 200 `accepted:false`.*
+- *Webhook subscribe/unsubscribe is still deferred, because the V3 calls are unverified. The Dashboard's auto-subscribe enrols vehicles, and D12 refuses telemetry for disconnected ones.*
+- *The concurrency guard (`FOR UPDATE`) is in place but has no automated test, because the test DB runs each test inside one transaction.*
+
 **Backend**
 - `POST /api/v1/webhooks/smartcar` (no Supabase auth). Steps exactly per arch §5:
   1. Read the **raw body** (before JSON parsing) and verify the signature. Fail → 401 `WEBHOOK_SIGNATURE_INVALID`, nothing persisted, nothing logged except the reason.
