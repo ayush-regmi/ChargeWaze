@@ -20,10 +20,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Connection, func, select
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
+from app.db.session import get_engine
 from app.integrations.smartcar.schemas import VehicleStateData, normalize_signals
 from app.integrations.smartcar.signatures import compute_signature
 from app.modules.users.models import Profile
@@ -488,6 +489,49 @@ def test_db_failure_returns_5xx(
     assert response.status_code == 500
     assert response.json()["error"]["code"] == "INTERNAL_ERROR"
     assert _count(db) == 0
+
+
+def test_db_failure_log_carries_no_sql_parameters_or_driver_detail(
+    api: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _add_vehicle(db)
+    secret_location = "40.712776,-74.005974"
+
+    class _DriverError(Exception):
+        sqlstate = "23505"
+
+    def _boom(*_: Any, **__: Any) -> Any:
+        raise IntegrityError(
+            "INSERT INTO vehicle_telemetry ... VALUES (%(raw_payload)s)",
+            {"raw_payload": {"vehicle": SC_VEHICLE, "user": SC_USER, "loc": secret_location}},
+            _DriverError(f"DETAIL: Key (source_event_id)=({SC_VEHICLE}) already exists"),
+        )
+
+    monkeypatch.setattr(webhook_router, "ingest_vehicle_event", _boom)
+    caplog.set_level(logging.DEBUG)
+    response = _post_fixture(api, "webhook_vehicle_state.json")
+    assert response.status_code == 500
+
+    (record,) = [r for r in caplog.records if r.getMessage() == "smartcar_webhook_ingest_failed"]
+    assert record.exc_info is None
+    assert record.__dict__["error_type"] == "IntegrityError"
+    assert record.__dict__["sqlstate"] == "23505"
+    for r in caplog.records:
+        rendered = f"{r.getMessage()} {r.__dict__}"
+        for leaked in (SC_USER, SC_VEHICLE, secret_location, "INSERT INTO"):
+            assert leaked not in rendered
+
+
+def test_engine_hides_sql_parameters() -> None:
+    get_engine.cache_clear()
+    try:
+        assert get_engine().hide_parameters is True
+    finally:
+        get_engine().dispose()
+        get_engine.cache_clear()
 
 
 def test_logs_never_carry_smartcar_ids_or_values(

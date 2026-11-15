@@ -22,6 +22,10 @@ def get_engine():
         settings.database_url,
         pool_pre_ping=True,
         future=True,
+        # Keep bound parameters out of exception text, so a traceback logged
+        # anywhere (including uvicorn's for unhandled errors) can't leak user
+        # data such as Smartcar IDs, telemetry payloads or location.
+        hide_parameters=True,
     )
 
 

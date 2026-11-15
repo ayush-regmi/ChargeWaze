@@ -118,9 +118,19 @@ def receive_smartcar_webhook(
 
     try:
         result = ingest_vehicle_event(db, event, data)
-    except SQLAlchemyError:
+    except SQLAlchemyError as exc:
         db.rollback()
-        logger.exception("smartcar_webhook_ingest_failed", extra={"event_id": event.event_id})
+        # No traceback or message: SQLAlchemy errors carry the SQL and bound
+        # parameters (Smartcar IDs, raw_payload, possibly location), and the
+        # driver message can echo values too (e.g. a unique-violation DETAIL).
+        logger.error(
+            "smartcar_webhook_ingest_failed",
+            extra={
+                "event_id": event.event_id,
+                "error_type": type(exc).__name__,
+                "sqlstate": getattr(getattr(exc, "orig", None), "sqlstate", None),
+            },
+        )
         raise ApiError(
             "INTERNAL_ERROR",
             "Webhook could not be stored; retry later.",

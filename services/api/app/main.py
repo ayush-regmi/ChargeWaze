@@ -8,6 +8,8 @@ conventions. Modules under ``app/modules/*`` register their own routers via
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -19,6 +21,7 @@ API_PREFIX = "/api/v1"
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    _quiet_http_client_logs()
 
     app = FastAPI(
         title="Chargewise API",
@@ -77,6 +80,18 @@ def _register_v1_routers(v1: APIRouter) -> None:
         router = getattr(mod, "router", None)
         if router is not None:
             v1.include_router(router)
+
+
+def _quiet_http_client_logs() -> None:
+    """Keep httpx/httpcore request logs (INFO/DEBUG) out of our logs.
+
+    They print full request URLs, and Smartcar URLs embed vehicle and
+    connection IDs (``/vehicles/{id}/signals``, ``/connections/{id}``), which
+    must never be logged. Warnings and errors still come through.
+    """
+
+    for name in ("httpx", "httpcore"):
+        logging.getLogger(name).setLevel(logging.WARNING)
 
 
 app = create_app()
