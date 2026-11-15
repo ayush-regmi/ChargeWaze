@@ -95,7 +95,7 @@ Returns the authenticated profile and user preferences (units, reserve SoC, pref
 
 ### 3.2 `GET /api/v1/vehicles`
 
-Lists only the caller's vehicles.
+Lists only the caller's vehicles, most recently connected first. By default only `connected` ones; `?include_disconnected=true` also returns disconnected (and pending) rows. Never calls Smartcar.
 
 **Response 200**
 ```json
@@ -107,13 +107,18 @@ Lists only the caller's vehicles.
       "model": "bZ",
       "year": 2026,
       "connection_status": "connected",
-      "supported_signals": ["soc", "odometer", "range", "charging"],
+      "supported_signals": ["soc", "range", "odometer", "charging_status"],
       "last_state_recorded_at": "2026-11-06T18:52:00Z",
       "is_stale": false
     }
   ]
 }
 ```
+
+- `last_state_recorded_at` is the newest provider timestamp in the cached `latest_state` ([`database-design.md`](database-design.md) §3.3), or `null` before the first webhook.
+- `is_stale` is `true` when there is no data yet or the newest reading is older than `TELEMETRY_STALE_AFTER_MINUTES` (default 15).
+
+**Errors:** `UNAUTHENTICATED`.
 
 ### 3.3 `POST /api/v1/vehicles/connect`
 
@@ -177,7 +182,10 @@ Webhook subscription is not done here yet; see F5 in [`phase2_plan.md`](phase2_p
   "year": 2026,
   "connection_status": "connected",
   "connected_at": "2026-11-02T09:15:00Z",
-  "supported_signals": ["soc", "odometer", "range", "charging"],
+  "disconnected_at": null,
+  "supported_signals": ["soc", "range", "odometer", "charging_status"],
+  "last_state_recorded_at": "2026-11-06T18:52:00Z",
+  "is_stale": false,
   "specs": {
     "usable_capacity_kwh": 71.4,
     "connectors": ["NACS", "J1772", "CCS1"],
@@ -191,6 +199,10 @@ Webhook subscription is not done here yet; see F5 in [`phase2_plan.md`](phase2_p
 ```
 
 `connectors` reflects the physical port plus adapters the user has configured. `charging_curve` is a piecewise representation consumed by the energy module.
+
+The vehicle may be disconnected (it's still the caller's). `last_state_recorded_at`, `is_stale` and `disconnected_at` are the same as in §3.2. `usable_capacity_kwh` is `null` when it isn't known (no catalog entry and not entered by the user); `specs` is `null` if the row has none. Never calls Smartcar.
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID; `NOT_FOUND` if it doesn't exist **or belongs to another user** (the two are indistinguishable).
 
 ### 3.5 `GET /api/v1/vehicles/{id}/state`
 
@@ -218,9 +230,16 @@ If no telemetry has ever arrived, responds `200` with `signals: {}` and `is_stal
 
 ### 3.6 `DELETE /api/v1/vehicles/{id}`
 
-Disconnects the Smartcar authorization, unsubscribes webhooks, and marks the vehicle row disconnected (keeping it for historical trips).
+Marks the vehicle row `disconnected` (keeping it for historical trips) and revokes its Smartcar connection (`DELETE /v3/connections/{id}`).
 
 **Response 204** — no body.
+
+- **Local disconnect wins:** the row is marked disconnected even if Smartcar is unreachable or refuses, so the webhook ingestor stops accepting the vehicle's telemetry. The failure is logged and the connection ID is kept for a later retry (see [`database-design.md`](database-design.md) §3.3). A `404` from Smartcar (connection already gone) counts as revoked.
+- **Idempotent:** disconnecting an already-disconnected vehicle returns `204` without calling Smartcar again.
+- **Webhooks:** Smartcar V3's per-vehicle unsubscribe isn't confirmed yet ([`smartcar-v3-notes.md`](smartcar-v3-notes.md) §5), so nothing is unsubscribed here; deliveries for a disconnected vehicle are acknowledged and dropped (`accepted: false`, phase2_plan.md D12). F5 settles unsubscription.
+- Reconnecting the same car later reactivates this row (D4).
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID; `NOT_FOUND` if it doesn't exist or belongs to another user.
 
 ### 3.7 `POST /api/v1/routes/plan`
 

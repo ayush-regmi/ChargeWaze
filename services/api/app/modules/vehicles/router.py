@@ -1,4 +1,4 @@
-"""HTTP routes for the vehicles module (``docs/api-contracts.md`` §3.3).
+"""HTTP routes for the vehicles module (``docs/api-contracts.md`` §3.2-3.6).
 
 Connect is a two-step flow, both steps authenticated with the Supabase JWT:
 
@@ -17,8 +17,10 @@ Smartcar's ``externalId`` would both name the attacker.
 from __future__ import annotations
 
 import logging
+import uuid
+from datetime import timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query, Response, status
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -29,6 +31,7 @@ from app.db.session import get_db
 from app.integrations.smartcar.client import SmartcarClient, get_smartcar_client
 from app.modules.auth.dependencies import AuthenticatedUser, get_current_user
 from app.modules.users.service import get_or_create_profile
+from app.modules.vehicles.garage import disconnect_vehicle, get_vehicle_detail, list_vehicles
 from app.modules.vehicles.redirects import DEFAULT_REDIRECT_AFTER
 from app.modules.vehicles.schemas import (
     ConnectCompleteRequest,
@@ -36,6 +39,8 @@ from app.modules.vehicles.schemas import (
     ConnectFlag,
     ConnectRequest,
     ConnectResponse,
+    VehicleDetail,
+    VehicleList,
 )
 from app.modules.vehicles.service import complete_connect
 from app.modules.vehicles.state import InvalidStateError, issue_state, verify_state
@@ -130,6 +135,65 @@ def complete_vehicle_connect(
         return _result("already_connected", claims.redirect_after)
 
     return _result(result.outcome, claims.redirect_after)
+
+
+@router.get("", response_model=VehicleList)
+def get_vehicles(
+    include_disconnected: bool = Query(
+        default=False, description="Also return vehicles the user disconnected."
+    ),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> VehicleList:
+    """The caller's vehicles for the Garage (api §3.2). Never calls Smartcar."""
+
+    items = list_vehicles(
+        db,
+        user_id=current_user.user_id,
+        include_disconnected=include_disconnected,
+        stale_after=_stale_after(settings),
+    )
+    return VehicleList(items=items)
+
+
+@router.get("/{vehicle_id}", response_model=VehicleDetail)
+def get_vehicle(
+    vehicle_id: uuid.UUID,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> VehicleDetail:
+    """One vehicle with its specs (api §3.4). ``NOT_FOUND`` unless the caller owns it."""
+
+    return get_vehicle_detail(
+        db,
+        user_id=current_user.user_id,
+        vehicle_id=vehicle_id,
+        stale_after=_stale_after(settings),
+    )
+
+
+@router.delete("/{vehicle_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+def delete_vehicle(
+    vehicle_id: uuid.UUID,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    smartcar: SmartcarClient = Depends(get_smartcar_client),
+) -> Response:
+    """Disconnect a vehicle (api §3.6). The row is kept for history.
+
+    Returns ``204`` even when Smartcar can't be reached: the local disconnect
+    is what stops telemetry being accepted, and revocation can be retried.
+    """
+
+    disconnect_vehicle(db, smartcar, user_id=current_user.user_id, vehicle_id=vehicle_id)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _stale_after(settings: Settings) -> timedelta:
+    return timedelta(minutes=settings.telemetry_stale_after_minutes)
 
 
 def _result(

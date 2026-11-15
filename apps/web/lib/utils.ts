@@ -1,7 +1,6 @@
 /**
- * Tiny class-name joiner. Mirrors the behavior of `clsx` for the handful of
- * cases Chargewise needs without pulling the dep in just yet.
+ * Class-name joiner with Tailwind conflict resolution (clsx + tailwind-merge
+ * semantics). Provided by shadcn's `cn` package; shadcn/ui components in
+ * `components/ui` import it directly.
  */
-export function cn(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(" ");
-}
+export { cn } from "cn";

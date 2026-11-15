@@ -10,7 +10,15 @@ import { NAV_ITEMS } from "@/lib/nav";
  * Mobile bottom tab bar. Shows a condensed version of the primary nav.
  */
 export function MobileNav() {
-  const pathname = usePathname();
+  return <MobileNavLinks pathname={usePathname()} />;
+}
+
+/**
+ * The links themselves. `pathname` is null in the Suspense fallback the layout
+ * renders while the URL isn't known yet (prerendering a dynamic route), so no
+ * item is highlighted until it streams in.
+ */
+export function MobileNavLinks({ pathname }: { pathname: string | null }) {
   return (
     <nav
       aria-label="Primary"
@@ -18,7 +26,8 @@ export function MobileNav() {
     >
       {NAV_ITEMS.map((item) => {
         const active =
-          pathname === item.href || pathname?.startsWith(`${item.href}/`);
+          pathname !== null &&
+          (pathname === item.href || pathname.startsWith(`${item.href}/`));
         return (
           <Link
             key={item.href}

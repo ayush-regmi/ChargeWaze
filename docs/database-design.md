@@ -172,16 +172,33 @@ Constraints:
 | `user_id` | `uuid` FK → `profiles.id` ON DELETE CASCADE | |
 | `smartcar_vehicle_id` | `text` | Nullable for simulated vehicles. |
 | `smartcar_user_id` | `text` | Nullable for simulated vehicles. Smartcar V3 stores no per-user tokens; the application token + this ID are enough ([`smartcar-v3-notes.md`](smartcar-v3-notes.md)). |
-| `smartcar_connection_id` | `text` | Nullable. Smartcar V3 connection ID, used by disconnect (`DELETE /v3/connections/{id}`). |
+| `smartcar_connection_id` | `text` | Nullable. Smartcar V3 connection ID, used by disconnect (`DELETE /v3/connections/{id}`). Cleared once Smartcar confirms the revocation; a `disconnected` row that still has one is a revocation still owed (Smartcar was unreachable at disconnect time). |
 | `make` | `text` | Not null. |
 | `model` | `text` | Not null. |
 | `year` | `int` | Not null. |
 | `connection_status` | `text` | `'connected'`, `'disconnected'`, `'pending'`. Default `'pending'`. |
 | `supported_signals` | `jsonb` | Array of signal codes returned by Smartcar for this vehicle. Default `[]`. |
-| `latest_state` | `jsonb` | Cached snapshot: `{ recorded_at, received_at, signals: {...} }`. Updated by the webhook ingestor. `NULL` until the first event arrives. |
+| `latest_state` | `jsonb` | Cached snapshot, see shape below. Written only by the webhook ingestor. `NULL` until the first event arrives. |
 | `connected_at` | `timestamptz` | Nullable. |
 | `disconnected_at` | `timestamptz` | Nullable. Set on disconnect, cleared on reconnect. |
 | `is_simulated` | `boolean` | Default `false`. |
+
+`latest_state` shape (phase2_plan.md D5):
+
+```json
+{
+  "recorded_at": "2026-11-06T18:52:00Z",
+  "received_at": "2026-11-06T18:52:08Z",
+  "signals": {
+    "soc": { "value": 72, "unit": "percent", "recorded_at": "2026-11-06T18:52:00Z" }
+  }
+}
+```
+
+- Keys under `signals` are Chargewise signal codes (the same ones as `supported_signals`).
+- Each signal keeps its own provider `recorded_at` and only moves forward (out-of-order rule, D5).
+- The top-level `recorded_at` is the max across signals; `received_at` is our clock for the newest delivery.
+- Readers take the max of the top-level and per-signal `recorded_at` and treat anything malformed as "no data yet".
 
 Constraints and indexes:
 - `CHECK (connection_status IN ('connected', 'disconnected', 'pending'))`.
