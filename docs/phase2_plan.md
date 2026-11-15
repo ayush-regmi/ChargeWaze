@@ -204,24 +204,27 @@ F4 and F5 don't touch the same files and could run in parallel once F3 lands; we
 
 ### F4 — Garage list, detail, disconnect (Garage slice, part 2)
 
-**Backend**
-- `GET /api/v1/vehicles` → api §3.2. Lists the caller's vehicles with `connection_status = 'connected'` by default (`?include_disconnected=true` optional). Includes `last_state_recorded_at` and `is_stale` computed from `latest_state`.
-- `GET /api/v1/vehicles/{id}` → api §3.4 with `specs`.
-- `DELETE /api/v1/vehicles/{id}` → api §3.6: unsubscribe webhook, revoke Smartcar access, set `disconnected` + `disconnected_at`, return 204. If Smartcar fails, still mark disconnected locally (so telemetry stops being accepted, E3), log the failure, and return 204 — retrying revocation is a follow-up job. *(Flag: confirm you're OK with "local disconnect wins"; the alternative is returning 502 and leaving the vehicle connected.)*
-- Ownership: every handler loads by `(id, user_id)` and returns **404** if not owned (guidelines §Security).
-- Pydantic response models in `modules/vehicles/schemas.py`; regenerate the TS client.
+**Backend** (shipped)
+- `GET /api/v1/vehicles` → api §3.2: the caller's `connected` vehicles, most recently connected first; `?include_disconnected=true` adds the rest. `last_state_recorded_at` / `is_stale` come from `latest_state` (`modules/vehicles/latest_state.py`) and `TELEMETRY_STALE_AFTER_MINUTES` (D11).
+- `GET /api/v1/vehicles/{id}` → api §3.4 with `specs`, plus the additive `last_state_recorded_at`, `is_stale`, `disconnected_at`. Disconnected vehicles are still readable by their owner.
+- `DELETE /api/v1/vehicles/{id}` → api §3.6: mark `disconnected` + `disconnected_at` first, then `delete_connection`; 204 either way ("local disconnect wins", approved 2026-11-13). `smartcar_connection_id` is cleared only when Smartcar confirms (or answers 404), so a disconnected row that still has one is a revocation owed; the retry job is a follow-up. Idempotent: a second DELETE doesn't call Smartcar.
+- **Webhook unsubscribe moved to F5:** a per-vehicle V3 unsubscribe isn't confirmed (`smartcar-v3-notes.md` §5). Telemetry for a disconnected vehicle is already refused by D12.
+- **`latest_state` shape defined here** (`database-design.md` §3.3) so F4 can read it; F5 writes it.
+- Ownership: every handler loads by `(id, user_id)`; another user's vehicle → **404**. Logs carry the revocation outcome only, never Smartcar IDs.
+- Logic in `modules/vehicles/garage.py`, models in `schemas.py`; the TS client is regenerated from OpenAPI in CI.
 
-**Frontend**
-- Garage page lists vehicle cards: make, model, year, status badge, supported signals, last update time (local time) + stale marker.
-- Vehicle detail (drawer or `/garage/[id]`): specs (capacity, connectors, charging curve) read-only for now.
-- Disconnect button with a confirm dialog (shadcn `AlertDialog`) → server action → refresh list.
-- Empty state: "No vehicles yet — Add vehicle".
+**Frontend** (shipped)
+- shadcn/ui is set up (`components.json`, Radix base) with `button` and `alert-dialog` only. Dark mode stays on `prefers-color-scheme`, so the generated `.dark` variant was not adopted. The `shadcn` CLI is not a dependency; add components with `npx shadcn@latest add <name>`.
+- Garage page lists vehicle cards: title, status, freshness badge (Up to date / Stale / Awaiting first update), last update in the viewer's local time, supported signals; empty state "No vehicles yet".
+- `/garage/[id]`: status, freshness, signals, read-only specs ("Not set" when unknown).
+- Disconnect: `AlertDialog` confirm → `disconnectVehicle` server action → redirect to `/garage`; errors stay in the dialog.
+- The `(app)` layout's navs are wrapped in Suspense (static fallback without the active highlight): `usePathname()` outside Suspense blocked prerendering the new dynamic route.
 
 **Tests**
-- pytest: list returns only the caller's vehicles; other user's vehicle → 404 on GET and DELETE; disconnect calls unsubscribe + revoke on the fake client, sets status, hides from default list; Smartcar failure during disconnect still disconnects locally.
-- Vitest: vehicle card renders signals and stale marker; empty state.
+- pytest (`test_vehicle_garage.py`, `test_latest_state.py`): auth required; only the caller's vehicles; default vs `include_disconnected`; ordering; no telemetry / fresh / stale / per-signal max / malformed `latest_state`; no Smartcar call on reads; detail with specs, null capacity, no specs, disconnected; another user's vehicle → 404 on GET and DELETE (and untouched); unknown id → 404; non-UUID → 422; disconnect revokes + hides from the list + keeps the row; Smartcar 500/401/unreachable/not configured still disconnects locally and keeps the connection ID; Smartcar 404 counts as revoked; no connection ID skips Smartcar; idempotent; no Smartcar IDs in logs.
+- Vitest: vehicle card (signals, link, up-to-date, stale, awaiting, no button when disconnected), empty state, specs panel, confirm dialog (cancel doesn't call the action; failure shows the error and keeps the dialog open), label/freshness helpers.
 
-**Acceptance:** Garage lists the connected car with real supported signals; disconnecting removes it from the list.
+**Acceptance:** Garage lists the connected car with real supported signals; disconnecting removes it from the list. *(Manual check with the Toyota still to do.)*
 
 ---
 
@@ -339,7 +342,7 @@ F4 and F5 don't touch the same files and could run in parallel once F3 lands; we
 | Event cadence too low for a 15-min freshness threshold. | Threshold is a setting; measured in F8; polling fallback opened as an issue if needed. |
 | Tunnel URL changes break webhook delivery in dev. | Static ngrok domain (D9) + local `send_test_webhook.py`. |
 | Race between concurrent webhook deliveries. | Single transaction, `FOR UPDATE` on the vehicle row, per-signal monotonic update. |
-| Smartcar outage during disconnect. | Local disconnect still succeeds; revocation failure logged (F4 flag). |
+| Smartcar outage during disconnect. | Local disconnect still succeeds; revocation failure logged and the connection ID kept, so a retry job (follow-up) can find owed revocations. |
 
 ## 8. How we'll work through it
 

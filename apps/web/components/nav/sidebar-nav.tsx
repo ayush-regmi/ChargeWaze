@@ -10,12 +10,21 @@ import { NAV_ITEMS } from "@/lib/nav";
  * Desktop sidebar. Rendered inside `app/(app)/layout.tsx`.
  */
 export function SidebarNav() {
-  const pathname = usePathname();
+  return <SidebarNavLinks pathname={usePathname()} />;
+}
+
+/**
+ * The links themselves. `pathname` is null in the Suspense fallback the layout
+ * renders while the URL isn't known yet (prerendering a dynamic route), so no
+ * item is highlighted until it streams in.
+ */
+export function SidebarNavLinks({ pathname }: { pathname: string | null }) {
   return (
     <nav aria-label="Primary" className="flex flex-col gap-1 p-4">
       {NAV_ITEMS.map((item) => {
         const active =
-          pathname === item.href || pathname?.startsWith(`${item.href}/`);
+          pathname !== null &&
+          (pathname === item.href || pathname.startsWith(`${item.href}/`));
         return (
           <Link
             key={item.href}
