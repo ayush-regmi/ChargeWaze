@@ -12,9 +12,11 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.modules.users.models import UserPreferences
+from app.modules.vehicles.garage import is_connected_vehicle
 from app.modules.vehicles.models import VehicleSpecs
 from tests import test_vehicle_garage as garage
 from tests.conftest import TEST_USER_ID
@@ -149,6 +151,8 @@ def test_primary_unknown_vehicle_is_404_and_nothing_changes(
         {"reserve_soc": -0.1},
         {"reserve_soc": 1.5},
         {"preferred_charge_to": 2},
+        {"reserve_soc": 0.7999},  # numeric(4, 3) would round it to 0.800
+        {"preferred_charge_to": 0.8501},
         {"max_detour_minutes": -1},
         {"max_detour_minutes": 241},
         {"preferred_networks": [""]},
@@ -355,3 +359,21 @@ def test_specs_validation_errors(
     row = db.get(VehicleSpecs, vehicle.id)
     assert row is not None
     assert row.connectors == ["NACS"]
+
+
+def test_primary_check_locks_the_vehicle_row(db: Session) -> None:
+    """The check must take the same row lock as disconnect, so the two serialize."""
+
+    vehicle = _add_vehicle(db)
+    statements: list[str] = []
+
+    def _capture(conn: Any, cursor: Any, statement: str, *args: Any) -> None:
+        statements.append(statement)
+
+    engine = db.get_bind()
+    event.listen(engine, "before_cursor_execute", _capture)
+    try:
+        assert is_connected_vehicle(db, user_id=TEST_USER_ID, vehicle_id=vehicle.id)
+    finally:
+        event.remove(engine, "before_cursor_execute", _capture)
+    assert any("FOR UPDATE" in s for s in statements)

@@ -86,14 +86,23 @@ def get_vehicle_detail(
 
 
 def is_connected_vehicle(db: Session, *, user_id: uuid.UUID, vehicle_id: uuid.UUID) -> bool:
-    """True if ``vehicle_id`` is one of the caller's connected vehicles."""
+    """True if ``vehicle_id`` is one of the caller's connected vehicles.
+
+    Locks the vehicle row (``FOR UPDATE``) until the caller commits, the same
+    lock ``disconnect_vehicle`` takes. Setting it as primary and disconnecting
+    it are therefore serialized: either the disconnect runs after the new
+    primary is committed and clears it, or this check waits, re-reads the row
+    as disconnected and returns False.
+    """
 
     found = db.scalar(
-        select(Vehicle.id).where(
+        select(Vehicle.id)
+        .where(
             Vehicle.id == vehicle_id,
             Vehicle.user_id == user_id,
             Vehicle.connection_status == "connected",
         )
+        .with_for_update()
     )
     return found is not None
 

@@ -11,6 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 MAX_PREFERRED_NETWORKS = 20
 MAX_NETWORK_NAME_LENGTH = 100
 MAX_DETOUR_MINUTES = 240
+# user_preferences.reserve_soc / preferred_charge_to are numeric(4, 3).
+SOC_DECIMAL_PLACES = 3
 
 
 class UserPreferencesOut(BaseModel):
@@ -51,6 +53,15 @@ class UserPreferencesUpdate(BaseModel):
         # client sent an explicit null.
         if value is None:
             raise ValueError("may be omitted but not null.")
+        return value
+
+    @field_validator("reserve_soc", "preferred_charge_to")
+    @classmethod
+    def _storage_precision(cls, value: float | None) -> float | None:
+        # Stored as numeric(4, 3): finer values would be rounded by Postgres
+        # after the ordering check, e.g. 0.7999 -> 0.800 == preferred_charge_to.
+        if value is not None and round(value, SOC_DECIMAL_PLACES) != value:
+            raise ValueError(f"use at most {SOC_DECIMAL_PLACES} decimal places.")
         return value
 
     @field_validator("preferred_networks")

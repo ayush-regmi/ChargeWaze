@@ -114,7 +114,7 @@ Partially updates the caller's preferences. Only the keys present in the body ch
 
 **Response 200** — the updated `preferences` object.
 
-- `units` is `imperial` or `metric`. `reserve_soc` and `preferred_charge_to` are fractions in `[0, 1]`, and after the update `reserve_soc` must be lower than `preferred_charge_to`. `max_detour_minutes` is `0`–`240`. `preferred_networks` holds at most 20 distinct, non-empty names (≤ 100 chars each).
+- `units` is `imperial` or `metric`. `reserve_soc` and `preferred_charge_to` are fractions in `[0, 1]` with at most three decimal places (their stored precision), and after the update `reserve_soc` must be lower than `preferred_charge_to`. `max_detour_minutes` is `0`–`240`. `preferred_networks` holds at most 20 distinct, non-empty names (≤ 100 chars each).
 - `primary_vehicle_id` must be one of the caller's **connected** vehicles; `null` clears it. The Dashboard shows the primary vehicle, else the most recently connected one.
 - Disconnecting the primary vehicle (§3.6) clears `primary_vehicle_id`.
 - `null` is only accepted for `primary_vehicle_id`; other keys must be omitted rather than set to `null`.
