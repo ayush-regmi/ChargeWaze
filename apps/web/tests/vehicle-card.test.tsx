@@ -8,7 +8,10 @@ import type { VehicleSummary } from "@/lib/vehicles";
 
 // The server action module pulls in Supabase/Next server code; the card only
 // needs a callable.
-vi.mock("@/app/(app)/garage/actions", () => ({ disconnectVehicle: vi.fn() }));
+vi.mock("@/app/(app)/garage/actions", () => ({
+  disconnectVehicle: vi.fn(),
+  setPrimaryVehicle: vi.fn(),
+}));
 
 const base: VehicleSummary = {
   id: "0b6c1f7e-2d3a-4c5b-8e9f-0a1b2c3d4e5f",
@@ -60,6 +63,19 @@ describe("VehicleCard", () => {
   it("has no disconnect button for a disconnected vehicle", () => {
     render(<VehicleCard vehicle={{ ...base, connection_status: "disconnected" }} />);
     expect(screen.queryByRole("button", { name: "Disconnect" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Set as primary" })).not.toBeInTheDocument();
+  });
+
+  it("offers 'Set as primary' on a connected non-primary vehicle", () => {
+    render(<VehicleCard vehicle={base} />);
+    expect(screen.getByRole("button", { name: "Set as primary" })).toBeInTheDocument();
+    expect(screen.queryByText("Primary")).not.toBeInTheDocument();
+  });
+
+  it("shows the Primary badge instead of the button on the primary vehicle", () => {
+    render(<VehicleCard vehicle={base} isPrimary />);
+    expect(screen.getByText("Primary")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Set as primary" })).not.toBeInTheDocument();
   });
 });
 

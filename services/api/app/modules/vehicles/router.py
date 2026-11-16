@@ -31,7 +31,12 @@ from app.db.session import get_db
 from app.integrations.smartcar.client import SmartcarClient, get_smartcar_client
 from app.modules.auth.dependencies import AuthenticatedUser, get_current_user
 from app.modules.users.service import get_or_create_profile
-from app.modules.vehicles.garage import disconnect_vehicle, get_vehicle_detail, list_vehicles
+from app.modules.vehicles.garage import (
+    disconnect_vehicle,
+    get_vehicle_detail,
+    list_vehicles,
+    update_specs,
+)
 from app.modules.vehicles.redirects import DEFAULT_REDIRECT_AFTER
 from app.modules.vehicles.schemas import (
     ConnectCompleteRequest,
@@ -41,6 +46,8 @@ from app.modules.vehicles.schemas import (
     ConnectResponse,
     VehicleDetail,
     VehicleList,
+    VehicleSpecsOut,
+    VehicleSpecsUpdate,
     VehicleState,
 )
 from app.modules.vehicles.service import complete_connect
@@ -174,6 +181,23 @@ def get_vehicle(
         vehicle_id=vehicle_id,
         stale_after=_stale_after(settings),
     )
+
+
+@router.patch("/{vehicle_id}/specs", response_model=VehicleSpecsOut)
+def patch_specs(
+    vehicle_id: uuid.UUID,
+    body: VehicleSpecsUpdate,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> VehicleSpecsOut:
+    """Edit capacity, connectors and charging curve (api §3.4a).
+
+    ``NOT_FOUND`` unless the caller owns the vehicle (connected or not).
+    """
+
+    specs = update_specs(db, user_id=current_user.user_id, vehicle_id=vehicle_id, changes=body)
+    db.commit()
+    return specs
 
 
 @router.get("/{vehicle_id}/state", response_model=VehicleState)

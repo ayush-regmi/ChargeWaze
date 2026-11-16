@@ -27,12 +27,14 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.errors import ApiError
 from app.integrations.smartcar.client import SmartcarClient
+from app.modules.users.service import clear_primary_vehicle
 from app.modules.vehicles.latest_state import is_stale, last_recorded_at
-from app.modules.vehicles.models import Vehicle
+from app.modules.vehicles.models import Vehicle, VehicleSpecs
 from app.modules.vehicles.schemas import (
     ChargingCurvePoint,
     VehicleDetail,
     VehicleSpecsOut,
+    VehicleSpecsUpdate,
     VehicleSummary,
 )
 
@@ -79,15 +81,69 @@ def get_vehicle_detail(
         **summary.model_dump(),
         connected_at=vehicle.connected_at,
         disconnected_at=vehicle.disconnected_at,
-        specs=None
-        if specs is None
-        else VehicleSpecsOut(
-            usable_capacity_kwh=None
-            if specs.usable_capacity_kwh is None
-            else float(specs.usable_capacity_kwh),
-            connectors=list(specs.connectors),
-            charging_curve=[ChargingCurvePoint.model_validate(p) for p in specs.charging_curve],
-        ),
+        specs=None if specs is None else _specs_out(specs),
+    )
+
+
+def is_connected_vehicle(db: Session, *, user_id: uuid.UUID, vehicle_id: uuid.UUID) -> bool:
+    """True if ``vehicle_id`` is one of the caller's connected vehicles."""
+
+    found = db.scalar(
+        select(Vehicle.id).where(
+            Vehicle.id == vehicle_id,
+            Vehicle.user_id == user_id,
+            Vehicle.connection_status == "connected",
+        )
+    )
+    return found is not None
+
+
+def update_specs(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    vehicle_id: uuid.UUID,
+    changes: VehicleSpecsUpdate,
+) -> VehicleSpecsOut:
+    """Apply a partial specs update (api §3.4a). Caller commits.
+
+    Allowed for connected and disconnected vehicles the caller owns; creates
+    the specs row if missing. Never calls Smartcar.
+    """
+
+    vehicle = db.scalar(
+        select(Vehicle)
+        .options(selectinload(Vehicle.specs))
+        .where(Vehicle.id == vehicle_id, Vehicle.user_id == user_id)
+        .with_for_update()
+    )
+    if vehicle is None:
+        raise _not_found()
+    specs = vehicle.specs
+    if specs is None:
+        specs = VehicleSpecs(vehicle_id=vehicle.id, connectors=[], charging_curve=[])
+        vehicle.specs = specs
+
+    fields = changes.model_dump(exclude_unset=True)
+    if "usable_capacity_kwh" in fields:
+        specs.usable_capacity_kwh = fields["usable_capacity_kwh"]
+    if "connectors" in fields:
+        specs.connectors = list(fields["connectors"])
+    if "charging_curve" in fields:
+        specs.charging_curve = [
+            {"soc": p["soc"], "power_kw": p["power_kw"]} for p in fields["charging_curve"]
+        ]
+    db.flush()
+    return _specs_out(specs)
+
+
+def _specs_out(specs: VehicleSpecs) -> VehicleSpecsOut:
+    return VehicleSpecsOut(
+        usable_capacity_kwh=None
+        if specs.usable_capacity_kwh is None
+        else float(specs.usable_capacity_kwh),
+        connectors=list(specs.connectors),
+        charging_curve=[ChargingCurvePoint.model_validate(p) for p in specs.charging_curve],
     )
 
 
@@ -118,6 +174,8 @@ def disconnect_vehicle(
     # Local state first: telemetry must stop being accepted whatever Smartcar does.
     vehicle.connection_status = "disconnected"
     vehicle.disconnected_at = now or datetime.now(UTC)
+    # A disconnected car must not stay the Dashboard's primary (api §3.6).
+    clear_primary_vehicle(db, user_id=user_id, vehicle_id=vehicle.id)
 
     outcome = _revoke(smartcar, vehicle)
     if outcome in ("revoked", "already_revoked"):
@@ -164,4 +222,11 @@ def _not_found() -> ApiError:
     return ApiError("NOT_FOUND", "Vehicle not found.", status_code=status.HTTP_404_NOT_FOUND)
 
 
-__all__ = ["RevocationOutcome", "disconnect_vehicle", "get_vehicle_detail", "list_vehicles"]
+__all__ = [
+    "RevocationOutcome",
+    "disconnect_vehicle",
+    "get_vehicle_detail",
+    "is_connected_vehicle",
+    "list_vehicles",
+    "update_specs",
+]

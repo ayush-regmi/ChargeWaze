@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
+from itertools import pairwise
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.vehicles.redirects import (
     DEFAULT_REDIRECT_AFTER,
@@ -88,6 +90,63 @@ class VehicleSpecsOut(BaseModel):
     charging_curve: list[ChargingCurvePoint]
 
 
+Connector = Literal["NACS", "CCS1", "J1772", "CHAdeMO"]
+
+MAX_USABLE_CAPACITY_KWH = Decimal("300")
+MAX_CHARGING_POWER_KW = 1000.0
+MAX_CHARGING_CURVE_POINTS = 20
+
+
+class ChargingCurvePointIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    soc: float = Field(ge=0, le=1)
+    power_kw: float = Field(gt=0, le=MAX_CHARGING_POWER_KW)
+
+
+class VehicleSpecsUpdate(BaseModel):
+    """Body for ``PATCH /api/v1/vehicles/{id}/specs`` (api §3.4a).
+
+    Only keys present in the body change. ``usable_capacity_kwh: null`` clears
+    the capacity; ``connectors`` and ``charging_curve`` can't be null (send
+    ``[]`` to clear them).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    usable_capacity_kwh: Decimal | None = Field(
+        default=None, gt=0, le=MAX_USABLE_CAPACITY_KWH, decimal_places=2
+    )
+    connectors: list[Connector] | None = Field(default=None, max_length=4)
+    charging_curve: list[ChargingCurvePointIn] | None = Field(
+        default=None, max_length=MAX_CHARGING_CURVE_POINTS
+    )
+
+    @field_validator("connectors", "charging_curve")
+    @classmethod
+    def _not_null(cls, value: object) -> object:
+        # Validators don't run for defaults, so this only fires on explicit null.
+        if value is None:
+            raise ValueError("may be omitted but not null; send [] to clear.")
+        return value
+
+    @field_validator("connectors")
+    @classmethod
+    def _distinct_connectors(cls, value: list[str] | None) -> list[str] | None:
+        if value is not None and len(set(value)) != len(value):
+            raise ValueError("connectors must be distinct.")
+        return value
+
+    @field_validator("charging_curve")
+    @classmethod
+    def _increasing_soc(
+        cls, value: list[ChargingCurvePointIn] | None
+    ) -> list[ChargingCurvePointIn] | None:
+        if value is not None and any(b.soc <= a.soc for a, b in pairwise(value)):
+            raise ValueError("charging_curve soc values must be strictly increasing.")
+        return value
+
+
 class VehicleDetail(VehicleSummary):
     """Vehicle detail (api §3.4). Adds timestamps and specs to the summary."""
 
@@ -123,15 +182,18 @@ class VehicleState(BaseModel):
 
 __all__ = [
     "ChargingCurvePoint",
+    "ChargingCurvePointIn",
     "ConnectCompleteRequest",
     "ConnectCompleteResponse",
     "ConnectFlag",
     "ConnectRequest",
     "ConnectResponse",
     "ConnectionStatus",
+    "Connector",
     "VehicleDetail",
     "VehicleList",
     "VehicleSpecsOut",
+    "VehicleSpecsUpdate",
     "VehicleState",
     "VehicleStateSignals",
     "VehicleSummary",

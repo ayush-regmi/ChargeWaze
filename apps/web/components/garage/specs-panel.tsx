@@ -1,13 +1,24 @@
+import type { ReactNode } from "react";
+
 import type { VehicleDetail } from "@/lib/vehicles";
 
-/** Read-only specs (api §3.4). Editing comes with F7. */
-export function SpecsPanel({ specs }: { specs: VehicleDetail["specs"] }) {
+/** Read-only specs (api §3.4). `action` is the Edit button from SpecsEditor. */
+export function SpecsPanel({
+  specs,
+  action,
+}: {
+  specs: VehicleDetail["specs"];
+  action?: ReactNode;
+}) {
   const capacity = specs?.usable_capacity_kwh;
   const connectors = specs?.connectors ?? [];
   const curve = specs?.charging_curve ?? [];
   return (
     <div className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-      <h2 className="text-sm font-medium">Specs</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium">Specs</h2>
+        {action}
+      </div>
       <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <dt className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
@@ -51,8 +62,8 @@ export function SpecsPanel({ specs }: { specs: VehicleDetail["specs"] }) {
       </div>
       {capacity == null ? (
         <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          Smartcar doesn&apos;t report battery capacity for this vehicle, and editing
-          specs isn&apos;t available yet.
+          Smartcar doesn&apos;t report battery capacity for this vehicle. Add it with
+          Edit specs so trip planning can estimate range.
         </p>
       ) : null}
     </div>

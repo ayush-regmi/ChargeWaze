@@ -4,6 +4,7 @@ import { signalLabel, vehicleTitle, type VehicleSummary } from "@/lib/vehicles";
 
 import { DisconnectButton } from "./disconnect-button";
 import { FreshnessBadge } from "./freshness-badge";
+import { PrimaryBadge, SetPrimaryButton } from "./set-primary-button";
 
 export function SignalList({ signals }: { signals: string[] }) {
   if (signals.length === 0) {
@@ -27,7 +28,14 @@ export function SignalList({ signals }: { signals: string[] }) {
   );
 }
 
-export function VehicleCard({ vehicle }: { vehicle: VehicleSummary }) {
+export function VehicleCard({
+  vehicle,
+  isPrimary = false,
+}: {
+  vehicle: VehicleSummary;
+  /** True when this is the user's chosen primary vehicle (shown on the Dashboard). */
+  isPrimary?: boolean;
+}) {
   const title = vehicleTitle(vehicle);
   const connected = vehicle.connection_status === "connected";
   return (
@@ -37,16 +45,24 @@ export function VehicleCard({ vehicle }: { vehicle: VehicleSummary }) {
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
-          <h2 className="text-lg font-semibold">
-            <Link href={`/garage/${vehicle.id}`} className="hover:underline">
-              {title}
-            </Link>
-          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold">
+              <Link href={`/garage/${vehicle.id}`} className="hover:underline">
+                {title}
+              </Link>
+            </h2>
+            {isPrimary ? <PrimaryBadge /> : null}
+          </div>
           <p className="text-sm capitalize text-neutral-600 dark:text-neutral-400">
             {vehicle.connection_status}
           </p>
         </div>
-        {connected ? <DisconnectButton vehicleId={vehicle.id} vehicleName={title} /> : null}
+        {connected ? (
+          <div className="flex flex-wrap items-start gap-2">
+            {isPrimary ? null : <SetPrimaryButton vehicleId={vehicle.id} />}
+            <DisconnectButton vehicleId={vehicle.id} vehicleName={title} />
+          </div>
+        ) : null}
       </div>
       <FreshnessBadge vehicle={vehicle} />
       <SignalList signals={vehicle.supported_signals} />
