@@ -84,6 +84,7 @@ export function VehicleStateView({ vehicle, state, units }: Props) {
               isCharging={signals.is_charging ?? null}
               powerKw={signals.charging_power_kw ?? null}
               recordedAt={at.is_charging}
+              powerRecordedAt={at.charging_power_kw}
             />
           </div>
         </>
@@ -155,14 +156,21 @@ function StatCard({
   );
 }
 
+/**
+ * Charging status and power are separate signals that update independently,
+ * so the power reading carries its own timestamp: a power value cached from an
+ * earlier session must not look as fresh as the current status.
+ */
 function ChargingCard({
   isCharging,
   powerKw,
   recordedAt,
+  powerRecordedAt,
 }: {
   isCharging: boolean | null;
   powerKw: number | null;
   recordedAt?: string;
+  powerRecordedAt?: string;
 }) {
   const power = formatPowerKw(powerKw);
   return (
@@ -177,8 +185,23 @@ function ChargingCard({
         )}
       </p>
       {isCharging ? (
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          {power ? `${power.value} ${power.unit}` : "Charging power unavailable"}
+        <p
+          data-testid="charging-power"
+          className="text-sm text-neutral-600 dark:text-neutral-400"
+        >
+          {power ? (
+            <>
+              {`${power.value} ${power.unit}`}
+              {powerRecordedAt ? (
+                <span className="text-xs text-neutral-500">
+                  {" "}
+                  · as of <LocalTime iso={powerRecordedAt} />
+                </span>
+              ) : null}
+            </>
+          ) : (
+            "Charging power unavailable"
+          )}
         </p>
       ) : null}
     </Card>

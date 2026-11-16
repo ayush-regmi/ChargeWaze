@@ -89,13 +89,25 @@ describe("VehicleStateView", () => {
     expect(card("Charging")).toHaveTextContent("Charging power unavailable");
   });
 
-  it("shows charging power when reported", () => {
-    const charging = {
+  it("shows charging power with its own timestamp, not the status timestamp", () => {
+    // Power last reported in an earlier session; status is newer.
+    const charging: VehicleState = {
       ...fresh,
       signals: { ...fresh.signals, is_charging: true, charging_power_kw: 7.2 },
+      signal_recorded_at: {
+        ...fresh.signal_recorded_at,
+        is_charging: "2026-11-06T18:52:00Z",
+        charging_power_kw: "2026-11-05T09:00:00Z",
+      },
     };
     render(<VehicleStateView vehicle={vehicle} state={charging} units="metric" />);
-    expect(card("Charging")).toHaveTextContent("7.2 kW");
+    const power = within(card("Charging")).getByTestId("charging-power");
+    expect(power).toHaveTextContent("7.2 kW");
+    expect(power.querySelector("time")).toHaveAttribute("datetime", "2026-11-05T09:00:00Z");
+    expect(within(card("Charging")).getByText(/As of/).querySelector("time")).toHaveAttribute(
+      "datetime",
+      "2026-11-06T18:52:00Z",
+    );
   });
 
   it("says a missing signal is not reported instead of showing a number", () => {
