@@ -223,11 +223,25 @@ Returns the latest cached state. **Never** triggers a live Smartcar call on the 
     "odometer_km": 20082.5,
     "is_charging": false,
     "charging_power_kw": null
+  },
+  "signal_recorded_at": {
+    "soc_percent": "2026-11-06T18:52:00Z",
+    "range_km": "2026-11-06T18:51:00Z",
+    "odometer_km": "2026-11-06T18:50:00Z",
+    "is_charging": "2026-11-06T18:52:00Z"
   }
 }
 ```
 
-If no telemetry has ever arrived, responds `200` with `signals: {}` and `is_stale: true`.
+- Reads only the cached `latest_state` ([`database-design.md`](database-design.md) §3.3); a reload returns the same values.
+- `signals` always has all five keys. A key is `null` when the vehicle hasn't reported it, or reported it in a unit the server doesn't recognise; values are never guessed ([PRD §7](product-requirements.md)). Distances are converted from the provider's `km`/`miles` to km and power from W/kW to kW; conversion to the user's display unit happens in the frontend.
+- `recorded_at` is the newest provider timestamp across signals. `signal_recorded_at` gives the provider timestamp for each non-null field in `signals` (signals move forward independently; see [`phase2_plan.md`](phase2_plan.md) D5).
+- `source` is `smartcar`, `simulated` for demo vehicles, or `null` before any data.
+- `is_stale` follows §3.2: `true` with no data yet, or when `recorded_at` is older than `TELEMETRY_STALE_AFTER_MINUTES`.
+- If no telemetry has ever arrived, responds `200` with every signal `null`, `signal_recorded_at: {}`, `recorded_at: null` and `is_stale: true`.
+- A disconnected vehicle still returns its last cached state to its owner.
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID; `NOT_FOUND` if it doesn't exist **or belongs to another user**.
 
 ### 3.6 `DELETE /api/v1/vehicles/{id}`
 

@@ -41,9 +41,11 @@ from app.modules.vehicles.schemas import (
     ConnectResponse,
     VehicleDetail,
     VehicleList,
+    VehicleState,
 )
 from app.modules.vehicles.service import complete_connect
 from app.modules.vehicles.state import InvalidStateError, issue_state, verify_state
+from app.modules.vehicles.vehicle_state import get_vehicle_state
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +169,27 @@ def get_vehicle(
     """One vehicle with its specs (api §3.4). ``NOT_FOUND`` unless the caller owns it."""
 
     return get_vehicle_detail(
+        db,
+        user_id=current_user.user_id,
+        vehicle_id=vehicle_id,
+        stale_after=_stale_after(settings),
+    )
+
+
+@router.get("/{vehicle_id}/state", response_model=VehicleState)
+def get_state(
+    vehicle_id: uuid.UUID,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> VehicleState:
+    """Latest cached state for the Dashboard (api §3.5).
+
+    Reads only ``vehicles.latest_state``; never calls Smartcar. ``NOT_FOUND``
+    unless the caller owns the vehicle.
+    """
+
+    return get_vehicle_state(
         db,
         user_id=current_user.user_id,
         vehicle_id=vehicle_id,

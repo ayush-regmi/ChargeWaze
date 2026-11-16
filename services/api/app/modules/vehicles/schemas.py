@@ -1,4 +1,4 @@
-"""Request/response models for the vehicles module (``docs/api-contracts.md`` §3.2-3.4)."""
+"""Request/response models for the vehicles module (``docs/api-contracts.md`` §3.2-3.5)."""
 
 from __future__ import annotations
 
@@ -96,6 +96,31 @@ class VehicleDetail(VehicleSummary):
     specs: VehicleSpecsOut | None
 
 
+class VehicleStateSignals(BaseModel):
+    """Normalized signals (api §3.5). ``null`` means the vehicle hasn't reported it
+    (or reported it in a unit we don't recognise); values are never guessed."""
+
+    soc_percent: float | None = None
+    range_km: float | None = None
+    odometer_km: float | None = None
+    is_charging: bool | None = None
+    charging_power_kw: float | None = None
+
+
+class VehicleState(BaseModel):
+    """Latest cached state (api §3.5). Served from ``latest_state``, never live."""
+
+    vehicle_id: UUID
+    # Newest provider timestamp across signals; null before the first webhook.
+    recorded_at: datetime | None
+    received_at: datetime | None
+    source: Literal["smartcar", "simulated"] | None
+    is_stale: bool
+    signals: VehicleStateSignals
+    # Provider timestamp per non-null field in ``signals`` (D5).
+    signal_recorded_at: dict[str, datetime]
+
+
 __all__ = [
     "ChargingCurvePoint",
     "ConnectCompleteRequest",
@@ -107,5 +132,7 @@ __all__ = [
     "VehicleDetail",
     "VehicleList",
     "VehicleSpecsOut",
+    "VehicleState",
+    "VehicleStateSignals",
     "VehicleSummary",
 ]

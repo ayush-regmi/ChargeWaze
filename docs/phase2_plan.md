@@ -277,7 +277,7 @@ F4 and F5 don't touch the same files and could run in parallel once F3 lands; we
 
 **Backend**
 - `GET /api/v1/vehicles/{id}/state` → api §3.5, read **only** from `vehicles.latest_state` (never calls Smartcar — test asserts the fake client is untouched).
-- `is_stale = now - recorded_at > telemetry_stale_after_minutes`. No telemetry ever → `signals: {}`, `is_stale: true`, `recorded_at: null`.
+- `is_stale = now - recorded_at > telemetry_stale_after_minutes`. No telemetry ever → every signal `null`, `is_stale: true`, `recorded_at: null`. *(Updated 2026-11-16 at implementation: `signals` always carries all five keys instead of `{}`, so the typed client has one shape; per-signal timestamps are `signal_recorded_at`; `range`/`odometer` are converted from km/miles and power from W/kW, anything else is `null`.)*
 - Fields: `soc_percent`, `range_km`, `odometer_km`, `is_charging`, `charging_power_kw`, plus per-signal `recorded_at` (D5). Missing signals are `null`, never guessed (PRD §7).
 - Ownership → 404.
 

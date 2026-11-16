@@ -94,6 +94,29 @@ jobs:
       - name: Lint / Typecheck / Test (Turborepo)
         run: npx turbo run lint typecheck test
 
+      # Phase 2 E6: no server-side secret may reach the browser bundle. Build
+      # with sentinel values in the server-only env vars, then fail if any
+      # sentinel or secret env-var name appears in the client output.
+      - name: Build web with sentinel server secrets
+        run: npm run build --workspace=apps/web
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+          SMARTCAR_CLIENT_SECRET: sentinel-server-secret-1
+          SMARTCAR_MANAGEMENT_TOKEN: sentinel-server-secret-2
+          SUPABASE_SERVICE_ROLE_KEY: sentinel-server-secret-3
+          MAPBOX_SECRET_TOKEN: sentinel-server-secret-4
+
+      - name: Check browser bundle for server secrets
+        working-directory: apps/web
+        run: |
+          if grep -rlE "sentinel-server-secret|SMARTCAR_CLIENT_SECRET|SMARTCAR_MANAGEMENT_TOKEN|SMARTCAR_STATE_SECRET|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_JWT_SECRET|MAPBOX_SECRET_TOKEN|AFDC_API_KEY|WEATHER_API_KEY" .next/static; then
+            echo "::error::Server-side secret found in the browser bundle (files above)."
+            exit 1
+          fi
+          echo "No server secrets in .next/static."
+
   e2e:
     name: E2E smoke (Playwright)
     runs-on: ubuntu-latest

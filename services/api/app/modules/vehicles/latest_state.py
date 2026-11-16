@@ -21,7 +21,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 
-def _parse_datetime(value: Any) -> datetime | None:
+def parse_datetime(value: Any) -> datetime | None:
     if not isinstance(value, str) or not value:
         return None
     try:
@@ -38,14 +38,14 @@ def last_recorded_at(latest_state: Mapping[str, Any] | None) -> datetime | None:
     if not isinstance(latest_state, Mapping):
         return None
     candidates: list[datetime] = []
-    top = _parse_datetime(latest_state.get("recorded_at"))
+    top = parse_datetime(latest_state.get("recorded_at"))
     if top is not None:
         candidates.append(top)
     signals = latest_state.get("signals")
     if isinstance(signals, Mapping):
         for entry in signals.values():
             if isinstance(entry, Mapping):
-                ts = _parse_datetime(entry.get("recorded_at"))
+                ts = parse_datetime(entry.get("recorded_at"))
                 if ts is not None:
                     candidates.append(ts)
     return max(candidates) if candidates else None
@@ -61,4 +61,4 @@ def is_stale(
     return (now or datetime.now(UTC)) - recorded_at > stale_after
 
 
-__all__ = ["is_stale", "last_recorded_at"]
+__all__ = ["is_stale", "last_recorded_at", "parse_datetime"]
