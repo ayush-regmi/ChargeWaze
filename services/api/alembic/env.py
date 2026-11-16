@@ -22,7 +22,9 @@ from app.modules.vehicles import models as _vehicles_models  # noqa: F401
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Don't disable loggers created before this runs (the app's, when the test
+    # suite migrates in-process); otherwise their log assertions pass vacuously.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 settings = get_settings()
 config.set_main_option("sqlalchemy.url", settings.database_url)

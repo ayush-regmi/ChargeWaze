@@ -93,7 +93,9 @@ def complete_connect(
         outcome = "error"
     logger.info(
         "smartcar_connect_completed",
-        extra={"outcome": outcome, **{r: results.count(r) for r in set(results)}},
+        # Nested: top-level ``extra`` keys can't reuse LogRecord attributes
+        # (``created`` would raise KeyError and fail the request).
+        extra={"outcome": outcome, "counts": {r: results.count(r) for r in set(results)}},
     )
     return ConnectResult(outcome=outcome, vehicles=results)
 

@@ -46,6 +46,7 @@ Reserved codes (grow this list as the API grows):
 | `STATIONS_UNREACHABLE` | 502/504 | AFDC/OCM failed or timed out. |
 | `ROUTE_INFEASIBLE` | 200 | Returned by `/routes/plan` when no feasible plan exists (see §3.7). |
 | `WEBHOOK_SIGNATURE_INVALID` | 401 | Smartcar webhook signature did not verify. |
+| `WEBHOOK_PAYLOAD_INVALID` | 400 | Smartcar webhook was signed but is not a usable event (not JSON, no `eventType`, `VEHICLE_STATE` without vehicle/user or `eventId`). |
 | `INTERNAL_ERROR` | 500 | Unhandled exception; logged to Sentry. |
 
 `ROUTE_INFEASIBLE` is deliberately **not** an HTTP error — infeasibility is a legitimate planning result, returned with `status: "infeasible"` in the response body (see §3.7).
@@ -422,7 +423,14 @@ Verification, deduplication, and persistence happen here. The response body is i
 { "accepted": true, "event_id": "smartcar-event-id" }
 ```
 
-**Errors:** `WEBHOOK_SIGNATURE_INVALID` (401). Smartcar retries on 5xx, so transient failures must return 5xx (not swallow) to trigger retry.
+`accepted: false` means the event was signed and understood but deliberately not stored: unknown vehicle, a vehicle that isn't `connected` (phase2_plan.md D12), an event type Chargewise doesn't ingest, or a `VEHICLE_ERROR` whose shape couldn't be parsed. Smartcar treats it like any 200 and stops retrying. A duplicate delivery returns `accepted: true` and writes nothing.
+
+**`VERIFY` response 200** (only after the signature checks out)
+```json
+{ "challenge": "<hex HMAC-SHA256 of data.challenge, keyed with the management token>" }
+```
+
+**Errors:** `WEBHOOK_SIGNATURE_INVALID` (401, missing or wrong `SC-Signature`), `WEBHOOK_PAYLOAD_INVALID` (400, signed but malformed). Smartcar retries on 5xx, so transient failures must return 5xx (not swallow) to trigger retry; a database failure returns `INTERNAL_ERROR` (500).
 
 ## 4. OpenAPI and typed client
 
