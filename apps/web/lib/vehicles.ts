@@ -36,3 +36,22 @@ export function freshness(
   if (!v.last_state_recorded_at) return "awaiting";
   return v.is_stale ? "stale" : "fresh";
 }
+
+export type VehicleState = components["schemas"]["VehicleState"];
+
+/**
+ * The vehicle the Dashboard shows: the user's primary vehicle if it is still
+ * connected, otherwise the most recently connected one (phase2_plan.md D6).
+ * `vehicles` is the `GET /api/v1/vehicles` list, already newest first.
+ */
+export function pickDashboardVehicle<T extends Pick<VehicleSummary, "id" | "connection_status">>(
+  vehicles: readonly T[],
+  primaryVehicleId: string | null | undefined,
+): T | null {
+  const connected = vehicles.filter((v) => v.connection_status === "connected");
+  if (primaryVehicleId) {
+    const primary = connected.find((v) => v.id === primaryVehicleId);
+    if (primary) return primary;
+  }
+  return connected[0] ?? null;
+}
