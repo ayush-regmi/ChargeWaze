@@ -1,6 +1,6 @@
 # Chargewise — Development Roadmap
 
-Status: **Phase 1 complete; Phase 2 next** · Last updated: 2026-11-12
+Status: **Phase 2 code complete; real-car verification and cadence measurement pending, then Phase 3** · Last updated: 2026-11-16
 
 Delivery plan for Chargewise. Estimates assume part-time development with Claude Code / Cursor and real testing. They are planning estimates, not deadlines.
 
@@ -38,6 +38,8 @@ Status: done. Merged in [PR #1](https://github.com/ayush-regmi/ChargeWise/pull/1
 - CI green on main.
 
 ### Phase 2 — Vehicle integration (Weeks 3–4)
+
+Status: code complete (F0–F7 merged; F8 adds the Playwright Garage → Dashboard test). Still open before this phase is done: the real-car checks for the first three completion criteria, and measuring the Toyota's event cadence for the freshness threshold (risk table, §5). Tracked in [`phase2_plan.md`](phase2_plan.md) F8.
 
 **Scope**
 

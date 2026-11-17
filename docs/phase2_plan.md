@@ -316,6 +316,12 @@ F4 and F5 don't touch the same files and could run in parallel once F3 lands; we
 4. **Secret-leak check in CI:** after `next build`, grep `.next/` for `SMARTCAR_` and fail if found (E6).
 5. **Docs:** update `api-contracts.md` (D3, D5, D6), `database-design.md` (F1 additions), `architecture.md` §4/§5 with verified V3 details, ADR 0002 if anything changed, README run instructions, roadmap status → "Phase 2 complete; Phase 3 next".
 
+**Progress (2026-11-16, `feature/phase2-closeout`):**
+- 3 done, with a change: the Garage and Dashboard only read the database, so no fake Smartcar client is needed. The API runs with the Smartcar URLs pointed at an unreachable address, and the seed step delivers a locally signed `VEHICLE_STATE` webhook through the real ingestor. Sign-in uses a small Supabase Auth stub (`apps/web/e2e/support/`) plus the API's HS256 fallback.
+- 4 done: the check already ran on `.next/static`; it now also scans prerendered HTML/RSC output. Server-only JS bundles are not scanned, because they aren't sent to the browser.
+- 5 partly done: `api-contracts.md` and `database-design.md` were already updated in F3–F7. `architecture.md` §4/§5 and §8 now match the code. ADR 0002 is unchanged until the cadence is measured. The roadmap status says "code complete, real-car verification pending", not "complete".
+- 1 and 2 are still open. They need the real car and a few days of webhook deliveries.
+
 ---
 
 ## 5. Cross-cutting rules for every Phase 2 PR
