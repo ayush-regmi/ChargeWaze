@@ -36,7 +36,8 @@ def test_models_match_migrated_schema(db_connection: Connection) -> None:
     from alembic.autogenerate import compare_metadata
     from alembic.migration import MigrationContext
 
-    import app.modules.users.models  # noqa: F401  (registers every model)
+    import app.modules.stations.models
+    import app.modules.users.models  # noqa: F401  (also registers the vehicle models)
     from app.db.session import Base
 
     context = MigrationContext.configure(
