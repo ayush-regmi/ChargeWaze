@@ -155,6 +155,8 @@ F2 and F3 don't share files, and neither do F4 and F5. Either pair could run in 
 
 **Acceptance:** the adapter is fully covered by fixture tests, and nothing outside `integrations/mapbox` calls Mapbox.
 
+**As built:** `directions()` returns a `DirectionsResult { routes, no_route_reason }` rather than a bare list, so F4 can tell `no_route` from `no_road_near_point` (D5). `DirectionsRoute` also carries `countries` (from `legs[].admins`, e.g. `["US", "CA"]`) for the "crosses the border" label. `PlaceSuggestion.full_address` is always a display line (`name, place_formatted` when Mapbox gives no address). `retrieve()` returns `None` for an unknown ID (empty result or HTTP 404). `suggest()` caps `limit` at 10 (Search Box maximum).
+
 ---
 
 ### F3 — Stations adapter
