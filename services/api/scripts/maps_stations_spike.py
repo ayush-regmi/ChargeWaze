@@ -8,6 +8,7 @@ SPIKE_ENV_FILE (values are never printed):
 Run from services/api/:
 
   uv run python scripts/maps_stations_spike.py afdc-route [--post] [--country all|US|CA] [--limit N]
+  uv run python scripts/maps_stations_spike.py afdc-nearest [--radius MI] [--level L] [--limit N]
   uv run python scripts/maps_stations_spike.py mapbox-directions
   uv run python scripts/maps_stations_spike.py mapbox-search "Toronto"
   uv run python scripts/maps_stations_spike.py cross-border [--points 300] [--distance 2]
@@ -256,6 +257,35 @@ def cmd_afdc_route(env: dict[str, str]) -> None:
         summarize_afdc(data)
 
 
+def cmd_afdc_nearest(env: dict[str, str]) -> None:
+    """F3: ``nearest.json`` around the public Frederick test point (radius in miles)."""
+
+    radius = arg("--radius", "15")
+    level = arg("--level", "dc_fast")
+    limit = arg("--limit", "25")
+    params = {
+        "api_key": env.get("AFDC_API_KEY") or "DEMO_KEY",
+        "fuel_type": "ELEC",
+        "status": "E",
+        "access": "public",
+        "country": "all",
+        "latitude": str(FREDERICK[1]),
+        "longitude": str(FREDERICK[0]),
+        "radius": radius,
+        "limit": limit,
+    }
+    if level:
+        params["ev_charging_level"] = level
+    base = env.get("AFDC_API_BASE_URL") or AFDC_BASE
+    status, headers, data, elapsed = http(f"{base}/nearest.json?{urllib.parse.urlencode(params)}")
+    name = f"afdc_nearest_frederick_{level or 'alllevels'}_{radius}mi_{limit}.json"
+    report(name, status, headers, elapsed, len(json.dumps(data)))
+    print("saved", save(name, data))
+    if isinstance(data, dict) and "fuel_stations" in data:
+        summarize_afdc(data)
+        print("top-level keys:", sorted(k for k in data if k != "fuel_stations"))
+
+
 def summarize_afdc(data: dict[str, Any]) -> None:
     stations = data.get("fuel_stations", [])
     print("total_results:", data.get("total_results"), "returned:", len(stations))
@@ -401,6 +431,7 @@ def cmd_summarize(_env: dict[str, str]) -> None:
 def main() -> None:
     commands = {
         "afdc-route": cmd_afdc_route,
+        "afdc-nearest": cmd_afdc_nearest,
         "mapbox-directions": cmd_mapbox_directions,
         "mapbox-search": cmd_mapbox_search,
         "cross-border": cmd_cross_border,
