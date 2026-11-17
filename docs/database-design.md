@@ -1,6 +1,6 @@
 # Chargewise — Database Design
 
-Status: **Draft (specification phase)** · Last updated: 2026-11-13
+Status: **Draft (specification phase)** · Last updated: 2026-11-17
 
 Postgres schema for the modular monolith. Owned by the backend only; the frontend never connects to the database directly. Managed with SQLAlchemy models and Alembic migrations under [`services/api/alembic/`](../services/api/alembic/).
 
@@ -84,10 +84,17 @@ erDiagram
         text external_id
         text name
         text operator
+        text network
+        text country
         numeric lat
         numeric lon
         jsonb connectors
+        text access
+        text status
+        timestamptz source_updated_at
         timestamptz fetched_at
+        jsonb raw_payload
+        boolean is_simulated
     }
     planned_trips {
         uuid id PK
@@ -241,22 +248,36 @@ Indexes:
 
 ### 3.6 `charging_stations`
 
-Cached station records. Treated as a local cache of external data, not the source of truth.
+Cached station records. Treated as a local cache of external data, not the source of truth. Global data with no `user_id`; RLS is enabled like every `public` table. Searches always go to the provider and **upsert** each result on `(provider, external_id)`, so a station's `id` stays the same across fetches and can be referenced by favorites and `planned_stops` ([phase3_plan.md](phase3_plan.md) D7). Nullable columns stay `NULL` when the provider doesn't give a value; nothing is guessed.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `uuid` PK | |
-| `provider` | `text` | `'afdc'`, `'ocm'`, `'nrcan'`, `'simulated'`. |
-| `external_id` | `text` | |
-| `name` | `text` | |
+| `id` | `uuid` PK | Stable Chargewise ID. |
+| `provider` | `text` | `'afdc'`, `'simulated'` (`CHECK`). AFDC includes NRCan's Canadian data, so there is no separate Canadian provider (phase 3 F0). |
+| `external_id` | `text` | Provider's station ID. Not null. |
+| `name` | `text` | Not null. |
 | `operator` | `text` | Nullable. |
-| `lat` | `numeric(9,6)` | |
-| `lon` | `numeric(9,6)` | |
-| `connectors` | `jsonb` | `[{ type, count, power_kw }]`. |
-| `fetched_at` | `timestamptz` | |
+| `network` | `text` | Nullable. Provider network code (AFDC `ev_network`). |
+| `street_address` | `text` | Nullable. |
+| `city` | `text` | Nullable. |
+| `region` | `text` | Nullable. State or province. |
+| `postal_code` | `text` | Nullable. |
+| `country` | `text` | Nullable. ISO 3166-1 alpha-2, e.g. `'US'`, `'CA'` (`CHECK ~ '^[A-Z]{2}$'`). |
+| `lat` | `numeric(9,6)` | Not null. `CHECK (BETWEEN -90 AND 90)`. |
+| `lon` | `numeric(9,6)` | Not null. `CHECK (BETWEEN -180 AND 180)`. |
+| `connectors` | `jsonb` | `[{ type, count, power_kw }]`. `type` is `NACS`, `CCS1`, `J1772` or `CHAdeMO`; `count` and `power_kw` are `null` when the provider doesn't give them per connector (never derived from level totals). Default `[]`. |
+| `access` | `text` | `'public'`, `'private'`, `'unknown'` (`CHECK`). Default `'unknown'`. |
+| `access_detail` | `text` | Nullable. Provider access restriction detail (AFDC `access_detail_code`), shown as-is. |
+| `status` | `text` | `'open'`, `'planned'`, `'temporarily_unavailable'`, `'unknown'` (`CHECK`). Default `'unknown'`. |
+| `pricing_text` | `text` | Nullable. Provider pricing text (AFDC `ev_pricing`), shown as-is and never parsed. |
+| `source_updated_at` | `timestamptz` | Nullable. Provider's own last-updated timestamp. |
+| `fetched_at` | `timestamptz` | When we last fetched the row from the provider; drives the TTL refresh. Default `now()`. |
+| `raw_payload` | `jsonb` | Not null. The provider record as received, for auditability and fields we don't map yet. |
+| `is_simulated` | `boolean` | Default `false`. `CHECK (is_simulated = (provider = 'simulated'))`. |
+| `created_at` | `timestamptz` | Default `now()`. |
 
-Indexes:
-- `UNIQUE (provider, external_id)`.
+Constraints and indexes:
+- `UNIQUE (provider, external_id)` — the upsert target.
 - `INDEX (lat, lon)` — upgradable to a PostGIS `GIST` index on `geography(Point)` when needed.
 
 ### 3.7 `planned_trips`
