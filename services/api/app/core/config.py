@@ -78,6 +78,14 @@ class Settings(BaseSettings):
     mapbox_api_base_url: str = "https://api.mapbox.com"
     mapbox_timeout_seconds: float = Field(default=10.0, gt=0)
 
+    # ---- Charging stations: AFDC (see docs/maps-stations-notes.md §1) ----
+    # NREL's API moved from developer.nrel.gov to developer.nlr.gov (F0).
+    afdc_api_key: str = ""
+    afdc_api_base_url: str = "https://developer.nlr.gov/api/alt-fuel-stations/v1"
+    stations_timeout_seconds: float = Field(default=15.0, gt=0)
+    # Douglas-Peucker cap for routes sent to AFDC nearby-route (phase3_plan.md D6).
+    stations_route_max_points: int = Field(default=1000, ge=2)
+
     # ---- Telemetry ----
     # Readings older than this are flagged stale (phase2_plan.md D11).
     telemetry_stale_after_minutes: int = Field(default=15, gt=0)

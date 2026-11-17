@@ -30,6 +30,13 @@ Facts here come from real calls made during the F0 spike, unless marked *docs on
 - **Simplification tolerance:** Douglas–Peucker at 0.25 km (≤ 300 points) gave 122 / 147 stations; at 0.05 km (611–655 points) 122 / 148. One station at the corridor edge was lost at 0.25 km. With a 2 mi (3.2 km) corridor that's acceptable; use a tolerance of at most **0.1 km** and a cap of **1,000 points** (about 20 KB), which matches the full route here.
 - Latency: 0.5–2.4 s per call (2.4 s for the full 194 KB route).
 
+### 1.3a `nearest` (added in F3, 2026-11-17)
+
+- `GET /v1/nearest.json?latitude=&longitude=&radius=` ([fixture](../fixtures/stations/afdc/nearest_frederick_dc_fast.json)). `radius` is in **miles** (*docs*: default 5, maximum 500; `infinite` also accepted). `limit` 1–200 or `all`, `offset` for paging, like `nearby-route`. `country` defaults to `US` here too, so the adapter sends `country=all`.
+- Results **are** sorted by `distance` (miles) ascending, with `distance_km` alongside. Frederick, 15 mi, DC fast: `total_results` 26.
+- The response echoes `latitude`, `longitude` and `offset` at the top level, next to `total_results` and `station_counts`. Stations here also carry `ev_network_ids`, which `nearby-route` didn't return; it's kept in `raw_payload` only.
+- A shared DC dispenser can list two connector types on one port (e.g. CHAdeMO + CCS1 with `port_count: 1` on the unit, 1 each on the connectors). Per-connector counts are "connectors of this type", not "cars at once".
+
 ### 1.4 Station fields we use
 
 | Field | Notes |
@@ -42,7 +49,7 @@ Facts here come from real calls made during the F0 spike, unless marked *docs on
 | `ev_charging_units[]` | `{charging_level: "2"\|"dc_fast"\|"1", port_count, network, funding_sources, connectors: {TYPE: {port_count, power_kw}}}`. **Every unit lists all 8 connector types**; types the unit doesn't have have `port_count: 0`, so filter on `port_count > 0`. In the sample, the per-unit types matched `ev_connector_types` and DC port totals matched `ev_dc_fast_num` on all 200 stations. |
 | `ev_dc_fast_num`, `ev_level2_evse_num`, `ev_level1_evse_num` | Port counts by level; `null` means zero. |
 | `status_code` | `E` open, `P` planned, `T` temporarily unavailable. |
-| `access_code`, `access_detail_code`, `restricted_access` | `public`/`private`; detail codes `CALL`, `FLEET`, `RESIDENTIAL`, …; `restricted_access: true` on 9 of 200 (e.g. a dealer). |
+| `access_code`, `access_detail_code`, `restricted_access` | `public`/`private`; detail codes `CALL`, `FLEET`, `RESIDENTIAL`, …; `restricted_access: true` on 9 of 200 (e.g. a dealer); searches leave these out (F3). `access_detail_code` also appears on unrestricted stations (`CREDIT_CARD_ALWAYS`), so only `restricted_access` marks a restriction. |
 | `ev_pricing` | Free text, often `null`. Shown as text if present; never parsed into numbers. |
 | `updated_at` (ISO-8601 UTC), `date_last_confirmed` (date) | Provider timestamps; `updated_at` becomes `source_updated_at`. |
 | `facility_type`, `maximum_vehicle_class`, `unverified`, `related_stations` | Kept in `raw_payload` only. |
@@ -61,7 +68,7 @@ Counts are connectors with `port_count > 0`.
 
 - DC fast power was known for every connector in the sample. Unknown power is mainly a Level 2 issue.
 - `ev_power_kw_min=150` keeps a station if **any** of its ports is ≥ 150 kW (46 of 96). Stations with mixed 50 kW and 350 kW ports pass. Because of plan D10 (unknown-power stations stay listed), we filter on our side and don't send `ev_power_kw_min`.
-- A "dc_fast" unit can also list low-power connectors (e.g. CCS 20 kW; J1772 6.2 kW on the same unit). Show power per connector, not per station.
+- A "dc_fast" unit can also list low-power connectors (e.g. CCS 20 kW; J1772 6.2 kW on the same unit). Show power per connector type, not per station; F3 keeps each type's highest known power.
 
 ### 1.6 Tesla Superchargers and the bZ
 

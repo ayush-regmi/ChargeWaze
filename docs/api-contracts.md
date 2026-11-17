@@ -45,7 +45,8 @@ Reserved codes (grow this list as the API grows):
 | `MAPBOX_UNREACHABLE` | 502/504 | Mapbox failed or timed out. |
 | `MAPBOX_ERROR` | 502 | Mapbox rejected the request or returned an unexpected response; Mapbox's error code (if any) is in `details`. |
 | `MAPBOX_NOT_CONFIGURED` | 503 | The server's Mapbox token is missing or Mapbox rejected it (401/403). |
-| `STATIONS_UNREACHABLE` | 502/504 | The station provider (AFDC) failed or timed out. |
+| `STATIONS_UNREACHABLE` | 502/504 | The station provider (AFDC) failed, timed out or returned an unexpected response; the upstream HTTP status (if any) is in `details`. |
+| `STATIONS_NOT_CONFIGURED` | 503 | The server's AFDC API key is missing or AFDC rejected it (401/403). |
 | `ROUTE_INFEASIBLE` | 200 | Returned by `/routes/plan` when no feasible plan exists (see §3.7). |
 | `WEBHOOK_SIGNATURE_INVALID` | 401 | Smartcar webhook signature did not verify. |
 | `WEBHOOK_PAYLOAD_INVALID` | 400 | Smartcar webhook was signed but is not a usable event (not JSON, no `eventType`, `VEHICLE_STATE` without vehicle/user or `eventId`). |
