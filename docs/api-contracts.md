@@ -190,7 +190,7 @@ The backend verifies `state` **and requires its user to be the caller**, so a Co
 |---|---|
 | `success` | At least one vehicle was added or reconnected. |
 | `already_connected` | Every authorized vehicle was already connected to this user. |
-| `denied` | The user declined in Smartcar (`error=access_denied`). |
+| `denied` | The user declined or backed out of Smartcar Connect (`error=access_denied` or `error=user_manually_returned_to_application`). |
 | `error` | Bad/expired `state`, `state` belongs to another user, Smartcar unreachable, no matching connection, or the vehicle is connected to another account. |
 
 **Errors:** `UNAUTHENTICATED` without a JWT; `VALIDATION_ERROR` if `state` is missing.
