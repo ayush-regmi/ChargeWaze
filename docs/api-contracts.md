@@ -1,6 +1,6 @@
 # Chargewise — API Contracts
 
-Status: **Draft (specification phase)** · Last updated: 2026-11-06
+Status: **Draft (specification phase)** · Last updated: 2026-11-17
 
 This document defines the public REST surface the FastAPI backend exposes to the Next.js frontend (and, later, to the React Native client). The actual contract of record is the OpenAPI document FastAPI generates at runtime; this file is the design intent, written before any code.
 
@@ -71,6 +71,9 @@ Reserved codes (grow this list as the API grows):
 | `GET` | `/api/v1/trips` | List saved / completed trips. |
 | `GET` | `/api/v1/trips/{id}` | One trip with stops and observations. |
 | `GET` | `/api/v1/stations` | Search compatible charging stations. |
+| `GET` | `/api/v1/places/suggest` | Autocomplete addresses, places and POIs (Mapbox Search Box). |
+| `GET` | `/api/v1/places/{id}` | Coordinates and address for a suggestion. |
+| `POST` | `/api/v1/routes/directions` | Driving routes between two points (no charging plan). |
 | `GET` | `/api/v1/analytics/consumption` | Aggregated consumption trends. |
 | `POST` | `/api/v1/webhooks/smartcar` | Smartcar-signed telemetry delivery. |
 
@@ -501,6 +504,100 @@ Verification, deduplication, and persistence happen here. The response body is i
 ```
 
 **Errors:** `WEBHOOK_SIGNATURE_INVALID` (401, missing or wrong `SC-Signature`), `WEBHOOK_PAYLOAD_INVALID` (400, signed but malformed). Smartcar retries on 5xx, so transient failures must return 5xx (not swallow) to trigger retry; a database failure returns `INTERNAL_ERROR` (500).
+
+### 3.13 `GET /api/v1/places/suggest`
+
+Place autocomplete for the Trip Planner and Charging page search boxes. The backend proxies Mapbox Search Box ([`phase3_plan.md`](phase3_plan.md) D2); the browser never calls Mapbox search directly.
+
+Query params:
+
+| Param | Required | Rules |
+|---|---|---|
+| `q` | yes | Search text, 3–200 characters after trimming. |
+| `session_token` | yes | A UUID the client creates once per search session (typing → picking a result) and sends on every `suggest` and the final `places/{id}` call. Mapbox bills per session. |
+| `lat`, `lon` | no (send both or neither) | Proximity bias: the map centre or the other trip endpoint. Without them results are biased by the *server's* IP, so clients should always send them. |
+| `limit` | no | 1–10, default 5. |
+
+**Response 200**
+```json
+{
+  "items": [
+    {
+      "id": "dXJuOm1ieHBsYzpCK3dJSnc",
+      "name": "Toronto",
+      "full_address": "Toronto, Ontario, Canada",
+      "kind": "place",
+      "country_code": "CA"
+    }
+  ]
+}
+```
+
+- `id` is an opaque Mapbox ID; pass it to §3.14. Suggestions carry **no coordinates**.
+- `kind` is `address`, `poi` or `place` (cities, regions, postcodes, …).
+- `country_code` is ISO 3166-1 alpha-2, or `null` if Mapbox gives none.
+- No matches → `200` with `items: []`.
+- Nothing is stored. Search text and coordinates are never logged (D13).
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (short/long `q`, `session_token` not a UUID, `lat`/`lon` out of range or only one given, `limit` out of range); `MAPBOX_NOT_CONFIGURED` (503); `MAPBOX_UNREACHABLE` (502/504); `MAPBOX_ERROR` (502).
+
+### 3.14 `GET /api/v1/places/{id}`
+
+Resolves a suggestion from §3.13 to coordinates. Query params: `?session_token=` (required, the same UUID used for the suggestions).
+
+**Response 200**
+```json
+{
+  "id": "dXJuOm1ieHBsYzpCK3dJSnc",
+  "name": "Toronto",
+  "full_address": "Toronto, Ontario, Canada",
+  "kind": "place",
+  "country_code": "CA",
+  "location": { "lat": 43.647938, "lon": -79.38355 }
+}
+```
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (`session_token` not a UUID, `id` longer than 512 characters); `NOT_FOUND` if Mapbox doesn't know the ID; `MAPBOX_*` as in §3.13.
+
+### 3.15 `POST /api/v1/routes/directions`
+
+Plain driving directions between two points: up to three alternatives, best first. No energy model, feasibility or charging stops (that is §3.7, Phase 4). The client passes a route's `geometry_polyline6` to `POST /stations/along-route` (Phase 3 F5).
+
+**Request**
+```json
+{
+  "origin": { "lat": 39.4143, "lon": -77.4105 },
+  "destination": { "lat": 43.6532, "lon": -79.3832 }
+}
+```
+
+- `lat` is −90…90 and `lon` −180…180. Origin and destination must be more than 50 m apart.
+
+**Response 200**
+```json
+{
+  "routes": [
+    {
+      "index": 0,
+      "geometry_polyline6": "iwsdjAdlwsrCg@...",
+      "distance_m": 748107.9,
+      "duration_s": 30890.7,
+      "summary": "US 15, QEW",
+      "countries": ["US", "CA"]
+    }
+  ],
+  "no_route_reason": null
+}
+```
+
+- Mapbox `driving` profile without live traffic ([`phase3_plan.md`](phase3_plan.md) D5).
+- `geometry_polyline6` is an encoded polyline with precision 6, `lat,lon` order (about 40 KB for Frederick → Toronto).
+- `index` is the route's position in the list (`0` = Mapbox's recommended route). It is only meaningful within this response.
+- `summary` is Mapbox's main-roads summary, or `null`. `countries` lists the ISO 3166-1 alpha-2 codes the route passes through, in order, so the UI can mark border crossings.
+- **No route is not an error:** `200` with `routes: []` and `no_route_reason` set to `no_route` (no drivable connection) or `no_road_near_point` (an endpoint isn't near a road). `no_route_reason` is `null` whenever `routes` is non-empty.
+- Nothing is stored. Coordinates and geometry are never logged (D13).
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (missing/out-of-range coordinates, points within 50 m); `MAPBOX_NOT_CONFIGURED` (503); `MAPBOX_UNREACHABLE` (502/504); `MAPBOX_ERROR` (502).
 
 ## 4. OpenAPI and typed client
 

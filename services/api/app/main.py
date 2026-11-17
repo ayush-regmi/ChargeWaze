@@ -22,6 +22,7 @@ API_PREFIX = "/api/v1"
 def create_app() -> FastAPI:
     settings = get_settings()
     _quiet_http_client_logs()
+    _redact_access_log_queries()
 
     app = FastAPI(
         title="Chargewise API",
@@ -72,6 +73,8 @@ def _register_v1_routers(v1: APIRouter) -> None:
         "app.modules.users.router",
         "app.modules.vehicles.router",
         "app.modules.vehicles.webhook_router",
+        "app.modules.places.router",
+        "app.modules.routing.router",
     ):
         try:
             mod = importlib.import_module(module_path)
@@ -92,6 +95,27 @@ def _quiet_http_client_logs() -> None:
 
     for name in ("httpx", "httpcore"):
         logging.getLogger(name).setLevel(logging.WARNING)
+
+
+class _StripQueryString(logging.Filter):
+    """Drop the query string from uvicorn access-log lines.
+
+    Place search and station endpoints take search text and coordinates as
+    query parameters, which must never be logged (phase3_plan.md D13). Uvicorn
+    logs ``(client, method, path_with_query, http_version, status)``.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str):
+            record.args = (*args[:2], args[2].split("?", 1)[0], *args[3:])
+        return True
+
+
+def _redact_access_log_queries() -> None:
+    access = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, _StripQueryString) for f in access.filters):
+        access.addFilter(_StripQueryString())
 
 
 app = create_app()
