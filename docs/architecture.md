@@ -14,7 +14,7 @@ This document describes the shape of the system and why it is shaped that way. I
 | Authentication | Supabase Auth | Managed auth, JWTs verifiable by the FastAPI backend. |
 | Vehicle integration | Smartcar API V3 + webhooks | V3 is the current, recommended version (V2 deprecating late 2026). See [`adr/0002-smartcar-v3-webhook-telemetry.md`](adr/0002-smartcar-v3-webhook-telemetry.md). |
 | Maps / routing | Mapbox Directions + Geocoding / Search Box | Reliable driving routes and POI/address autocomplete. |
-| Charging stations | AFDC / NREL Alternative Fuel Stations API for US; evaluate Natural Resources Canada or Open Charge Map for Canada | AFDC has no Canadian coverage. |
+| Charging stations | AFDC Alternative Fuel Stations API (`developer.nlr.gov`, formerly NREL) for the US and Canada | Canadian stations come from Natural Resources Canada through the same API (`country=all`); verified in Phase 3 F0, see [`maps-stations-notes.md`](maps-stations-notes.md). |
 | Weather | Open-Meteo (non-commercial) initially | Free tier is fine for a portfolio; re-evaluate before any commercial use. |
 | Testing | pytest, Vitest + React Testing Library, Playwright | Covers backend, components, end-to-end UI. |
 | ML | scikit-learn, XGBoost, pandas, NumPy | Introduced only after a deterministic baseline exists. |
@@ -48,7 +48,7 @@ flowchart LR
     DB[(PostgreSQL / Supabase)]
     Smartcar[Smartcar V3 API + Webhooks]
     Mapbox[Mapbox Directions + Geocoding]
-    Stations[AFDC / NREL + OCM]
+    Stations[AFDC stations API - US + Canada]
     Weather[Open-Meteo]
     Sentry[Sentry]
 
@@ -81,7 +81,7 @@ Backend code lives in one FastAPI application under `services/api/app/`, split i
 | `vehicles` | Connected vehicles, specs, ownership, Garage endpoints. |
 | `integrations/smartcar` | V3 authentication, data retrieval, webhook verification + ingestion. |
 | `integrations/mapbox` | Geocoding, Directions, Search Box. |
-| `integrations/stations` | Charging-station retrieval and normalization (AFDC first, OCM later). |
+| `integrations/stations` | Charging-station retrieval and normalization (AFDC, behind a provider interface so another source can be added). |
 | `integrations/weather` | Weather forecast and historical lookups. |
 | `energy` | Battery consumption and range prediction (deterministic model, then ML wrapper). |
 | `routing` | Route feasibility and charging-stop optimization. |
@@ -281,7 +281,7 @@ Rules:
 
 Tracked explicitly so they don't get buried in PR threads:
 
-- **Canadian stations** — pick NRCan vs OCM before Phase 3.
+- ~~**Canadian stations**~~ — resolved in Phase 3 F0: AFDC covers Canada with `country=all` ([`maps-stations-notes.md`](maps-stations-notes.md)).
 - **Smartcar event frequency** — verify empirically on the real Toyota during Phase 2 before setting a Dashboard freshness threshold.
 - **Weather provider** — confirm Open-Meteo license fits the usage before building on it.
 - **Mapbox EV Routing** — stay on a self-built optimizer; revisit only if Mapbox EV Routing becomes GA with acceptable pricing.

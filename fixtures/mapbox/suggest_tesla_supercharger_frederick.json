@@ -1,0 +1,289 @@
+{
+  "attribution": "© 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service. (https://www.mapbox.com/about/maps/)",
+  "response_id": "dvCsu_xXi66rMTotPSVuv-BpZZ9hSm0IUTDrnXFEl9dA61bM3-kyXjd7B5pG7EpiploufX7oVCiVzfF6Ke2EvNBF4v83cyjIt51U",
+  "suggestions": [
+    {
+      "address": "5500 Buckeystown Pike",
+      "brand": [
+        "Tesla"
+      ],
+      "brand_id": [
+        "tesla"
+      ],
+      "context": {
+        "address": {
+          "address_number": "5500",
+          "name": "5500 Buckeystown Pike",
+          "street_name": "Buckeystown Pike"
+        },
+        "country": {
+          "country_code": "US",
+          "country_code_alpha_3": "USA",
+          "name": "United States"
+        },
+        "place": {
+          "id": "dXJuOm1ieHBsYzpCd01JN0E",
+          "name": "Frederick"
+        },
+        "postcode": {
+          "id": "dXJuOm1ieHBsYzpCQVl1N0E",
+          "name": "21704"
+        },
+        "region": {
+          "name": "Maryland",
+          "region_code": "MD",
+          "region_code_full": "US-MD"
+        },
+        "street": {
+          "name": "Buckeystown Pike"
+        }
+      },
+      "distance": 10878,
+      "external_ids": {
+        "dataplor": "9d9dd43b-298c-46b4-b228-51dca9e67f23"
+      },
+      "feature_type": "poi",
+      "full_address": "5500 Buckeystown Pike, Frederick, Maryland 21704, United States",
+      "language": "en",
+      "maki": "charging-station",
+      "mapbox_id": "dXJuOm1ieHBvaTo5ODY2MDU4My1hMjEyLTQ2ZmMtYmI0ZS04MDgyY2E2MDM5YWI",
+      "metadata": {},
+      "name": "Tesla Supercharger",
+      "place_formatted": "Frederick, Maryland 21704, United States",
+      "poi_category": [
+        "charging station",
+        "transportation"
+      ],
+      "poi_category_ids": [
+        "charging_station",
+        "transportation"
+      ]
+    },
+    {
+      "address": "9180 Fingerboard Rd",
+      "brand": [
+        "Tesla"
+      ],
+      "brand_id": [
+        "tesla"
+      ],
+      "context": {
+        "address": {
+          "address_number": "9180",
+          "name": "9180 Fingerboard Rd",
+          "street_name": "Fingerboard Rd"
+        },
+        "country": {
+          "country_code": "US",
+          "country_code_alpha_3": "USA",
+          "name": "United States"
+        },
+        "place": {
+          "id": "dXJuOm1ieHBsYzpCd01JN0E",
+          "name": "Frederick"
+        },
+        "postcode": {
+          "id": "dXJuOm1ieHBsYzpCQVl1N0E",
+          "name": "21704"
+        },
+        "region": {
+          "name": "Maryland",
+          "region_code": "MD",
+          "region_code_full": "US-MD"
+        },
+        "street": {
+          "name": "Fingerboard Rd"
+        }
+      },
+      "distance": 7690,
+      "external_ids": {
+        "dataplor": "3b456696-0f1f-4c7c-99a8-fca18d464926"
+      },
+      "feature_type": "poi",
+      "full_address": "9180 Fingerboard Rd, Frederick, Maryland 21704, United States",
+      "language": "en",
+      "maki": "charging-station",
+      "mapbox_id": "dXJuOm1ieHBvaTpiYTcwOGI4YS1iODc1LTQ5ZjctYThhNy01MzM1ZjZjMmE0ZjE",
+      "metadata": {},
+      "name": "Tesla Supercharger",
+      "place_formatted": "Frederick, Maryland 21704, United States",
+      "poi_category": [
+        "charging station",
+        "transportation"
+      ],
+      "poi_category_ids": [
+        "charging_station",
+        "transportation"
+      ]
+    },
+    {
+      "address": "5577 Spectrum Dr",
+      "brand": [
+        "Tesla"
+      ],
+      "brand_id": [
+        "tesla"
+      ],
+      "context": {
+        "address": {
+          "address_number": "5577",
+          "name": "5577 Spectrum Dr",
+          "street_name": "Spectrum Dr"
+        },
+        "country": {
+          "country_code": "US",
+          "country_code_alpha_3": "USA",
+          "name": "United States"
+        },
+        "place": {
+          "id": "dXJuOm1ieHBsYzpCd01JN0E",
+          "name": "Frederick"
+        },
+        "postcode": {
+          "id": "dXJuOm1ieHBsYzpCQVlPN0E",
+          "name": "21703"
+        },
+        "region": {
+          "name": "Maryland",
+          "region_code": "MD",
+          "region_code_full": "US-MD"
+        },
+        "street": {
+          "name": "Spectrum Dr"
+        }
+      },
+      "distance": 11114,
+      "external_ids": {
+        "dataplor": "45ef8008-e8e7-4ea9-85a8-123008b7a121"
+      },
+      "feature_type": "poi",
+      "full_address": "5577 Spectrum Dr, Frederick, Maryland 21703, United States",
+      "language": "en",
+      "maki": "charging-station",
+      "mapbox_id": "dXJuOm1ieHBvaTowNGJmZWEyZS02YTI3LTQ2MWUtYTNlZi0xOWFkOTExMTg3Yzg",
+      "metadata": {},
+      "name": "Tesla Supercharger",
+      "place_formatted": "Frederick, Maryland 21703, United States",
+      "poi_category": [
+        "charging station",
+        "transportation"
+      ],
+      "poi_category_ids": [
+        "charging_station",
+        "transportation"
+      ]
+    },
+    {
+      "address": "5833 Ballenger Creek Pike #5833",
+      "brand": [
+        "Tesla"
+      ],
+      "brand_id": [
+        "tesla"
+      ],
+      "context": {
+        "address": {
+          "address_number": "5833",
+          "name": "5833 Ballenger Creek Pike #5833",
+          "street_name": "Ballenger Creek Pike"
+        },
+        "country": {
+          "country_code": "US",
+          "country_code_alpha_3": "USA",
+          "name": "United States"
+        },
+        "place": {
+          "id": "dXJuOm1ieHBsYzpCd01JN0E",
+          "name": "Frederick"
+        },
+        "postcode": {
+          "id": "dXJuOm1ieHBsYzpCQVlPN0E",
+          "name": "21703"
+        },
+        "region": {
+          "name": "Maryland",
+          "region_code": "MD",
+          "region_code_full": "US-MD"
+        },
+        "street": {
+          "name": "Ballenger Creek Pike"
+        }
+      },
+      "distance": 13806,
+      "external_ids": {
+        "dataplor": "ac2d8e32-c74b-4b44-a87c-5786152050d4"
+      },
+      "feature_type": "poi",
+      "full_address": "5833 Ballenger Creek Pike #5833, Frederick, Maryland 21703, United States",
+      "language": "en",
+      "maki": "charging-station",
+      "mapbox_id": "dXJuOm1ieHBvaTpkMWNkNzg4Yi04MWM4LTQ0MWMtYmVkOC1jNWJiN2Y4ODk1ZTU",
+      "metadata": {},
+      "name": "Tesla Supercharger",
+      "place_formatted": "Frederick, Maryland 21703, United States",
+      "poi_category": [
+        "charging station",
+        "transportation"
+      ],
+      "poi_category_ids": [
+        "charging_station",
+        "transportation"
+      ]
+    },
+    {
+      "address": "5831 Buckeystown Pike",
+      "context": {
+        "address": {
+          "address_number": "5831",
+          "name": "5831 Buckeystown Pike",
+          "street_name": "Buckeystown Pike"
+        },
+        "country": {
+          "country_code": "US",
+          "country_code_alpha_3": "USA",
+          "name": "United States"
+        },
+        "neighborhood": {
+          "id": "dXJuOm1ieHBsYzpEQnRNN0E",
+          "name": "Evergreen Point"
+        },
+        "place": {
+          "id": "dXJuOm1ieHBsYzpCd01JN0E",
+          "name": "Frederick"
+        },
+        "postcode": {
+          "id": "dXJuOm1ieHBsYzpCQVl1N0E",
+          "name": "21704"
+        },
+        "region": {
+          "name": "Maryland",
+          "region_code": "MD",
+          "region_code_full": "US-MD"
+        },
+        "street": {
+          "name": "Buckeystown Pike"
+        }
+      },
+      "distance": 11349,
+      "external_ids": {
+        "dataplor": "25fc1f54-8d55-40fa-a8af-4243377a4842"
+      },
+      "feature_type": "poi",
+      "full_address": "5831 Buckeystown Pike, Frederick, Maryland 21704, United States",
+      "language": "en",
+      "maki": "charging-station",
+      "mapbox_id": "dXJuOm1ieHBvaToxY2I0MDZiMy00NWUyLTQzOTItOTc5Yy1mYTkxMTRhOGVhNDE",
+      "metadata": {},
+      "name": "Tesla Supercharger",
+      "place_formatted": "Frederick, Maryland 21704, United States",
+      "poi_category": [
+        "charging station",
+        "transportation"
+      ],
+      "poi_category_ids": [
+        "charging_station",
+        "transportation"
+      ]
+    }
+  ]
+}

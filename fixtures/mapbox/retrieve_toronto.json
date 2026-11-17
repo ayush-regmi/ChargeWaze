@@ -1,0 +1,55 @@
+{
+  "attribution": "© 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service. (https://www.mapbox.com/about/maps/)",
+  "features": [
+    {
+      "geometry": {
+        "coordinates": [
+          -79.38355,
+          43.647938
+        ],
+        "type": "Point"
+      },
+      "properties": {
+        "bbox": [
+          -79.536797,
+          43.592346,
+          -79.273262,
+          43.736785
+        ],
+        "context": {
+          "country": {
+            "country_code": "CA",
+            "country_code_alpha_3": "CAN",
+            "id": "dXJuOm1ieHBsYzpJaWM",
+            "name": "Canada"
+          },
+          "place": {
+            "id": "dXJuOm1ieHBsYzpCK3dJSnc",
+            "name": "Toronto"
+          },
+          "region": {
+            "id": "dXJuOm1ieHBsYzpSQ2M",
+            "name": "Ontario",
+            "region_code": "ON",
+            "region_code_full": "CA-ON"
+          }
+        },
+        "coordinates": {
+          "latitude": 43.647938,
+          "longitude": -79.38355
+        },
+        "feature_type": "place",
+        "full_address": "Toronto, Ontario, Canada",
+        "language": "en",
+        "maki": "marker",
+        "mapbox_id": "dXJuOm1ieHBsYzpCK3dJSnc",
+        "metadata": {},
+        "name": "Toronto",
+        "name_preferred": "Toronto",
+        "place_formatted": "Ontario, Canada"
+      },
+      "type": "Feature"
+    }
+  ],
+  "type": "FeatureCollection"
+}

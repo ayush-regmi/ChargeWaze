@@ -1,0 +1,184 @@
+{
+  "attribution": "© 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service. (https://www.mapbox.com/about/maps/)",
+  "response_id": "dvCsu_xXi66rMTotPSVuv-BpZZ9hSm0IUTDrnXFEl9dA61bM3-kyXicOY_EwlEJmtiArfn3yQT2dquot_SMt1zm61ildo4DEVdIT",
+  "suggestions": [
+    {
+      "context": {
+        "country": {
+          "country_code": "CA",
+          "country_code_alpha_3": "CAN",
+          "id": "dXJuOm1ieHBsYzpJaWM",
+          "name": "Canada"
+        },
+        "region": {
+          "id": "dXJuOm1ieHBsYzpSQ2M",
+          "name": "Ontario",
+          "region_code": "ON",
+          "region_code_full": "CA-ON"
+        }
+      },
+      "distance": 366,
+      "feature_type": "place",
+      "language": "en",
+      "maki": "marker",
+      "mapbox_id": "dXJuOm1ieHBsYzpCK3dJSnc",
+      "metadata": {},
+      "name": "Toronto",
+      "place_formatted": "Ontario, Canada"
+    },
+    {
+      "address": "Toronto",
+      "context": {
+        "country": {
+          "country_code": "CA",
+          "country_code_alpha_3": "CAN",
+          "name": "Canada"
+        },
+        "place": {
+          "id": "dXJuOm1ieHBsYzpCK3dJSnc",
+          "name": "Toronto"
+        },
+        "postcode": {
+          "id": "dXJuOm1ieHBsYzorZjl1Snc",
+          "name": "M5G 1C3"
+        }
+      },
+      "distance": 773,
+      "external_ids": {
+        "dataplor": "91c28315-b95a-491e-8ba5-8221f404689d"
+      },
+      "feature_type": "poi",
+      "full_address": "Toronto, M5G 1C3, Canada",
+      "language": "en",
+      "maki": "bus",
+      "mapbox_id": "dXJuOm1ieHBvaTpkMzI4ZTYyZS05OWUzLTRlMjgtOTRlNC02OTc5ODVjYzJhYjA",
+      "metadata": {},
+      "name": "Toronto",
+      "place_formatted": "M5G 1C3, Canada",
+      "poi_category": [
+        "bus station",
+        "transportation"
+      ],
+      "poi_category_ids": [
+        "bus_station",
+        "transportation"
+      ]
+    },
+    {
+      "address": "Toronto",
+      "context": {
+        "country": {
+          "country_code": "CA",
+          "country_code_alpha_3": "CAN",
+          "name": "Canada"
+        },
+        "place": {
+          "id": "dXJuOm1ieHBsYzpCK3dJSnc",
+          "name": "Toronto"
+        },
+        "postcode": {
+          "id": "dXJuOm1ieHBsYzpBY0xyN2lj",
+          "name": "M5J 1E4"
+        }
+      },
+      "distance": 479,
+      "external_ids": {
+        "dataplor": "bee0cbc2-90e6-4a2f-b9a3-49b9674866fb"
+      },
+      "feature_type": "poi",
+      "full_address": "Toronto, M5J 1E4, Canada",
+      "language": "en",
+      "maki": "bus",
+      "mapbox_id": "dXJuOm1ieHBvaTo5NzU3NDhkMy1mYjZjLTRhYzgtODE1OC1mNDU0YmZiMTQ0ZGY",
+      "metadata": {},
+      "name": "Toronto",
+      "place_formatted": "M5J 1E4, Canada",
+      "poi_category": [
+        "bus stop",
+        "transportation"
+      ],
+      "poi_category_ids": [
+        "bus_stop",
+        "transportation"
+      ]
+    },
+    {
+      "context": {
+        "country": {
+          "country_code": "CA",
+          "country_code_alpha_3": "CAN",
+          "id": "dXJuOm1ieHBsYzpJaWM",
+          "name": "Canada"
+        },
+        "region": {
+          "id": "dXJuOm1ieHBsYzpSQ2M",
+          "name": "Ontario",
+          "region_code": "ON",
+          "region_code_full": "CA-ON"
+        }
+      },
+      "distance": 3245,
+      "feature_type": "place",
+      "language": "en",
+      "maki": "marker",
+      "mapbox_id": "dXJuOm1ieHBsYzpCNkpvSnc",
+      "metadata": {},
+      "name": "Toronto Islands",
+      "place_formatted": "Ontario, Canada"
+    },
+    {
+      "address": "6301 Silver Dart Drive",
+      "context": {
+        "address": {
+          "address_number": "6301",
+          "name": "6301 Silver Dart Drive",
+          "street_name": "Silver Dart Drive"
+        },
+        "country": {
+          "country_code": "CA",
+          "country_code_alpha_3": "CAN",
+          "name": "Canada"
+        },
+        "neighborhood": {
+          "id": "dXJuOm1ieHBsYzorOHdu",
+          "name": "Northeast"
+        },
+        "place": {
+          "id": "dXJuOm1ieHBsYzpBdTFJSnc",
+          "name": "Mississauga"
+        },
+        "postcode": {
+          "id": "dXJuOm1ieHBsYzp6M0F1Snc",
+          "name": "L5P 1B2"
+        },
+        "street": {
+          "name": "Silver Dart Drive"
+        }
+      },
+      "distance": 18955,
+      "external_ids": {
+        "dataplor": "6f02236d-7893-49e0-be76-01e0e876edf0",
+        "golden": "airport-YYZ",
+        "iata": "YYZ"
+      },
+      "feature_type": "poi",
+      "full_address": "6301 Silver Dart Drive, Mississauga, L5P 1B2, Canada",
+      "language": "en",
+      "maki": "airport",
+      "mapbox_id": "dXJuOm1ieHBvaTowMTQwODEzMC05MTAwLTQyMDctYWY3MC1hYjkwNTgyMzQ1OGI",
+      "metadata": {},
+      "name": "Toronto Pearson International Airport",
+      "name_local": {
+        "fr": "Aéroport International Pearson de Toronto"
+      },
+      "name_preferred": "Toronto Pearson International Airport",
+      "place_formatted": "Mississauga, L5P 1B2, Canada",
+      "poi_category": [
+        "airport"
+      ],
+      "poi_category_ids": [
+        "airport"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "message": {
+    "code": "eJwrLkrWTyzI1M9IzEvJSS0q1i9LzMlMSSxJ1Ssq1jU3BwC8GgtZ",
+    "error": "Session Token is required",
+    "status_code": 400,
+    "version": "1176:93488f385e61fe5cbc9d8a0f3148d43b9e430039"
+  }
+}

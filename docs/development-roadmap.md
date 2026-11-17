@@ -63,7 +63,7 @@ Status: code complete (F0–F7 merged; F8 adds the Playwright Garage → Dashboa
 **Scope**
 
 - `integrations/mapbox` adapter: Geocoding, Search Box autocomplete, Directions.
-- `integrations/stations` adapter: AFDC/NREL for US; evaluate NRCan or Open Charge Map for Canadian coverage and pick one.
+- `integrations/stations` adapter: AFDC for the US and Canada (Canadian data comes from NRCan through AFDC with `country=all`; verified in F0, see [`maps-stations-notes.md`](maps-stations-notes.md)).
 - `GET /api/v1/stations` endpoint.
 - Frontend: Mapbox GL JS map in Trip Planner and Charging Stations pages; autocomplete origin/destination; station layer with connector/network/power filters defaulted to the active vehicle's compatible connectors.
 - Caching of station fetches into `charging_stations` with `provider` + `external_id` uniqueness.
@@ -220,7 +220,7 @@ Tracked explicitly here and in the per-doc "open questions" sections.
 | Risk | Owner | Resolution step |
 |---|---|---|
 | Smartcar event frequency on the Toyota is lower than Dashboard needs. | Phase 2 | Measure during Phase 2; if too low, add a polling fallback or widen the freshness threshold. |
-| Canadian charging data is missing. | Phase 3 | Pick between NRCan and Open Charge Map before Phase 3 starts. |
+| Canadian charging data is missing. | Phase 3 | **Resolved 2026-11-16 (F0):** AFDC returns Ontario stations with `country=all` (its default is `US`). No second provider needed. |
 | Open-Meteo license is non-commercial. | Pre-ML | Confirm Chargewise stays non-commercial, or pick a different weather provider before Stage B. |
 | Mapbox EV Routing becomes GA mid-project. | Ongoing | Stay on the self-built optimizer unless Mapbox EV Routing gives a clear win and acceptable pricing. |
 | API costs exceed hobby budget. | Phase 6 | Add per-user rate limits in Phase 6; monitor Mapbox and Smartcar usage. |

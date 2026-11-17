@@ -43,7 +43,7 @@ Reserved codes (grow this list as the API grows):
 | `SMARTCAR_ERROR` | 502 | Smartcar rejected the request; Smartcar's error code is in `details`. |
 | `SMARTCAR_NOT_CONFIGURED` | 503 | Smartcar credentials, application ID or state secret are not set on the server. |
 | `MAPBOX_UNREACHABLE` | 502/504 | Mapbox failed or timed out. |
-| `STATIONS_UNREACHABLE` | 502/504 | AFDC/OCM failed or timed out. |
+| `STATIONS_UNREACHABLE` | 502/504 | The station provider (AFDC) failed or timed out. |
 | `ROUTE_INFEASIBLE` | 200 | Returned by `/routes/plan` when no feasible plan exists (see §3.7). |
 | `WEBHOOK_SIGNATURE_INVALID` | 401 | Smartcar webhook signature did not verify. |
 | `WEBHOOK_PAYLOAD_INVALID` | 400 | Smartcar webhook was signed but is not a usable event (not JSON, no `eventType`, `VEHICLE_STATE` without vehicle/user or `eventId`). |

@@ -1,0 +1,466 @@
+{
+  "alt_fuel_station": {
+    "access_code": "public",
+    "access_days_time": "24 hours daily",
+    "access_detail_code": null,
+    "cards_accepted": null,
+    "city": "Burlington",
+    "country": "CA",
+    "date_last_confirmed": "2026-11-17",
+    "ev_charging_units": [
+      {
+        "charging_level": "dc_fast",
+        "connectors": {
+          "CHADEMO": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772COMBO": {
+            "port_count": 1,
+            "power_kw": 350.0
+          },
+          "J3271": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA1450": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA515": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA520": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "TESLA": {
+            "port_count": 0,
+            "power_kw": null
+          }
+        },
+        "funding_sources": [],
+        "network": "Electrify Canada",
+        "port_count": 1
+      },
+      {
+        "charging_level": "dc_fast",
+        "connectors": {
+          "CHADEMO": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772COMBO": {
+            "port_count": 1,
+            "power_kw": 350.0
+          },
+          "J3271": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA1450": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA515": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA520": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "TESLA": {
+            "port_count": 0,
+            "power_kw": null
+          }
+        },
+        "funding_sources": [],
+        "network": "Electrify Canada",
+        "port_count": 1
+      },
+      {
+        "charging_level": "dc_fast",
+        "connectors": {
+          "CHADEMO": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772COMBO": {
+            "port_count": 1,
+            "power_kw": 350.0
+          },
+          "J3271": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA1450": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA515": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA520": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "TESLA": {
+            "port_count": 0,
+            "power_kw": null
+          }
+        },
+        "funding_sources": [],
+        "network": "Electrify Canada",
+        "port_count": 1
+      },
+      {
+        "charging_level": "dc_fast",
+        "connectors": {
+          "CHADEMO": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772COMBO": {
+            "port_count": 1,
+            "power_kw": 350.0
+          },
+          "J3271": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA1450": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA515": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA520": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "TESLA": {
+            "port_count": 0,
+            "power_kw": null
+          }
+        },
+        "funding_sources": [],
+        "network": "Electrify Canada",
+        "port_count": 1
+      },
+      {
+        "charging_level": "dc_fast",
+        "connectors": {
+          "CHADEMO": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772COMBO": {
+            "port_count": 1,
+            "power_kw": 350.0
+          },
+          "J3271": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA1450": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA515": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA520": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "TESLA": {
+            "port_count": 0,
+            "power_kw": null
+          }
+        },
+        "funding_sources": [],
+        "network": "Electrify Canada",
+        "port_count": 1
+      },
+      {
+        "charging_level": "dc_fast",
+        "connectors": {
+          "CHADEMO": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772COMBO": {
+            "port_count": 1,
+            "power_kw": 350.0
+          },
+          "J3271": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA1450": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA515": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA520": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "TESLA": {
+            "port_count": 0,
+            "power_kw": null
+          }
+        },
+        "funding_sources": [],
+        "network": "Electrify Canada",
+        "port_count": 1
+      },
+      {
+        "charging_level": "dc_fast",
+        "connectors": {
+          "CHADEMO": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772COMBO": {
+            "port_count": 1,
+            "power_kw": 350.0
+          },
+          "J3271": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA1450": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA515": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA520": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "TESLA": {
+            "port_count": 0,
+            "power_kw": null
+          }
+        },
+        "funding_sources": [],
+        "network": "Electrify Canada",
+        "port_count": 1
+      },
+      {
+        "charging_level": "dc_fast",
+        "connectors": {
+          "CHADEMO": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772COMBO": {
+            "port_count": 1,
+            "power_kw": 350.0
+          },
+          "J3271": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA1450": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA515": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA520": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "TESLA": {
+            "port_count": 0,
+            "power_kw": null
+          }
+        },
+        "funding_sources": [],
+        "network": "Electrify Canada",
+        "port_count": 1
+      },
+      {
+        "charging_level": "dc_fast",
+        "connectors": {
+          "CHADEMO": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772COMBO": {
+            "port_count": 1,
+            "power_kw": 350.0
+          },
+          "J3271": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA1450": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA515": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA520": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "TESLA": {
+            "port_count": 0,
+            "power_kw": null
+          }
+        },
+        "funding_sources": [],
+        "network": "Electrify Canada",
+        "port_count": 1
+      },
+      {
+        "charging_level": "dc_fast",
+        "connectors": {
+          "CHADEMO": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "J1772COMBO": {
+            "port_count": 1,
+            "power_kw": 350.0
+          },
+          "J3271": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA1450": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA515": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "NEMA520": {
+            "port_count": 0,
+            "power_kw": null
+          },
+          "TESLA": {
+            "port_count": 0,
+            "power_kw": null
+          }
+        },
+        "funding_sources": [],
+        "network": "Electrify Canada",
+        "port_count": 1
+      }
+    ],
+    "ev_connector_types": [
+      "J1772COMBO"
+    ],
+    "ev_dc_fast_num": 10,
+    "ev_level1_evse_num": null,
+    "ev_level2_evse_num": null,
+    "ev_network": "Electrify Canada",
+    "ev_network_ids": {
+      "posts": [
+        "800104-01",
+        "800104-02",
+        "800104-03",
+        "800104-04",
+        "800104-05",
+        "800104-06",
+        "800104-07",
+        "800104-08",
+        "800104-09",
+        "800104-10"
+      ],
+      "station": [
+        "800104"
+      ]
+    },
+    "ev_network_web": "https://www.electrify-canada.ca",
+    "ev_other_evse": null,
+    "ev_pricing": null,
+    "ev_renewable_source": null,
+    "ev_workplace_charging": false,
+    "expected_date": null,
+    "facility_type": null,
+    "fuel_type_code": "ELEC",
+    "funding_sources": [],
+    "geocode_status": "GPS",
+    "groups_with_access_code": "Public",
+    "id": 448148,
+    "intersection_directions": null,
+    "latitude": 43.3541,
+    "longitude": -79.7862,
+    "maximum_vehicle_class": null,
+    "open_date": "2025-12-20",
+    "owner_type_code": null,
+    "plus4": null,
+    "related_stations": [],
+    "restricted_access": false,
+    "state": "ON",
+    "station_name": "Woodview Place (Burlington, ON)",
+    "station_phone": "833-231-3226",
+    "status_code": "E",
+    "street_address": "3295 Fairview Street",
+    "unverified": false,
+    "updated_at": "2026-11-17T03:58:28Z",
+    "zip": "L7N 3N9"
+  }
+}

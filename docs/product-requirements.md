@@ -194,7 +194,7 @@ Dashboard and Garage must also handle: first-time connect with no telemetry yet,
 
 Carry these into the roadmap as Phase-level decisions:
 
-- **Canadian charger data.** AFDC does not cover Canada. Cross-border trips (e.g. Frederick, MD to Toronto, ON) need Natural Resources Canada data or Open Charge Map. Decide before starting Phase 3.
+- ~~**Canadian charger data.**~~ Resolved 2026-11-16 (Phase 3 F0): AFDC includes Natural Resources Canada's stations when called with `country=all`; a Frederick, MD → Toronto, ON route returned stations on both sides of the border. No second provider is needed. See [`maps-stations-notes.md`](maps-stations-notes.md).
 - **Weather provider licensing.** Open-Meteo is free for non-commercial use. Confirm whether Chargewise remains non-commercial before relying on it long-term.
 - **Smartcar entitlements.** Confirm the plan's event frequency and request quotas are enough for the Dashboard's freshness target. May require a telemetry-polling fallback.
 - **Public demo data.** Decide the exact seeded routes and simulated vehicle for the demo mode in Phase 6.
