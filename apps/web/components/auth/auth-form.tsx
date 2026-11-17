@@ -133,7 +133,7 @@ export function AuthForm({
               <button
                 type="button"
                 onClick={() => onOAuth("google")}
-                className="flex items-center justify-center gap-2 rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+                className="flex items-center justify-center gap-2 rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 hover:text-emerald-700 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:hover:bg-neutral-50 dark:hover:text-emerald-700"
               >
                 Continue with Google
               </button>
