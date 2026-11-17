@@ -112,7 +112,7 @@ The connect flow:
 6. The web app forwards that query to `POST /api/v1/vehicles/connect/complete` with the **signed-in user's** Supabase JWT. The backend verifies `state` and requires its user to be the caller. Connect has to finish where the user's session is: otherwise an attacker could start Connect on their own account, send the authorization URL to a victim, and receive the victim's car (both `state` and Smartcar's `externalId` would name the attacker).
 7. Backend lists the Smartcar user's connections and only accepts active ones whose `externalId` equals the user in `state`; the redirect's `user_id` is unauthenticated and the application token can read any Smartcar user's connections. Per connection: a car already connected to this user is a duplicate; a disconnected (or leftover pending) row is reactivated; a car active on another Chargewise user is refused; otherwise a `vehicles` row (`connected`) and `vehicle_specs` (from the static catalog, or `NULL`s) are inserted. `supported_signals` comes from a best-effort signal read and is often `[]` right after Connect; F5/F6 recompute it when data arrives.
 8. Backend returns `{ result, redirect_after }`; the web app redirects to `redirect_after` with `connect=success|already_connected|denied|error`, and the Garage shows a banner.
-9. Webhook enrolment: until F5 adds the V3 subscribe call, vehicles are enrolled by the Smartcar Dashboard's auto-subscribe setting.
+9. Webhook enrolment: vehicles are enrolled by the Smartcar Dashboard's auto-subscribe setting. Chargewise does not call the V3 subscribe API; revisit if the real-car check shows a newly connected vehicle isn't enrolled.
 
 Verified V3 details live in [`smartcar-v3-notes.md`](smartcar-v3-notes.md).
 
@@ -120,8 +120,8 @@ Verified V3 details live in [`smartcar-v3-notes.md`](smartcar-v3-notes.md).
 
 `POST /api/v1/webhooks/smartcar` is the only endpoint allowed to accept Smartcar-signed traffic. It must:
 
-1. **Verify the signature** using the stored Smartcar webhook secret. Reject on mismatch.
-2. **Deduplicate** by the Smartcar event ID; already-processed events return 200 without re-writing.
+1. **Verify the signature**: `SC-Signature` is the hex HMAC-SHA256 of the raw body, keyed with the Application Management Token (`SMARTCAR_MANAGEMENT_TOKEN`). Reject on mismatch, and verify before answering a `VERIFY` challenge.
+2. **Deduplicate** by the Smartcar event ID, per signal (`source`, `source_event_id`, `signal_code`); already-processed events return 200 without re-writing.
 3. **Parse and validate** supported signals; unknown fields are stored verbatim in a raw JSON column for later inspection.
 4. **Preserve** the provider `recorded_at` and the raw unit.
 5. **Persist** a normalized `vehicle_telemetry` row and update the cached latest state on `vehicles`.
@@ -252,7 +252,7 @@ The two modes **never** share records. Analytics and ML training sets exclude `i
 |---|---|
 | FastAPI | `pytest` unit + integration; API contract tests against generated OpenAPI. |
 | React components | Vitest + React Testing Library. |
-| End-to-end UI | Playwright for the MVP demo flow. |
+| End-to-end UI | Playwright for the MVP demo flow. Runs the real API and web app against local Postgres and a small Supabase Auth stub (`apps/web/e2e/support/`); data is seeded by delivering a locally signed webhook, so no real Supabase or Smartcar is involved. |
 | Database | Alembic migration round-trip tests; integration tests on a disposable Postgres. |
 | Smartcar | Deterministic mock responses + signed webhook fixtures in [`fixtures/smartcar/`](../fixtures/smartcar/). |
 | Routing | Covers every case in the acceptance matrix (see [`product-requirements.md`](product-requirements.md#9-acceptance-test-matrix)). |

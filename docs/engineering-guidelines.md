@@ -88,6 +88,7 @@ Tooling is **npm workspaces + Turborepo** on the JS side and **`uv`** on the Pyt
   - `npm run build` / `npm run lint` / `npm run test` / `npm run typecheck`.
 - Workspace-scoped:
   - Frontend: `npm run dev --workspace=apps/web`, `npm run test --workspace=apps/web`, `npm run test:e2e --workspace=apps/web`.
+  - E2E needs local Postgres (`docker compose up -d`), `uv`, and Playwright's browser (`npx playwright install chromium` in `apps/web`). It starts its own API (port 8765), web app (port 3100) and Auth stub, and uses a separate `chargewise_e2e` database.
   - Backend (from [`services/api/`](../services/api)): `uv sync --group dev`, `uv run fastapi dev app/main.py`, `uv run pytest`, `uv run ruff check`, `uv run mypy app`.
   - Migrations: `uv run alembic upgrade head`, `uv run alembic downgrade -1`.
 - Generated typed API client: `uv run --project services/api python services/api/scripts/export_openapi.py && npm run generate --workspace=packages/api-client`.

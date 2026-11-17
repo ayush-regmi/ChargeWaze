@@ -4,7 +4,7 @@ A full-stack EV intelligence and route-planning platform. Chargewise combines co
 
 > Given my vehicle's current battery level, where I want to go, the weather, and available charging infrastructure, what is the most efficient and reliable way to complete my trip?
 
-**Status: Phase 1 complete.** The monorepo scaffolds, Supabase Auth, `GET /api/v1/me`, and CI are on `main`. Phase 2 (Smartcar V3 vehicle integration) is next.
+**Status: Phase 2 code complete; real-car verification pending.** On `main`: Supabase Auth, Smartcar V3 Connect, the Garage, the signed-webhook ingestor, the Dashboard with freshness markers, primary vehicle and spec editing, and a Playwright Garage → Dashboard test. Phase 2 closes once the real Toyota has been checked end to end and its event cadence measured; Phase 3 (maps and chargers) is next.
 
 ## MVP demo flow
 
@@ -60,7 +60,7 @@ Start here, in this order:
 - [x] Phase 1 slice 1 — monorepo scaffolds (Next.js app shell, FastAPI `/health`, typed API client)
 - [x] Phase 1 slice 2 — Supabase Auth (email/password + Google; Apple behind a flag) with `GET /api/v1/me`
 - [x] Phase 1 slice 3 — CI green on `main`
-- [ ] Phase 2 — Vehicle integration (Smartcar V3 Connect + webhooks)
+- [ ] Phase 2 — Vehicle integration (Smartcar V3 Connect + webhooks): code complete (Garage, webhook ingestor, Dashboard, primary vehicle, E2E); real-car verification and event-cadence measurement pending
 - [ ] Phase 3 — Maps and chargers
 - [ ] Phase 4 — Charging-aware trip planner
 - [ ] Phase 5 — History and analytics
