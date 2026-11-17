@@ -192,6 +192,20 @@ def test_directions_malformed_body_is_upstream_error(body: bytes) -> None:
     assert exc.value.code == "MAPBOX_ERROR"
 
 
+def test_directions_ok_without_routes_is_upstream_error() -> None:
+    recorder = Recorder(httpx.Response(200, json={"code": "Ok"}))
+    with pytest.raises(ApiError) as exc:
+        make_client(recorder).directions(FREDERICK, TORONTO)
+    assert exc.value.code == "MAPBOX_ERROR"
+
+
+def test_directions_ok_with_empty_routes_is_no_route() -> None:
+    recorder = Recorder(httpx.Response(200, json={"code": "Ok", "routes": []}))
+    result = make_client(recorder).directions(FREDERICK, TORONTO)
+    assert result.routes == []
+    assert result.no_route_reason == "no_route"
+
+
 # ---- search box -----------------------------------------------------------------
 
 
@@ -322,6 +336,29 @@ def test_retrieve_escapes_id_in_path() -> None:
 )
 def test_retrieve_unknown_id_is_none(response: httpx.Response) -> None:
     assert make_client(Recorder(response)).retrieve("gone", session_token=SESSION) is None
+
+
+@pytest.mark.parametrize("body", [{}, {"suggestions": None}, {"attribution": "x"}])
+def test_suggest_malformed_body_is_upstream_error(body: dict[str, Any]) -> None:
+    with pytest.raises(ApiError) as exc:
+        make_client(Recorder(httpx.Response(200, json=body))).suggest(
+            "Toronto", session_token=SESSION
+        )
+    assert exc.value.code == "MAPBOX_ERROR"
+    assert exc.value.status_code == 502
+
+
+def test_suggest_explicitly_empty_is_no_matches() -> None:
+    recorder = Recorder(httpx.Response(200, json={"suggestions": []}))
+    assert make_client(recorder).suggest("zzqx", session_token=SESSION) == []
+
+
+@pytest.mark.parametrize("body", [{}, {"type": "FeatureCollection"}, {"features": None}])
+def test_retrieve_malformed_body_is_upstream_error(body: dict[str, Any]) -> None:
+    with pytest.raises(ApiError) as exc:
+        make_client(Recorder(httpx.Response(200, json=body))).retrieve("abc", session_token=SESSION)
+    assert exc.value.code == "MAPBOX_ERROR"
+    assert exc.value.status_code == 502
 
 
 # ---- error mapping --------------------------------------------------------------

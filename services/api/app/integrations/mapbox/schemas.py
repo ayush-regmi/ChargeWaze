@@ -101,7 +101,8 @@ class _UpstreamRoute(_Lenient):
 
 class UpstreamDirections(_Lenient):
     code: str
-    routes: list[_UpstreamRoute] = Field(default_factory=list)
+    # Absent on some failure codes; required (may be empty) when ``code`` is ``Ok``.
+    routes: list[_UpstreamRoute] | None = None
 
 
 class _UpstreamCountry(_Lenient):
@@ -122,7 +123,8 @@ class UpstreamSuggestion(_Lenient):
 
 
 class UpstreamSuggestResponse(_Lenient):
-    suggestions: list[UpstreamSuggestion] = Field(default_factory=list)
+    # Required: a body without it is malformed, not "no matches".
+    suggestions: list[UpstreamSuggestion]
 
 
 class _UpstreamCoordinates(_Lenient):
@@ -145,7 +147,8 @@ class _UpstreamFeature(_Lenient):
 
 
 class UpstreamRetrieveResponse(_Lenient):
-    features: list[_UpstreamFeature] = Field(default_factory=list)
+    # Required: a body without it is malformed, not "unknown ID".
+    features: list[_UpstreamFeature]
 
 
 def display_address(name: str, full_address: str | None, place_formatted: str | None) -> str:

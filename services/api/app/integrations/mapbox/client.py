@@ -118,8 +118,11 @@ class MapboxClient:
             return DirectionsResult(routes=[], no_route_reason=reason)
         if body.code != "Ok":
             raise errors.unexpected_response(body.code)
+        if body.routes is None:
+            # "Ok" without a ``routes`` array is malformed, not "no route".
+            raise errors.unexpected_response()
         if not body.routes:
-            # "Ok" with nothing in it isn't documented; treat it as no route.
+            # "Ok" with an empty array isn't documented; treat it as no route.
             return DirectionsResult(routes=[], no_route_reason="no_route")
 
         return DirectionsResult(
