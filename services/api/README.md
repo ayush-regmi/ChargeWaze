@@ -52,8 +52,30 @@ uv run python scripts/send_test_webhook.py --vehicle-id <smartcar-vehicle-id> --
 
 ### With the real car: tunnel
 
-Smartcar needs a public HTTPS URL. Phase 2 uses ngrok with a free static domain (`docs/phase2_plan.md` D9), so the URL registered with Smartcar stays the same across restarts. The exact tunnel commands will be added after the first live run (F5 acceptance).
+Smartcar needs a public HTTPS URL. Phase 2 uses ngrok with a free static domain (`docs/phase2_plan.md` D9), so the URL registered with Smartcar stays the same across restarts. These commands were used for the first live run on 2026-11-16 (ngrok 3.39).
 
-1. Start the API on port 8000 and a tunnel to it.
+First make sure the database in `.env` is migrated. Without the vehicle tables, Connect completion and every webhook fail with 500:
+
+```bash
+uv run alembic upgrade head
+```
+
+One-time ngrok setup (authtoken and a free static domain from the ngrok dashboard):
+
+```bash
+brew install ngrok
+```
+
+```bash
+ngrok config add-authtoken <your-token>
+```
+
+Then, with the API running on port 8000:
+
+```bash
+ngrok http --url=<your-static-domain> 8000
+```
+
+1. Check the tunnel: `curl https://<your-static-domain>/health`.
 2. In the Smartcar Dashboard, set the webhook URL to `https://<your-domain>/api/v1/webhooks/smartcar`. Smartcar then sends a `VERIFY` event, which the API answers once the signature checks out.
 3. Telemetry from the car arrives as `VEHICLE_STATE` events. Each reading is stored in `vehicle_telemetry` and updates `vehicles.latest_state`.
