@@ -42,7 +42,12 @@ export default function GaragePage() {
 async function VehicleList() {
   await connection();
   const api = await requireSessionApi("/garage");
-  const { data } = await api.GET("/api/v1/vehicles");
+  const [{ data }, { data: me }] = await Promise.all([
+    api.GET("/api/v1/vehicles"),
+    api.GET("/api/v1/me"),
+  ]);
+  // /me failing only hides the Primary badge; the list still renders.
+  const primaryId = me?.preferences.primary_vehicle_id ?? null;
 
   if (!data) {
     return (
@@ -57,7 +62,7 @@ async function VehicleList() {
   return (
     <div className="space-y-4">
       {data.items.map((vehicle) => (
-        <VehicleCard key={vehicle.id} vehicle={vehicle} />
+        <VehicleCard key={vehicle.id} vehicle={vehicle} isPrimary={vehicle.id === primaryId} />
       ))}
     </div>
   );

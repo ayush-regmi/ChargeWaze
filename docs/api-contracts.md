@@ -56,10 +56,12 @@ Reserved codes (grow this list as the API grows):
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/v1/me` | Authenticated profile and preferences. |
+| `PATCH` | `/api/v1/me/preferences` | Partially update preferences, including the primary vehicle. |
 | `GET` | `/api/v1/vehicles` | List the caller's connected vehicles. |
 | `POST` | `/api/v1/vehicles/connect` | Start a Smartcar Connect flow. |
 | `POST` | `/api/v1/vehicles/connect/complete` | Finish Connect for the signed-in user. |
 | `GET` | `/api/v1/vehicles/{id}` | Vehicle metadata and specs. |
+| `PATCH` | `/api/v1/vehicles/{id}/specs` | Edit usable capacity, connectors and charging curve. |
 | `GET` | `/api/v1/vehicles/{id}/state` | Latest cached vehicle state. |
 | `DELETE` | `/api/v1/vehicles/{id}` | Disconnect vehicle and stop telemetry. |
 | `POST` | `/api/v1/routes/plan` | Generate a charging-aware trip plan. |
@@ -93,6 +95,31 @@ Returns the authenticated profile and user preferences (units, reserve SoC, pref
   }
 }
 ```
+
+### 3.1a `PATCH /api/v1/me/preferences`
+
+Partially updates the caller's preferences. Only the keys present in the body change; an empty body is a no-op. Returns the full preferences object (same shape as `preferences` in §3.1).
+
+**Request** (every key optional)
+```json
+{
+  "units": "metric",
+  "reserve_soc": 0.1,
+  "preferred_charge_to": 0.8,
+  "max_detour_minutes": 15,
+  "preferred_networks": ["EVgo"],
+  "primary_vehicle_id": "vehicle-uuid"
+}
+```
+
+**Response 200** — the updated `preferences` object.
+
+- `units` is `imperial` or `metric`. `reserve_soc` and `preferred_charge_to` are fractions in `[0, 1]` with at most three decimal places (their stored precision), and after the update `reserve_soc` must be lower than `preferred_charge_to`. `max_detour_minutes` is `0`–`240`. `preferred_networks` holds at most 20 distinct, non-empty names (≤ 100 chars each).
+- `primary_vehicle_id` must be one of the caller's **connected** vehicles; `null` clears it. The Dashboard shows the primary vehicle, else the most recently connected one.
+- Disconnecting the primary vehicle (§3.6) clears `primary_vehicle_id`.
+- `null` is only accepted for `primary_vehicle_id`; other keys must be omitted rather than set to `null`.
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` for unknown keys, out-of-range values, or `reserve_soc >= preferred_charge_to`; `NOT_FOUND` if `primary_vehicle_id` doesn't exist, belongs to another user, or isn't connected.
 
 ### 3.2 `GET /api/v1/vehicles`
 
@@ -205,6 +232,31 @@ The vehicle may be disconnected (it's still the caller's). `last_state_recorded_
 
 **Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID; `NOT_FOUND` if it doesn't exist **or belongs to another user** (the two are indistinguishable).
 
+### 3.4a `PATCH /api/v1/vehicles/{id}/specs`
+
+Partially updates a vehicle's specs. Only the keys present in the body change. Returns the full `specs` object (same shape as `specs` in §3.4). Works for connected and disconnected vehicles the caller owns; creates the specs row if the vehicle has none. Never calls Smartcar.
+
+**Request** (every key optional)
+```json
+{
+  "usable_capacity_kwh": 71.4,
+  "connectors": ["NACS", "CCS1"],
+  "charging_curve": [
+    { "soc": 0.1, "power_kw": 150 },
+    { "soc": 0.8, "power_kw": 60 }
+  ]
+}
+```
+
+**Response 200** — the updated `specs` object.
+
+- `usable_capacity_kwh`: `> 0` and `≤ 300`, at most two decimal places; `null` clears it (back to "unknown").
+- `connectors`: distinct values from `NACS`, `CCS1`, `J1772`, `CHAdeMO`; `[]` clears them.
+- `charging_curve`: at most 20 points; `soc` in `[0, 1]` and strictly increasing; `power_kw` `> 0` and `≤ 1000`; `[]` clears it.
+- `connectors` and `charging_curve` must be omitted rather than set to `null`.
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID, a key is unknown, or a value breaks the rules above; `NOT_FOUND` if the vehicle doesn't exist or belongs to another user.
+
 ### 3.5 `GET /api/v1/vehicles/{id}/state`
 
 Returns the latest cached state. **Never** triggers a live Smartcar call on the hot path.
@@ -253,6 +305,7 @@ Marks the vehicle row `disconnected` (keeping it for historical trips) and revok
 - **Idempotent:** disconnecting an already-disconnected vehicle returns `204` without calling Smartcar again.
 - **Webhooks:** Smartcar V3's per-vehicle unsubscribe isn't confirmed yet ([`smartcar-v3-notes.md`](smartcar-v3-notes.md) §5), so nothing is unsubscribed here; deliveries for a disconnected vehicle are acknowledged and dropped (`accepted: false`, phase2_plan.md D12). F5 settles unsubscription.
 - Reconnecting the same car later reactivates this row (D4).
+- If this vehicle was the caller's `primary_vehicle_id`, it is cleared (§3.1a).
 
 **Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID; `NOT_FOUND` if it doesn't exist or belongs to another user.
 

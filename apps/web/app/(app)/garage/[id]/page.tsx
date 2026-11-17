@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { DisconnectButton } from "@/components/garage/disconnect-button";
 import { FreshnessBadge } from "@/components/garage/freshness-badge";
 import { LocalTime } from "@/components/garage/local-time";
-import { SpecsPanel } from "@/components/garage/specs-panel";
+import { SpecsEditor } from "@/components/garage/specs-editor";
 import { SignalList } from "@/components/garage/vehicle-card";
 import { requireSessionApi } from "@/lib/session-api";
 import { vehicleTitle } from "@/lib/vehicles";
@@ -81,7 +81,7 @@ async function VehicleDetails({ params }: { params: Promise<{ id: string }> }) {
         <SignalList signals={data.supported_signals} />
       </div>
 
-      <SpecsPanel specs={data.specs} />
+      <SpecsEditor vehicleId={data.id} specs={data.specs} />
     </div>
   );
 }
