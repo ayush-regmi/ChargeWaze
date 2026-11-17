@@ -71,6 +71,13 @@ class Settings(BaseSettings):
     smartcar_connect_url: str = "https://connect.smartcar.com/oauth/authorize"
     smartcar_timeout_seconds: float = Field(default=10.0, gt=0)
 
+    # ---- Mapbox (server side; see docs/maps-stations-notes.md §2) ----
+    # Secret token for Directions and Search Box. No URL restriction, never sent
+    # to the browser; the map's public token lives in the web app's env.
+    mapbox_secret_token: str = ""
+    mapbox_api_base_url: str = "https://api.mapbox.com"
+    mapbox_timeout_seconds: float = Field(default=10.0, gt=0)
+
     # ---- Telemetry ----
     # Readings older than this are flagged stale (phase2_plan.md D11).
     telemetry_stale_after_minutes: int = Field(default=15, gt=0)
