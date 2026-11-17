@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { sessionCookie } from "./support/e2e-auth.mjs";
+import { seedConnectedVehicle } from "./support/seed";
 
 /**
  * Garage → Dashboard with seeded data (phase2_plan.md F8). The seed step gives
@@ -9,6 +10,12 @@ import { sessionCookie } from "./support/e2e-auth.mjs";
  */
 // Both tests share the seeded vehicle and the second changes its primary flag.
 test.describe.configure({ mode: "serial" });
+
+// Reseed per group attempt, not once per run: a retry restarts the whole
+// serial group, and the second test has already made the vehicle primary.
+test.beforeAll(() => {
+  seedConnectedVehicle();
+});
 
 test.beforeEach(async ({ context, baseURL }) => {
   const { name, value } = sessionCookie();

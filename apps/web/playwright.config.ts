@@ -12,8 +12,8 @@ import { API_DIR, API_ENV, API_PORT, API_URL, WEB_PORT } from "./e2e/support/e2e
  *   test-only secrets and the Smartcar API pointed at an unreachable address;
  * - `next dev` pointed at both.
  *
- * The `setup` project seeds one connected vehicle and delivers a signed
- * webhook before the browser tests run.
+ * Specs that need data seed it themselves in `beforeAll` (see
+ * `e2e/support/seed.ts`), so retries start from a clean state.
  *
  * Needs Postgres on localhost:5432 (`docker compose up -d`) and `uv`. The
  * credentialed sign-in flows (email, Google, Apple) run in a separate manual
@@ -31,13 +31,8 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "setup",
-      testMatch: /.*\.setup\.ts/,
-    },
-    {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      dependencies: ["setup"],
     },
   ],
   webServer: [
