@@ -56,6 +56,11 @@ from app.modules.vehicles.vehicle_state import get_vehicle_state
 
 logger = logging.getLogger(__name__)
 
+# Smartcar Connect errors that mean the user chose not to connect, not that
+# something broke: declining access, or backing out of Connect (seen on the
+# real bZ as ``user_manually_returned_to_application``).
+CANCELLED_CONNECT_ERRORS = frozenset({"access_denied", "user_manually_returned_to_application"})
+
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
 
@@ -119,7 +124,8 @@ def complete_vehicle_connect(
     if body.error:
         logger.info("smartcar_connect_provider_error", extra={"smartcar_error": body.error})
         return _result(
-            "denied" if body.error == "access_denied" else "error", claims.redirect_after
+            "denied" if body.error in CANCELLED_CONNECT_ERRORS else "error",
+            claims.redirect_after,
         )
 
     if not body.user_id or (

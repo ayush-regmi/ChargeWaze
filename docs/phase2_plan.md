@@ -180,7 +180,7 @@ F4 and F5 don't touch the same files and could run in parallel once F3 lands; we
 - `POST /api/v1/vehicles/connect/complete` (auth required), body `{ state, user_id, external_id, error }` → `{ result, redirect_after }`:
   1. Verify the signed `state` (D2: HS256, 10 min, `iss`/`aud` checked); invalid/expired → `error` with `/garage`.
   2. `state` user ≠ signed-in user → `error` with `/garage`; Smartcar is not called.
-  3. `error=access_denied` → `denied`; any other `error` → `error`.
+  3. `error=access_denied` or `user_manually_returned_to_application` (user backed out, seen on the real bZ) → `denied`; any other `error` → `error`.
   4. Missing `user_id`, or an `external_id` that isn't the `state` user → `error`.
   5. `list_connections(user_id)`; keep only `ACTIVE` connections whose `user.externalId` is the `state` user. None → `error`.
   6. Per vehicle: active on another Chargewise user → refused; already `connected` for this user → duplicate; `disconnected`/`pending` → reactivate the same row (D4); else insert `vehicles` (`connected`) + `vehicle_specs` from the catalog (D8). Make/model/year come from the connection; `supported_signals` from a best-effort `get_signals` (often `[]` right after Connect; F5/F6 recompute).
@@ -321,6 +321,16 @@ F4 and F5 don't touch the same files and could run in parallel once F3 lands; we
 - 4 done: the check already ran on `.next/static`; it now also scans prerendered HTML/RSC output. Server-only JS bundles are not scanned, because they aren't sent to the browser.
 - 5 partly done: `api-contracts.md` and `database-design.md` were already updated in F3–F7. `architecture.md` §4/§5 and §8 now match the code. ADR 0002 is unchanged until the cadence is measured. The roadmap status says "code complete, real-car verification pending", not "complete".
 - 1 and 2 are still open. They need the real car and a few days of webhook deliveries.
+
+**Real-car run (2026-11-16, `fix/phase2-real-car-findings`):** live mode, ngrok tunnel, 2026 bZ.
+- Webhook `VERIFY` passed through the tunnel; real `VEHICLE_STATE` events (SoC, range, odometer, charging) landed in `vehicle_telemetry` and `latest_state`.
+- E1 done: the Dashboard shows SoC, manufacturer range, odometer and charging status with per-signal timestamps; charging power is unavailable, as expected for the bZ.
+- E2 done: values are identical after a hard reload; the stale banner appears after 15 min with no events.
+- E3 partly done: disconnecting removes the car from Garage and the Dashboard, and the row is kept as `disconnected`. **Still to do:** trigger an event from the car after disconnecting and confirm nothing is stored (and whether Smartcar still delivers at all).
+- Connect banners: success, already connected (Smartcar shows the car under "Already authorized") and cancelled all show correctly. Backing out of Connect returns `error=user_manually_returned_to_application`, which is now treated like `access_denied` (`denied` banner) instead of `error`.
+- Reconnecting reuses the same row and keeps its last reading, so the card shows "Stale" rather than "Awaiting first update".
+- Found on the way: the Supabase dev database was one migration behind (no vehicle tables), which made Connect completion and webhooks fail with 500. Fixed with `alembic upgrade head`; the README now says to run it first.
+- 2 (cadence) still open.
 
 ---
 

@@ -358,8 +358,9 @@ def test_callback_signal_read_failure_still_connects(
     assert _vehicles(db)[0].supported_signals == []
 
 
-def test_callback_denied(api: TestClient, db: Session) -> None:
-    response = _callback(api, state=_state(), error="access_denied")
+@pytest.mark.parametrize("error", ["access_denied", "user_manually_returned_to_application"])
+def test_callback_denied(api: TestClient, db: Session, error: str) -> None:
+    response = _callback(api, state=_state(), error=error)
     assert _flag(response) == ("/garage", "denied")
     assert _vehicles(db) == []
 
