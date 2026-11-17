@@ -1,6 +1,6 @@
 # Chargewise
 
-A full-stack EV intelligence and route-planning platform. Chargewise combines connected-vehicle data (Smartcar V3), driving directions (Mapbox), charging-station data (AFDC/NREL and partners), and its own charging-aware route optimizer to answer one question:
+A full-stack EV intelligence and route-planning platform. Chargewise combines connected-vehicle data (Smartcar V3), driving directions (Mapbox), charging-station data (AFDC, US and Canada), and its own charging-aware route optimizer to answer one question:
 
 > Given my vehicle's current battery level, where I want to go, the weather, and available charging infrastructure, what is the most efficient and reliable way to complete my trip?
 

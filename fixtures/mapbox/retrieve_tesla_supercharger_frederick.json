@@ -1,0 +1,92 @@
+{
+  "attribution": "© 2026 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service. (https://www.mapbox.com/about/maps/)",
+  "features": [
+    {
+      "geometry": {
+        "coordinates": [
+          -77.40551751,
+          39.38465459
+        ],
+        "type": "Point"
+      },
+      "properties": {
+        "address": "5500 Buckeystown Pike",
+        "brand": [
+          "Tesla"
+        ],
+        "brand_id": [
+          "tesla"
+        ],
+        "context": {
+          "address": {
+            "address_number": "5500",
+            "id": "",
+            "name": "5500 Buckeystown Pike",
+            "street_name": "buckeystown pike"
+          },
+          "country": {
+            "country_code": "US",
+            "country_code_alpha_3": "USA",
+            "id": "",
+            "name": "United States"
+          },
+          "locality": {
+            "id": "dXJuOm1ieHBsYzpBWWpLN0E",
+            "name": "Ballenger Creek"
+          },
+          "place": {
+            "id": "dXJuOm1ieHBsYzpCd01JN0E",
+            "name": "Frederick"
+          },
+          "postcode": {
+            "id": "dXJuOm1ieHBsYzpCQVl1N0E",
+            "name": "21704"
+          },
+          "region": {
+            "id": "",
+            "name": "Maryland",
+            "region_code": "MD",
+            "region_code_full": "US-MD"
+          },
+          "street": {
+            "id": "",
+            "name": "buckeystown pike"
+          }
+        },
+        "coordinates": {
+          "latitude": 39.38465459,
+          "longitude": -77.40551751,
+          "routable_points": [
+            {
+              "latitude": 39.38461058649467,
+              "longitude": -77.4055297776439,
+              "name": "POI"
+            }
+          ]
+        },
+        "external_ids": {},
+        "feature_type": "poi",
+        "full_address": "5500 Buckeystown Pike, Frederick, Maryland 21704, United States",
+        "language": "en",
+        "maki": "charging-station",
+        "mapbox_id": "dXJuOm1ieHBvaTo5ODY2MDU4My1hMjEyLTQ2ZmMtYmI0ZS04MDgyY2E2MDM5YWI",
+        "metadata": {
+          "wheelchair_accessible": true
+        },
+        "name": "Tesla Supercharger",
+        "operational_status": "active",
+        "place_formatted": "Frederick, Maryland 21704, United States",
+        "poi_category": [
+          "charging station",
+          "transportation"
+        ],
+        "poi_category_ids": [
+          "charging_station",
+          "transportation"
+        ]
+      },
+      "type": "Feature"
+    }
+  ],
+  "type": "FeatureCollection"
+}

@@ -1,0 +1,12 @@
+{
+  "error_details": [
+    {
+      "code": "INVALID_PARAM",
+      "detail": "Couldn't find alternative fuel station with ID of 999999999",
+      "status": "422"
+    }
+  ],
+  "errors": [
+    "Couldn't find alternative fuel station with ID of 999999999"
+  ]
+}
