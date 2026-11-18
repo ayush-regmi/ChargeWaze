@@ -67,9 +67,11 @@ Reserved codes (grow this list as the API grows):
 | `PATCH` | `/api/v1/vehicles/{id}/specs` | Edit usable capacity, connectors and charging curve. |
 | `GET` | `/api/v1/vehicles/{id}/state` | Latest cached vehicle state. |
 | `DELETE` | `/api/v1/vehicles/{id}` | Disconnect vehicle and stop telemetry. |
-| `POST` | `/api/v1/routes/plan` | Generate a charging-aware trip plan. |
-| `GET` | `/api/v1/trips` | List saved / completed trips. |
-| `GET` | `/api/v1/trips/{id}` | One trip with stops and observations. |
+| `POST` | `/api/v1/routes/plan` | Generate and store a charging-aware trip plan. |
+| `GET` | `/api/v1/trips` | List saved (default) or unsaved planned trips. |
+| `GET` | `/api/v1/trips/{id}` | One trip with its stored plan and observation. |
+| `DELETE` | `/api/v1/trips/{id}` | Delete a trip. |
+| `POST` | `/api/v1/trips/{id}/save` | Save a stored plan to trip history. |
 | `GET` | `/api/v1/stations` | Search compatible charging stations. |
 | `GET` | `/api/v1/places/suggest` | Autocomplete addresses, places and POIs (Mapbox Search Box). |
 | `GET` | `/api/v1/places/{id}` | Coordinates and address for a suggestion. |
@@ -317,7 +319,7 @@ Marks the vehicle row `disconnected` (keeping it for historical trips) and revok
 
 ### 3.7 `POST /api/v1/routes/plan`
 
-The main planning call. Deterministic MVP implementation; later upgraded to the SoC-discretized graph search (see [`architecture.md`](architecture.md#6-routing-algorithm)).
+The main planning call (Phase 4). The server gets the driving route itself, finds compatible chargers along it, runs the deterministic optimizer ([`architecture.md`](architecture.md#6-routing-algorithm), [ADR 0008](adr/0008-route-ordered-dp-charging-optimizer.md)), **stores the result** and returns it with its `trip_id`. Design decisions: [`phase4_plan.md`](phase4_plan.md) §2.
 
 **Request**
 ```json
@@ -325,6 +327,7 @@ The main planning call. Deterministic MVP implementation; later upgraded to the 
   "vehicle_id": "vehicle-uuid",
   "origin": { "lat": 39.4143, "lon": -77.4105, "label": "Frederick, MD" },
   "destination": { "lat": 43.6532, "lon": -79.3832, "label": "Toronto, ON" },
+  "route_index": 0,
   "departure_time": "2026-11-07T08:00:00Z",
   "preferences": {
     "reserve_soc": 0.15,
@@ -336,66 +339,160 @@ The main planning call. Deterministic MVP implementation; later upgraded to the 
 }
 ```
 
-- `starting_soc_override` is required when the cached vehicle state is stale.
-- `preferences` falls back to the user's stored defaults when omitted.
+- `origin` / `destination`: same rules as §3.15 (more than 50 m apart); `label` is optional, at most 200 characters, and stored.
+- `route_index` (default `0`): which route from §3.15 to plan on. The server calls Mapbox again with the same options; it never uses geometry sent by the client.
+- `departure_time` is optional and stored; v1 doesn't use it (no traffic or weather).
+- `preferences` is optional and partial: each key falls back to the caller's stored preferences (§3.1), then to the defaults. Same rules as §3.1a, including `reserve_soc < preferred_charge_to` after merging.
+- `starting_soc_override` is a fraction in `[0, 1]` or `null`. When given it is always used. When `null`, the vehicle's cached `soc_percent` is used only if its own `signal_recorded_at` (§3.5) is no older than `TELEMETRY_STALE_AFTER_MINUTES`; otherwise the request fails with `STARTING_SOC_REQUIRED` (below).
 
 **Response 200 (feasible)**
 ```json
 {
+  "trip_id": "trip-uuid",
+  "created_at": "2026-11-06T18:00:00Z",
   "status": "feasible",
+  "model_version": "deterministic-v1",
+  "vehicle_id": "vehicle-uuid",
+  "origin": { "lat": 39.4143, "lon": -77.4105, "label": "Frederick, MD" },
+  "destination": { "lat": 43.6532, "lon": -79.3832, "label": "Toronto, ON" },
+  "departure_time": "2026-11-07T08:00:00Z",
+  "starting_soc": 0.9,
+  "starting_soc_source": "telemetry",
+  "starting_soc_recorded_at": "2026-11-06T17:55:00Z",
   "route": {
-    "distance_km": 743.2,
-    "duration_minutes": 512,
-    "polyline": "<encoded>",
-    "arrival_soc": 0.21
+    "route_index": 0,
+    "geometry_polyline6": "iwsdjAdlwsrCg@...",
+    "distance_km": 748.1,
+    "drive_minutes": 515,
+    "summary": "US 15, QEW",
+    "countries": ["US", "CA"]
   },
   "stops": [
     {
       "sequence": 1,
       "station": {
         "id": "station-uuid",
-        "name": "EVgo - Harrisburg",
+        "name": "Example station",
+        "network": "Electrify America",
         "connector": "CCS1",
         "power_kw": 150,
         "location": { "lat": 40.2732, "lon": -76.8867 }
       },
-      "arrival_soc": 0.18,
-      "departure_soc": 0.80,
-      "charging_minutes": 28,
-      "detour_minutes": 4
+      "distance_along_route_km": 260.0,
+      "distance_from_route_km": 0.8,
+      "arrival_soc": 0.162,
+      "departure_soc": 0.61,
+      "charging_minutes": 15,
+      "detour_minutes": 2,
+      "detour_is_estimate": true
     }
   ],
-  "total_minutes": 554,
-  "energy_kwh_estimated": 148.6,
-  "model_version": "deterministic-v1"
+  "arrival_soc": 0.15,
+  "totals": {
+    "drive_minutes": 515,
+    "charging_minutes": 45,
+    "detour_minutes": 8,
+    "stop_overhead_minutes": 15,
+    "waiting_minutes": 0,
+    "total_minutes": 583,
+    "energy_kwh_estimated": 150.92
+  },
+  "assumptions": {
+    "usable_capacity_kwh": 71.0,
+    "usable_capacity_source": "catalog",
+    "baseline_kwh_per_km": 0.2,
+    "baseline_source": "catalog",
+    "charging_curve_source": "catalog_derived",
+    "adjustments_applied": [],
+    "reserve_soc": 0.15,
+    "charge_to_soc": 0.8,
+    "max_detour_minutes": 20,
+    "preferred_networks": ["Tesla Supercharger", "EVgo"],
+    "preferred_networks_relaxed": false,
+    "stop_overhead_minutes": 5,
+    "detour_road_factor": 1.3,
+    "detour_speed_kmh": 50,
+    "soc_grid_step": 0.01
+  },
+  "candidates": {
+    "searched": true,
+    "corridor_km": 6.4,
+    "considered": 41,
+    "excluded_incompatible": 12,
+    "excluded_unknown_power": 3,
+    "excluded_detour": 5
+  },
+  "alternatives": [],
+  "reason": null
 }
 ```
 
+- **Units and rounding:** SoC values are fractions (0..1) with 3 decimals. Minutes are whole numbers, rounded half-up; totals are computed before rounding, so per-stop minutes can differ from the totals by a minute. `total_minutes = drive + charging + detour + stop_overhead + waiting`.
+- `starting_soc_source` is `telemetry` or `override`; `starting_soc_recorded_at` is the reading's provider timestamp, or `null` for an override.
+- `stops` is in route order; `[]` when no charging is needed. Each `station.id` is the stable Chargewise station ID (§3.16), and `station.power_kw` is the known power of the connector type used. `detour_minutes` is always an estimate (`2 × distance_from_route_km × detour_road_factor` at `detour_speed_kmh`).
+- `assumptions` says where each vehicle number came from: `*_source` is `vehicle` (the user's specs, §3.4a) or `catalog`. `charging_curve_source` is `vehicle`, `catalog` or `catalog_derived` (derived from published figures, not measured; the UI says so). `adjustments_applied` lists energy adjustments (speed, temperature, …) and is always `[]` in v1. `preferred_networks_relaxed` is `true` when no plan existed using only preferred networks, so all networks were used.
+- `candidates` explains which stations were used. Stations with no known power for a compatible connector are **never** used and are counted in `excluded_unknown_power`. When no charging was needed, the stations search isn't run: `searched: false` and the counts are `0`.
+- `alternatives` is reserved for several plans and is always `[]` in v1.
+- Every plan, feasible or infeasible, is stored as an **unsaved** trip (§3.8). Saving is §3.9b; discarding is §3.9a.
+
 **Response 200 (infeasible)**
+
+Same top-level shape, with `status: "infeasible"`, `stops: []`, `arrival_soc: null`, `totals: null`, and a `reason`:
+
 ```json
 {
+  "trip_id": "trip-uuid",
   "status": "infeasible",
+  "route": { "route_index": 0, "geometry_polyline6": "…", "distance_km": 748.1, "drive_minutes": 515, "summary": "US 15, QEW", "countries": ["US", "CA"] },
+  "stops": [],
+  "arrival_soc": null,
+  "totals": null,
   "reason": {
-    "code": "NO_COMPATIBLE_CHARGER_IN_RANGE",
-    "message": "No charger compatible with the vehicle's connectors is reachable from the current SoC.",
+    "code": "DESTINATION_UNREACHABLE",
+    "message": "No charger is close enough to cross the gap after km 412 with your charge-to limit.",
     "limiting_segment": {
-      "from": { "lat": 44.0, "lon": -78.0 },
-      "to":   { "lat": 44.5, "lon": -78.3 },
-      "required_soc": 0.42
+      "from": { "lat": 42.11, "lon": -78.21 },
+      "to":   { "lat": 42.98, "lon": -78.87 },
+      "from_km": 412.0,
+      "to_km": 640.0,
+      "required_soc": 0.79,
+      "available_soc": 0.8
     }
   }
 }
 ```
 
-Infeasibility codes (grow as needed): `NO_COMPATIBLE_CHARGER_IN_RANGE`, `STARTING_SOC_TOO_LOW`, `RESERVE_SOC_UNREACHABLE`, `DESTINATION_UNREACHABLE`.
+Infeasibility codes ([`architecture.md`](architecture.md#66-infeasibility) §6.6):
 
-**Errors:** `VALIDATION_ERROR`, `NOT_FOUND` (vehicle), `MAPBOX_UNREACHABLE`, `STATIONS_UNREACHABLE`.
+| Code | Meaning | `limiting_segment` |
+|---|---|---|
+| `NO_DRIVING_ROUTE` | Mapbox found no drivable route; `route` is `null`. | `null` |
+| `STARTING_SOC_TOO_LOW` | Starting SoC is at or below `reserve_soc`. | `null` |
+| `RESERVE_SOC_UNREACHABLE` | Infeasible with this reserve, feasible with a lower one. | where SoC falls lowest |
+| `NO_COMPATIBLE_CHARGER_IN_RANGE` | Charging is needed but no usable charger is reachable from the start. | origin → where SoC reaches the reserve |
+| `DESTINATION_UNREACHABLE` | A gap between chargers (or to the destination) can't be crossed from `charge_to_soc`. | the gap |
+
+`limiting_segment.from`/`to` are points on the route (coordinates rounded to 2 decimals in logs only, never in the response); `from_km`/`to_km` are distances along it.
+
+**Errors**
+- `UNAUTHENTICATED`.
+- `NOT_FOUND`: the vehicle doesn't exist or isn't the caller's.
+- `VALIDATION_ERROR` (422), for body rule violations and for these `details.reason` values:
+  - `STARTING_SOC_REQUIRED`: no `starting_soc_override`, and the SoC reading is missing or stale. `details` also has `last_soc` (fraction or `null`) and `last_recorded_at` (or `null`) so the UI can prefill a prompt.
+  - `VEHICLE_SPECS_INCOMPLETE`: the vehicle lacks a value the model needs, from its specs and from the catalog. `details.missing` lists any of `usable_capacity_kwh`, `connectors`, `charging_curve`, `baseline_kwh_per_km`.
+  - `ROUTE_INDEX_UNAVAILABLE`: `route_index` is beyond the routes Mapbox returned.
+- `MAPBOX_NOT_CONFIGURED`, `MAPBOX_UNREACHABLE`, `MAPBOX_ERROR`; `STATIONS_NOT_CONFIGURED`, `STATIONS_UNREACHABLE`.
+- Nothing is stored when the request fails.
 
 ### 3.8 `GET /api/v1/trips`
 
-Lists saved plans and observed trips for the caller.
+Lists the caller's planned trips, newest first. Observed trips arrive in Phase 5.
 
-Query params: `?vehicle_id=...&status=planned|completed&limit=&cursor=`.
+Query params: `?vehicle_id=&saved=true|false&status=planned|completed|abandoned&limit=&cursor=`.
+
+- `saved` defaults to `true` (saved trips only); `false` lists only unsaved plans.
+- Saved trips are ordered by `saved_at` descending, unsaved by `created_at` descending; ties by `id`.
+- `vehicle_id` must be the caller's (else `NOT_FOUND`).
 
 **Response 200**
 ```json
@@ -407,16 +504,25 @@ Query params: `?vehicle_id=...&status=planned|completed&limit=&cursor=`.
       "origin_label": "Frederick, MD",
       "destination_label": "Toronto, ON",
       "status": "planned",
-      "created_at": "2026-11-06T18:00:00Z"
+      "plan_status": "feasible",
+      "distance_km": 748.1,
+      "total_minutes": 583,
+      "stop_count": 3,
+      "created_at": "2026-11-06T18:00:00Z",
+      "saved_at": "2026-11-06T18:02:00Z"
     }
   ],
   "next_cursor": null
 }
 ```
 
+- `plan_status` is `feasible` or `infeasible`. `distance_km` and `total_minutes` are `null` when there was no route or no feasible plan.
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` for bad params or cursor; `NOT_FOUND` for a `vehicle_id` that isn't the caller's.
+
 ### 3.9 `GET /api/v1/trips/{id}`
 
-Returns the full plan and, when present, the matched observation.
+Returns one trip with the stored plan (saved or not) and, from Phase 5, the matched observation. Nothing is recomputed.
 
 **Response 200**
 ```json
@@ -424,10 +530,31 @@ Returns the full plan and, when present, the matched observation.
   "id": "trip-uuid",
   "vehicle_id": "vehicle-uuid",
   "status": "planned",
-  "plan": { "...": "same shape as /routes/plan 200" },
+  "plan_status": "feasible",
+  "created_at": "2026-11-06T18:00:00Z",
+  "saved_at": null,
+  "plan": { "...": "the stored /routes/plan 200 body, unchanged" },
   "observation": null
 }
 ```
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID; `NOT_FOUND` if it doesn't exist or isn't the caller's.
+
+### 3.9a `DELETE /api/v1/trips/{id}`
+
+Deletes a trip (saved or not) and its stops.
+
+**Response 204** — no body.
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID; `NOT_FOUND` if it doesn't exist, isn't the caller's, or was already deleted.
+
+### 3.9b `POST /api/v1/trips/{id}/save`
+
+Marks a stored plan as saved, so it appears in `GET /trips` (§3.8). No body. Idempotent: saving a saved trip keeps its first `saved_at`. Feasible and infeasible plans can both be saved. Unsaved plans are removed by the retention job after 30 days (Phase 6).
+
+**Response 200** — the trip's list item (same shape as an item in §3.8).
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID; `NOT_FOUND` if it doesn't exist or isn't the caller's.
 
 ### 3.10 `GET /api/v1/stations`
 

@@ -149,7 +149,7 @@ The UI always displays the reading's `recorded_at`. If it crosses the freshness 
 
 ## 6. Routing algorithm
 
-The MVP does not use machine learning. It uses a deterministic battery model plus a search over feasible charging-stop sequences.
+The MVP does not use machine learning. It uses a deterministic battery model plus a dynamic-programming search over charging stops along one road route. The full design, interfaces and hand-checked trips are in [`phase4_plan.md`](phase4_plan.md); the search is [ADR 0008](adr/0008-route-ordered-dp-charging-optimizer.md).
 
 ### 6.1 Feasibility check
 
@@ -169,52 +169,64 @@ A route is feasible without charging when:
 s_{\text{arrival}} \geq s_{\min}
 \]
 
+The reserve applies at **every** arrival, at chargers as well as the destination (phase4_plan D10).
+
 ### 6.2 Baseline energy model
 
-For a route split into segments of length \(d_i\) with estimated consumption \(c_i\):
+For a route split into segments of length \(d_i\) (km) with estimated consumption \(c_i\) (kWh/km):
 \[
 E = \sum_{i=1}^{n} d_i c_i
 \]
 
-Initially, \(c_i\) comes from a configured per-vehicle baseline (kWh/mi for the bZ). Later, \(c_i\) is modulated by speed, elevation, temperature, and (eventually) learned corrections. Until then, the model is explicit about **what it does not know**.
+In v1, \(c_i\) is one flat per-vehicle `baseline_kwh_per_km` from the static vehicle catalog (0.20 kWh/km for the 2026 bZ XLE AWD, a cited highway figure; phase4_plan §2.3). There is no generic default: a vehicle without a catalog baseline can't be planned yet. Later, \(c_i\) is modulated by speed, elevation, temperature, and (eventually) learned corrections. Until then, the model is explicit about **what it does not know** (§6.7), and every plan lists the factors it used.
 
 ### 6.3 Charging-stop search (MVP)
 
-1. Request one or more road routes from the Mapbox adapter.
-2. Ask the stations adapter for chargers compatible with the vehicle's connectors near each route.
-3. Estimate energy consumption between origin, candidate chargers, and destination.
-4. Discard segments that would violate \(s_{\min}\).
-5. Enumerate feasible charging sequences (bounded; MVP uses a small upper bound on number of stops).
-6. For each stop, estimate charging time from required energy and the vehicle's charging curve.
+1. Get the driving routes from the Mapbox adapter and take the one the user selected (`route_index`).
+2. If the route is feasible without charging (§6.1), return it with no stops; no station search.
+3. Ask the stations module for DC fast chargers along that route, with a corridor derived from the user's maximum detour. Keep only stations with a connector the vehicle supports **and** a known power for that connector; count the rest. Unknown power is never guessed.
+4. Estimate each station's detour as `2 × distance_from_route × 1.3` km at 50 km/h, and drop stations over the maximum detour.
+5. Sort candidates by distance along the route and run a dynamic program over states (station, departure SoC on a 1 % grid). Arrival SoC at every station and at the destination must stay at or above \(s_{\min}\); departure SoC is at most the charge-to preference.
+6. Each stop costs its charging time (§6.4), its detour time and a fixed per-stop overhead (default 5 minutes: parking, plugging in, starting the session).
 7. Pick the plan minimizing total journey time.
 
 Objective:
 \[
-\min \left( T_{\text{drive}} + T_{\text{charge}} + T_{\text{waiting}} \right)
+\min \left( T_{\text{drive}} + \sum_{\text{stops}} \left( T_{\text{charge}} + T_{\text{detour}} + T_{\text{overhead}} \right) + T_{\text{waiting}} \right)
 \]
 
-Waiting time is initially a user-set assumption or zero. Chargewise never fabricates real-time queue data.
+\(T_{\text{drive}}\) is the same for every plan on one route. Waiting time is zero: Chargewise never fabricates real-time queue data.
 
 ### 6.4 Charging time model
 
 Because charging power depends on SoC, charging time is modeled as:
 \[
-T_{\text{charge}} = \int_{s_{\text{start}}}^{s_{\text{target}}} \frac{B}{P(s)} \, ds
+T_{\text{charge}} = \int_{s_{\text{start}}}^{s_{\text{target}}} \frac{B}{\min\left(P(s),\, P_{\text{station}}\right)} \, ds
 \]
 
-where \(P(s)\) is the vehicle-specific charging power at SoC \(s\). MVP uses a piecewise-linear approximation stored on `vehicle_specs.charging_curve`.
+where \(P(s)\) is the vehicle-specific charging power at SoC \(s\), stored as a piecewise-linear `vehicle_specs.charging_curve` (falling back to the catalog curve). On each piece where the capped power goes linearly from \(p_1\) to \(p_2\) over \(\Delta s\), the integral is exact: \(B\,\Delta s / p_1\) when \(p_1 = p_2\), otherwise \(B\,\Delta s \ln(p_2/p_1) / (p_2 - p_1)\). A vehicle with no curve can't be planned; the planner does not guess its power. The 2026 bZ's catalog curve is **derived** from published figures (peak, 10–80 % time and average power), not measured, and plans say so.
 
-### 6.5 Post-MVP upgrade (Phase 4 end or later)
+### 6.5 Post-MVP upgrade
 
-Model the problem as a graph:
-- Nodes: (charger, discretized SoC bucket) plus origin and destination.
-- Edges: drive segments with energy cost, and charging actions with time cost.
-
-Then run Dijkstra or A* to find a minimum-cost feasible itinerary. This is the route-engineering centerpiece of the portfolio.
+The MVP search is already a graph search over (charger, SoC bucket) nodes, specialised to one route (ADR 0008). The general version (Dijkstra or A* over chargers from several routes, with time-dependent edges for traffic, weather or charger queues) is the post-MVP upgrade. Revisit when planning across alternative routes or adding time-dependent costs.
 
 ### 6.6 Infeasibility
 
-If no feasible plan exists, the planner returns an explicit infeasibility response with the limiting constraint (insufficient SoC, no compatible chargers in reach, reserve too high). It must never return a silent "route found" result for an infeasible journey.
+If no feasible plan exists, the planner returns an explicit infeasibility response with the limiting constraint. It must never return a silent "route found" result for an infeasible journey. Codes, checked in this order:
+
+| Code | Meaning |
+|---|---|
+| `NO_DRIVING_ROUTE` | Mapbox found no drivable route. |
+| `STARTING_SOC_TOO_LOW` | Starting SoC is at or below the reserve. |
+| `RESERVE_SOC_UNREACHABLE` | Infeasible with the user's reserve, but feasible with a lower one. |
+| `NO_COMPATIBLE_CHARGER_IN_RANGE` | Charging is needed, but no usable charger is reachable from the start. |
+| `DESTINATION_UNREACHABLE` | Chargers are reachable, but a gap between them (or to the destination) can't be crossed from the charge-to limit. |
+
+Missing or stale starting SoC and incomplete vehicle specs are request errors (`VALIDATION_ERROR` with a `details.reason`), not infeasibility, because the user can fix them. See [`api-contracts.md`](api-contracts.md) §3.7.
+
+### 6.7 What the v1 model does not account for
+
+Charging losses (the curve is power into the battery), the time a charger takes to reach full power (partly covered by the per-stop overhead), temperature, speed, elevation, wind, HVAC load, battery ageing, traffic, and charger availability or queues. SoC above the curve's last point is never planned. Each plan's `assumptions` block reports the values that were used.
 
 ## 7. Deployment
 
