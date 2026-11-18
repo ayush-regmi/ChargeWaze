@@ -59,30 +59,53 @@ def create_app() -> FastAPI:
     return app
 
 
-def _register_v1_routers(v1: APIRouter) -> None:
+# Every router the remaining phases plan to add is listed here up front
+# (docs/plan.md §2.3), so feature branches built in parallel don't all edit this
+# tuple. A module that doesn't exist yet is skipped.
+V1_ROUTER_MODULES: tuple[str, ...] = (
+    "app.modules.users.router",
+    "app.modules.vehicles.router",
+    "app.modules.vehicles.webhook_router",
+    "app.modules.places.router",
+    "app.modules.routing.router",
+    "app.modules.stations.router",  # Phase 3 F5
+    "app.modules.trips.router",  # Phase 4 F1
+    "app.modules.trips.observed_router",  # Phase 5 F3
+    "app.modules.analytics.router",  # Phase 5 F5
+)
+
+
+def _register_v1_routers(
+    v1: APIRouter, module_paths: tuple[str, ...] = V1_ROUTER_MODULES
+) -> None:
     """Attach module routers to the v1 prefix.
 
-    Each module is imported lazily so that scaffolding slices do not need every
-    downstream module (users, vehicles, routing, ...) to exist yet. Once every
-    expected module is wired up, this can become a plain list of imports.
+    Each module is imported lazily so a planned router that hasn't been built
+    yet is skipped. Only a missing *router module* (or its package) is
+    skipped: if a router exists but one of its own imports fails, the error
+    is raised, so a broken module can't silently drop its endpoints.
     """
 
     import importlib
 
-    for module_path in (
-        "app.modules.users.router",
-        "app.modules.vehicles.router",
-        "app.modules.vehicles.webhook_router",
-        "app.modules.places.router",
-        "app.modules.routing.router",
-    ):
+    for module_path in module_paths:
         try:
             mod = importlib.import_module(module_path)
-        except ImportError:
-            continue
+        except ModuleNotFoundError as exc:
+            if _is_planned_module_missing(module_path, exc.name):
+                continue
+            raise
         router = getattr(mod, "router", None)
         if router is not None:
             v1.include_router(router)
+
+
+def _is_planned_module_missing(module_path: str, missing: str | None) -> bool:
+    """True when ``missing`` is ``module_path`` itself or one of its parent packages."""
+
+    if not missing:
+        return False
+    return module_path == missing or module_path.startswith(f"{missing}.")
 
 
 def _quiet_http_client_logs() -> None:

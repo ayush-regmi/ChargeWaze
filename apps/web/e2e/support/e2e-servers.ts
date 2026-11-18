@@ -1,14 +1,15 @@
 import path from "node:path";
 
-import { E2E_JWT_SECRET } from "./e2e-auth.mjs";
+import { E2E_JWT_SECRET, envPort } from "./e2e-auth.mjs";
 
 /**
  * Ports and backend settings shared by `playwright.config.ts` and the seed
  * step. Ports differ from the usual dev ports (3000/8000) so a running dev
- * stack is never reused by mistake.
+ * stack is never reused by mistake. `E2E_WEB_PORT` / `E2E_API_PORT` override
+ * them so parallel sessions don't share servers (docs/plan.md §2.4).
  */
-export const WEB_PORT = 3100;
-export const API_PORT = 8765;
+export const WEB_PORT = envPort("E2E_WEB_PORT", 3100);
+export const API_PORT = envPort("E2E_API_PORT", 8765);
 export const API_URL = `http://127.0.0.1:${API_PORT}`;
 export const API_DIR = path.resolve(__dirname, "../../../../services/api");
 
