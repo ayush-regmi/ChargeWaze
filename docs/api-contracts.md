@@ -72,13 +72,20 @@ Reserved codes (grow this list as the API grows):
 | `GET` | `/api/v1/trips/{id}` | One trip with its stored plan and observation. |
 | `DELETE` | `/api/v1/trips/{id}` | Delete a trip. |
 | `POST` | `/api/v1/trips/{id}/save` | Save a stored plan to trip history. |
+| `GET` | `/api/v1/observed-trips` | List the caller's observed driving legs. |
+| `GET` | `/api/v1/observed-trips/{id}` | One observed leg. |
+| `POST` | `/api/v1/observed-trips/recompute` | Re-run trip inference for a vehicle (catch-up). |
+| `POST` | `/api/v1/observed-trips/{id}/confirm` | Confirm an observed leg. |
+| `POST` | `/api/v1/observed-trips/{id}/reject` | Reject an observed leg. |
 | `GET` | `/api/v1/stations` | Search compatible charging stations near a point. |
 | `GET` | `/api/v1/stations/{id}` | One cached station (refreshed after the cache TTL). |
 | `POST` | `/api/v1/stations/along-route` | Stations within a corridor of a route, in route order. |
 | `GET` | `/api/v1/places/suggest` | Autocomplete addresses, places and POIs (Mapbox Search Box). |
 | `GET` | `/api/v1/places/{id}` | Coordinates and address for a suggestion. |
 | `POST` | `/api/v1/routes/directions` | Driving routes between two points (no charging plan). |
-| `GET` | `/api/v1/analytics/consumption` | Aggregated consumption trends. |
+| `GET` | `/api/v1/analytics/consumption` | Consumption trends and model error per day/week/month. |
+| `GET` | `/api/v1/analytics/trips` | Per-trip estimated vs observed energy (the analytics table). |
+| `GET` | `/api/v1/analytics/trips.csv` | The same rows as CSV. |
 | `POST` | `/api/v1/webhooks/smartcar` | Smartcar-signed telemetry delivery. |
 
 ## 3. Endpoints
@@ -629,29 +636,120 @@ Defaults: only `status = open`, `access = public`, and not `restricted_access` s
 
 ### 3.11 `GET /api/v1/analytics/consumption`
 
-Aggregated consumption trends for the caller's observed trips.
+Consumption trends and model error for one vehicle's observed driving legs (Phase 5). Design decisions: [`phase5_plan.md`](phase5_plan.md) §2 (D9, D11–D13) and §3 F5.
 
-Query params: `?vehicle_id=&from=&to=&group_by=day|week|month`.
+Query params: `?vehicle_id=&from=&to=&group_by=day|week|month&tz=&include_simulated=false`.
+
+- `vehicle_id` (required) must be the caller's.
+- `from` / `to`: dates (`YYYY-MM-DD`), inclusive, in `tz`. Default: the last 30 days up to today. `from > to` → `VALIDATION_ERROR`.
+- `group_by` defaults to `week`. Weeks are ISO weeks (Monday start).
+- `tz`: an IANA time zone (default `UTC`); the client sends the browser's zone. A leg belongs to the bucket of its `end_time` in that zone.
+- More than 366 buckets → `VALIDATION_ERROR` with `details.reason = "RANGE_TOO_LARGE"`.
 
 **Response 200**
 ```json
 {
   "vehicle_id": "vehicle-uuid",
-  "range": { "from": "2026-10-01", "to": "2026-11-06" },
+  "range": { "from": "2026-11-02", "to": "2026-11-08" },
+  "group_by": "day",
+  "tz": "UTC",
+  "model_version": "deterministic-v1",
+  "includes_simulated": false,
+  "excluded_simulated_trips": 0,
   "series": [
     {
-      "bucket": "2026-10",
-      "trips": 12,
-      "distance_km": 842.1,
-      "observed_energy_kwh": 171.4,
-      "estimated_energy_kwh": 164.2,
-      "mae_kwh_per_trip": 2.1
+      "bucket": "2026-11-08",
+      "bucket_start": "2026-11-08T00:00:00Z",
+      "trips": 2,
+      "distance_km": 406.0,
+      "energy_trips": 2,
+      "observed_energy_kwh": 80.23,
+      "estimated_energy_kwh": 81.2,
+      "observed_kwh_per_km": 0.198,
+      "estimated_kwh_per_km": 0.2,
+      "mae_kwh": 0.485,
+      "bias_kwh": -0.485
     }
-  ]
+  ],
+  "totals": {
+    "trips": 2,
+    "distance_km": 406.0,
+    "energy_trips": 2,
+    "observed_energy_kwh": 80.23,
+    "estimated_energy_kwh": 81.2,
+    "observed_kwh_per_km": 0.198,
+    "estimated_kwh_per_km": 0.2,
+    "mae_kwh": 0.485,
+    "bias_kwh": -0.485
+  },
+  "plans": { "matched": 1, "with_energy": 1, "mae_kwh": 0.29, "mean_arrival_soc_error_points": -0.3 }
 }
 ```
 
-Rows where every included trip is `is_simulated = true` are excluded by default. A `?include_simulated=true` flag can opt in for the public demo.
+- **Which legs count:** legs with `included_in_aggregates` (§3.11a): `review_status` `auto` or `confirmed`, not in progress, and not simulated unless `include_simulated=true`. `trips` and `distance_km` count all of them. `energy_trips` counts those with an observed energy *and* a model estimate, and the energy, ratio and error fields use only those legs, so observed and estimated always cover the same trips.
+- `*_kwh_per_km` are distance-weighted (Σ energy / Σ distance). `mae_kwh` is the mean of |observed − estimated|; `bias_kwh` is the mean of (observed − estimated), negative when the model over-predicts. Ratios and errors are `null` when `energy_trips` is `0`.
+- `bucket` labels: `2026-11-08` (day), `2026-W45` (week), `2026-11` (month). `bucket_start` is the bucket's start in `tz`, written in UTC. **Every** bucket in the range is listed, empty ones with `0` counts and `null` ratios.
+- `estimated_energy_kwh` is the deterministic model (`model_version`) run on each leg's observed distance (phase5_plan D9), not the planner's route estimate.
+- `plans` summarizes matched plans whose chain ended in the range: `matched` counts them, `with_energy` those whose legs all have energy, `mae_kwh` the mean |observed − predicted| of those, and `mean_arrival_soc_error_points` the mean arrival SoC error in percentage points.
+- **Simulated data** is never mixed in silently: by default it is left out and `excluded_simulated_trips` says how many simulated legs in the range were skipped; with `include_simulated=true`, `includes_simulated` is `true` and the UI shows a banner.
+- Energy is in kWh and distance in km; the client converts to Wh/mi or kWh/100 km.
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (missing or bad params, unknown `tz`, `RANGE_TOO_LARGE`); `NOT_FOUND` (`vehicle_id` isn't the caller's).
+
+### 3.11a `GET /api/v1/analytics/trips`
+
+The analytics table: one row per observed leg with its model estimate. Query params: `?vehicle_id=&from=&to=&tz=&include_simulated=false&limit=&cursor=`, with the same meaning as §3.11. Newest first (`end_time` descending, ties by `id`).
+
+**Response 200**
+```json
+{
+  "items": [
+    {
+      "id": "observed-trip-uuid",
+      "vehicle_id": "vehicle-uuid",
+      "start_time": "2026-11-08T10:53:00Z",
+      "start_time_latest": "2026-11-08T10:53:00Z",
+      "end_time": "2026-11-08T13:00:00Z",
+      "distance_km": 183.6,
+      "soc_start_percent": 66,
+      "soc_end_percent": 15,
+      "observed_energy_kwh": 36.21,
+      "observed_energy_uncertainty_kwh": 0.71,
+      "estimated_energy_kwh": 36.72,
+      "error_kwh": -0.51,
+      "observed_kwh_per_km": 0.197,
+      "energy_source": "soc_inferred",
+      "quality_flag": "high",
+      "quality_reasons": [],
+      "review_status": "auto",
+      "in_progress": false,
+      "included_in_aggregates": true,
+      "planned_trip_id": "trip-uuid",
+      "plan_origin_label": "Frederick, MD",
+      "plan_destination_label": "Toronto, ON",
+      "model_version": "deterministic-v1",
+      "is_simulated": false
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+- Lists every leg in the range **except rejected ones**, including `needs_review` and in-progress legs (flagged, with `included_in_aggregates: false`), so the table explains the chart.
+- `estimated_energy_kwh` and `error_kwh` are `null` when the leg has no backtest (no energy, or no baseline for the vehicle); `observed_*` are `null` when the leg has no energy.
+- `plan_*_label` are the matched plan's labels (`null` when unmatched).
+
+**Errors:** as §3.11, plus `VALIDATION_ERROR` for a bad cursor.
+
+### 3.11b `GET /api/v1/analytics/trips.csv`
+
+The rows of §3.11a as CSV, for the same filters (no `limit`/`cursor`: every row). `Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment; filename="chargewise-trips-<from>-<to>.csv"`.
+
+- The header row is exactly the §3.11a field names, in the order shown; `quality_reasons` is joined with `;`. Timestamps are ISO-8601 UTC, numbers use `.` and no thousands separator, `null` is an empty cell, and booleans are `true`/`false`. Parsing the CSV gives the same values as the JSON pages.
+- Text cells starting with `=`, `+`, `-`, `@`, tab or carriage return are prefixed with `'` (CSV injection; labels are user text). Numeric cells are never changed.
+- At most 10,000 rows; more → `422 VALIDATION_ERROR` with `details.reason = "EXPORT_TOO_LARGE"` (narrow the range). A file is never silently truncated.
+
+**Errors:** as §3.11a (sent as the JSON error envelope).
 
 ### 3.12 `POST /api/v1/webhooks/smartcar`
 
@@ -829,6 +927,145 @@ Stations within a corridor around a route, in order along the route. Stateless: 
 - The route and coordinates are never logged (D13).
 
 **Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (geometry too large, not a valid polyline, fewer than two points or out of range; other bad fields); `NOT_FOUND` (`vehicle_id` not the caller's); `STATIONS_NOT_CONFIGURED` (503); `STATIONS_UNREACHABLE` (502/504).
+
+### 3.18 `GET /api/v1/observed-trips`
+
+The caller's observed driving legs (Phase 5), inferred automatically from telemetry. One item is one leg: driving only, never a charging session; a road trip with charging stops is several legs. Design decisions: [`phase5_plan.md`](phase5_plan.md) §2 (D1–D3, D8, D14) and §3 F3. These routes live under `/observed-trips`, not `/trips/observed`, so they can't collide with `GET /trips/{id}` (§3.9).
+
+Query params: `?vehicle_id=&review_status=auto|needs_review|confirmed|rejected&from=&to=&limit=&cursor=`.
+
+- `vehicle_id` is optional (all the caller's vehicles); if given it must be the caller's.
+- `review_status` may repeat; by default every status except `rejected` is listed.
+- `from` / `to` are ISO-8601 timestamps that filter on `end_time` (inclusive / exclusive).
+- Newest first (`end_time` descending, ties by `id`). Cursor pagination as §1.
+
+**Response 200**
+```json
+{
+  "items": [
+    {
+      "id": "observed-trip-uuid",
+      "vehicle_id": "vehicle-uuid",
+      "start_time": "2026-11-09T18:12:00Z",
+      "start_time_latest": "2026-11-10T08:41:00Z",
+      "end_time": "2026-11-10T08:41:00Z",
+      "start_time_is_exact": false,
+      "distance_km": 28.6,
+      "odometer_start_km": 24712.3,
+      "odometer_end_km": 24740.9,
+      "soc_start_percent": 66,
+      "soc_start_recorded_at": "2026-11-09T18:12:00Z",
+      "soc_end_percent": 61,
+      "soc_end_recorded_at": "2026-11-10T08:41:00Z",
+      "energy_kwh": 3.55,
+      "energy_kwh_uncertainty": 0.71,
+      "energy_source": "soc_inferred",
+      "usable_capacity_kwh": 71.0,
+      "capacity_source": "catalog",
+      "quality_flag": "low",
+      "quality_reasons": ["soc_delta_small", "soc_reading_stale", "start_time_bounded"],
+      "review_status": "needs_review",
+      "reviewed_at": null,
+      "in_progress": false,
+      "planned_trip_id": null,
+      "plan_leg_index": null,
+      "inference_version": "telemetry-v1",
+      "is_simulated": false
+    }
+  ],
+  "next_cursor": null
+}
+```
+
+- **Times:** the leg started some time in `[start_time, start_time_latest]` and its last odometer increase was recorded at `end_time`. When the start is known (`start_time_is_exact: true`) the two are equal. The UI shows a bounded start as "between …", never as an exact time.
+- **Energy** is observed: `(soc_start_percent − soc_end_percent) / 100 × usable_capacity_kwh`. It is `null`, with `energy_source: null`, when a SoC reading is missing, SoC rose during the leg, or capacity is unknown; it is never derived from distance. `energy_kwh_uncertainty` comes from the SoC resolution (1 point by default).
+- **Quality:** `quality_flag` is `high`, `medium` or `low`, and `quality_reasons` lists every rule the leg missed: `soc_missing`, `soc_increased`, `capacity_unknown`, `soc_delta_small`, `soc_reading_stale`, `start_time_bounded`, `odometer_regression` (definitions in phase5_plan D8).
+- **Review:** `auto` (high/medium), `needs_review` (low), `confirmed` or `rejected` (§3.18c–d). Low-quality legs don't count in analytics until confirmed.
+- `in_progress` is `true` for the newest leg while it may still grow (fewer than 20 minutes since its last reading, with nothing after it yet). It can change on the next telemetry event.
+- `planned_trip_id` / `plan_leg_index` are set when the leg was matched to a plan (§3.18e).
+- No location is ever returned; legs have none.
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (bad params or cursor); `NOT_FOUND` (`vehicle_id` isn't the caller's).
+
+### 3.18a `GET /api/v1/observed-trips/{id}`
+
+One leg, same shape as an item in §3.18 (rejected legs included).
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID; `NOT_FOUND` if it doesn't exist or isn't the caller's.
+
+### 3.18b `POST /api/v1/observed-trips/recompute`
+
+Re-runs trip inference and plan matching for one vehicle, synchronously. Inference already runs on its own after each telemetry webhook ([ADR 0009](adr/0009-in-process-post-ingest-hook-for-trip-inference.md)); this is a catch-up path (after a deploy or a fix) and is idempotent.
+
+**Request**
+```json
+{ "vehicle_id": "vehicle-uuid", "full": false }
+```
+
+- `full: false` re-infers from the newest finished leg onward; `full: true` rebuilds the vehicle's whole history. Confirmed and rejected legs are never changed or deleted.
+
+**Response 200**
+```json
+{
+  "vehicle_id": "vehicle-uuid",
+  "legs_created": 2,
+  "legs_updated": 1,
+  "legs_deleted": 0,
+  "legs_unchanged": 14,
+  "plans_matched": 1,
+  "dropped_simulated_readings": 0
+}
+```
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR`; `NOT_FOUND` (`vehicle_id` isn't the caller's).
+
+### 3.18c `POST /api/v1/observed-trips/{id}/confirm`
+
+Marks a leg as a real trip the caller made (`review_status: "confirmed"`, `reviewed_at` set). Any leg can be confirmed, including a rejected one. No body. Idempotent: confirming a confirmed leg keeps its first `reviewed_at`. Confirming changes neither the numbers nor `quality_flag`. A confirmed leg is frozen: inference won't change or delete it.
+
+**Response 200** — the leg (§3.18a).
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID; `NOT_FOUND` if it doesn't exist or isn't the caller's.
+
+### 3.18d `POST /api/v1/observed-trips/{id}/reject`
+
+Marks a leg as not a real trip of the caller's (someone else drove, a tow, a bad reading): `review_status: "rejected"`. It's frozen, hidden from lists by default and never counted in analytics. If it was matched to a plan, the match is removed and the plan is re-matched. No body. Idempotent. Rejecting a confirmed leg is allowed.
+
+There is no endpoint for creating an observed trip by hand (contract §6 question 3, answered in phase5_plan D3).
+
+**Response 200** — the leg (§3.18a).
+
+**Errors:** as §3.18c.
+
+### 3.18e Trip observation (in `GET /api/v1/trips/{id}`)
+
+From Phase 5, `observation` in §3.9 is `null` until a plan is matched to the legs that carried it out (phase5_plan D4), and then:
+
+```json
+{
+  "observation": {
+    "matched_at": "2026-11-08T13:41:00Z",
+    "legs": [
+      { "id": "observed-trip-uuid-1", "plan_leg_index": 1, "start_time": "2026-11-08T08:02:00Z", "end_time": "2026-11-08T10:32:00Z", "distance_km": 222.4, "soc_start_percent": 80, "soc_end_percent": 18, "energy_kwh": 44.02, "quality_flag": "high", "review_status": "auto" },
+      { "id": "observed-trip-uuid-2", "plan_leg_index": 2, "start_time": "2026-11-08T10:53:00Z", "end_time": "2026-11-08T13:00:00Z", "distance_km": 183.6, "soc_start_percent": 66, "soc_end_percent": 15, "energy_kwh": 36.21, "quality_flag": "high", "review_status": "auto" }
+    ],
+    "observed_distance_km": 406.0,
+    "planned_distance_km": 402.6,
+    "predicted_energy_kwh": 80.52,
+    "observed_energy_kwh": 80.23,
+    "error_kwh": -0.29,
+    "observed_start_soc": 0.8,
+    "predicted_arrival_soc": 0.153,
+    "observed_arrival_soc": 0.15,
+    "arrival_soc_error_points": -0.3,
+    "model_version": "deterministic-v1"
+  }
+}
+```
+
+- `legs` are in drive order; leg *n* is the drive from stop *n − 1* (or the origin) to stop *n* (or the destination) when the counts line up, which the UI uses to compare each planned leg with what happened.
+- `observed_energy_kwh` and `error_kwh` are `null` when any leg has no energy. SoC values here are fractions, like the plan.
+- A matched plan's list item (§3.8) has `status: "completed"`.
 
 ## 4. OpenAPI and typed client
 

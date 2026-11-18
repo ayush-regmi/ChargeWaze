@@ -321,7 +321,7 @@ Detailed plan: [`phase4_plan.md`](phase4_plan.md), written by P4-F0. **Settled 2
 
 ### 4.3 Phase 5: History and analytics
 
-Detailed plan: `docs/phase5_plan.md`, written by P5-F0. Decisions to settle:
+Detailed plan: [`phase5_plan.md`](phase5_plan.md), written by P5-F0. **Settled 2026-11-18 in phase5_plan.md §2**: D1, D3, D4 and D5 changed from the recommendations below (observed trips are driving *legs* with no `odometer_inferred` energy; confirm/reject on any leg; matching by time + odometer distance over a chain of legs, since there is no location; no chart library), D2 changed to a background trigger after each webhook at the user's request ([ADR 0009](adr/0009-in-process-post-ingest-hook-for-trip-inference.md)), and D8–D14 were added (quality rules, backtests for every leg, capacity, simulated data, aggregates, buckets/time zone, in-progress legs). The table below is kept as the original recommendation; the phase plan wins. The Owns lists below are updated to match.
 
 | # | Decision | Recommendation |
 |---|---|---|
@@ -334,35 +334,35 @@ Detailed plan: `docs/phase5_plan.md`, written by P5-F0. Decisions to settle:
 | P5-D7 | Vehicle location | Still not requested (Phase 3 D12); trips get distance from odometer, not paths. |
 
 **P5-F0 Phase 5 design + contracts** · S · Depends: P4-F0 (needs the `planned_trips` shape) · Lane: — · Branch `feature/phase5-design`
-- Owns: `docs/phase5_plan.md` (new), contract §3.11 and new analytics/observed-trip sections.
+- Owns: `docs/phase5_plan.md` (new), `docs/adr/0009-in-process-post-ingest-hook-for-trip-inference.md` (new), contract §3.11–3.11b and §3.18–3.18e (+ endpoint-index rows), this §4.3.
 
 **P5-F1 Observed trips + predictions schema** · S · Depends: P5-F0, P4-F1; after P3-F8 in the migration lane · Lane: migration · Branch `feature/phase5-observed-schema`
-- Owns: new migration (`observed_trips`, `prediction_results`, RLS), `modules/trips/observed_models.py` (new), `alembic/env.py`, `tests/trips/test_observed_models.py`, `docs/database-design.md` §3.9–3.10.
+- Owns: new migration (`observed_trips`, `prediction_results` as in phase5_plan §3 F1, RLS), `modules/trips/observed_models.py` (new), `alembic/env.py`, `tests/trips/test_observed_models.py`, `docs/database-design.md` §3.9–3.10.
 
 **P5-F2 Trip inference engine** · M · Depends: P5-F0 · Lane: — · Branch `feature/phase5-trip-inference`
 - Owns: `modules/trips/inference.py` (new, pure), `tests/trips/test_inference.py`, telemetry series fixtures in `fixtures/telemetry/` (new subfolder of the existing `fixtures/`).
-- Acceptance: driving vs charging separation, gaps, out-of-order readings, quality flags, simulated rows excluded.
+- Acceptance: the five phase5_plan §5 examples exactly; driving vs charging separation, gaps, out-of-order readings, quality flags, simulated rows excluded.
 
 **P5-F3 Observed-trip ingestion + confirm** · M · Depends: P5-F1, P5-F2 · Lane: — · Branch `feature/phase5-trip-ingestion`
-- Owns: `modules/trips/observed_service.py`, `modules/trips/observed_router.py` (new; registered in W0 if the name is known by then, otherwise one line in `main.py` as a declared exception), `scripts/infer_trips.py`, a read-only telemetry query function in `modules/vehicles/telemetry_service.py`, tests.
-- Acceptance: idempotent re-runs, confirm/reject flow, ownership.
+- Owns: `modules/trips/observed_service.py`, `modules/trips/observed_router.py` (new; already registered by W0), `modules/vehicles/ingest_hooks.py` (new, ADR 0009), the `BackgroundTasks` scheduling in `modules/vehicles/webhook_router.py`, `IngestResult` fields and a read-only `list_readings` function in `modules/vehicles/telemetry_service.py`, `scripts/infer_trips.py`, config block "trips", `tests/trips/test_observed_*.py`, `tests/test_ingest_hooks.py`.
+- Acceptance: a webhook that inserts odometer/SoC/charging readings creates legs with no other call; a hook failure still answers Smartcar 200; idempotent re-runs; frozen legs survive `full`; confirm/reject flow; ownership.
 
-**P5-F4 Plan ↔ observation matching** · S · Depends: P5-F3, P4-F4 · Lane: — · Branch `feature/phase5-prediction-matching`
-- Owns: `modules/trips/matching.py`, writes `prediction_results`, tests. Hooks into the ingestion service through one call site.
+**P5-F4 Plan ↔ observation matching + backtests** · S–M · Depends: P5-F3, P4-F4 · Lane: — · Branch `feature/phase5-prediction-matching`
+- Owns: `modules/trips/matching.py`, writes `prediction_results` (plan and leg rows), the one call site in `observed_service.py`, the `observation` field in `GET /trips/{id}` (`modules/trips/service.py`, `modules/trips/router.py`; P4-F1 is merged by then), `tests/trips/test_matching.py`.
 
 **P5-F5 Analytics API + CSV** · M · Depends: P5-F1 · Lane: — · Branch `feature/phase5-analytics-api`
-- Owns: `services/api/app/modules/analytics/` (new), `tests/analytics/`, config block "analytics".
-- Acceptance: day/week/month buckets, MAE, `include_simulated` default false, CSV equals JSON rows, Wh/mi vs kWh/100 mi left to the client (units stay raw in the API).
+- Owns: `services/api/app/modules/analytics/` (new), `modules/trips/observed_queries.py` (new, read-only functions analytics calls, so it doesn't query trips tables itself), `tests/analytics/`, config block "analytics".
+- Acceptance: day/week/month buckets in a given time zone, MAE and bias, `include_simulated` default false with the excluded count, CSV equals JSON rows, injection escaping, export cap, units stay raw in the API.
 
-**P5-F6 Analytics UI** · L · Depends: P5-F5 · Lane: dependency (chart library) · Branch `feature/phase5-analytics-ui`
-- Owns: `app/(app)/analytics/`, `components/analytics/` (new), `apps/web/package.json`, `package-lock.json`, tests.
-- Acceptance: trends, estimated vs observed, per-trip quality flags, CSV download, simulated data never mixed silently.
+**P5-F6 Analytics UI** · L · Depends: P5-F5 · Lane: — (no chart library, phase5_plan D5) · Branch `feature/phase5-analytics-ui`
+- Owns: `app/(app)/analytics/`, `components/analytics/` (new, including `charts/`), `e2e/analytics.spec.ts`, tests.
+- Acceptance: trends, estimated vs observed, per-trip quality flags, CSV download, simulated data never mixed silently. Adding any chart dependency needs a new approval and the dependency lane.
 
 **P5-F7 History with observations** · M · Depends: P5-F3, P4-F7 · Lane: — · Branch `feature/phase5-history-observations`
 - Owns: `components/trips/observation-*` (new), edits to `app/(app)/trips/[id]/` and `trips/saved/` pages (P4-F7 is merged by then), confirm/reject UI, tests.
 
 **P5-F8 Phase 5 close-out** · S · Depends: P5-F4, P5-F6, P5-F7 · Lane: — · Branch `feature/phase5-closeout`
-- Real trips produce `observed_trips` rows without manual help; roadmap status; Playwright analytics flow.
+- Real trips produce `observed_trips` rows without manual help; record the measured cadence and quality mix; phase5_plan §6 mapping; roadmap status; Playwright analytics flow.
 
 ### 4.4 Phase 6: Production and portfolio
 
