@@ -1,12 +1,12 @@
 # Phase 4 Plan: Charging-Aware Trip Planner
 
-Status: **Approved 2026-11-18**: P4-D1…D9 settled as in §2 (D1, D2, D3, D4 and D6 changed from the [`plan.md`](plan.md#42-phase-4-charging-aware-trip-planner) recommendations; D10–D16 added) · Created: 2026-11-18 by P4-F0 · Phase owner: project lead
+Status: **Approved 2026-11-18**: P4-D1…D9 settled as in §2 (D1, D2, D3, D4 and D6 changed from the [`plan.md`](plan.md#42-phase-4-charging-aware-trip-planner) recommendations; D10–D16 added; per-vehicle baseline added as follow-up F8) · Created: 2026-11-18 by P4-F0 · Phase owner: project lead
 
 This is the working plan for [Phase 4 of the roadmap](development-roadmap.md#phase-4--charging-aware-trip-planner-weeks-79). [`plan.md`](plan.md) §4.2 decides *when* each feature runs and *which files* it owns; this file decides *what* each feature builds. Each feature session edits only its own section here (for "As built" notes).
 
 Based on: roadmap Phase 4, [`product-requirements.md`](product-requirements.md) §4.2, §4.6, §7 and §9, [`architecture.md`](architecture.md) §5, §6 and §10, [`api-contracts.md`](api-contracts.md) §1 and §3.7–3.9b, [`database-design.md`](database-design.md) §3.4 and §3.7–3.8, [`phase3_plan.md`](phase3_plan.md) D5–D10 and F5, and ADRs [0003](adr/0003-own-charging-optimizer-over-mapbox-ev-routing.md), [0004](adr/0004-deterministic-energy-baseline-before-ml.md) and [0008](adr/0008-route-ordered-dp-charging-optimizer.md).
 
-**Not in Phase 4:** speed/elevation/temperature/weather adjustments, a per-vehicle editable consumption baseline (§7 follow-up), several alternative plans, live charger availability, traffic, observed trips and prediction scoring (Phase 5).
+**Not in Phase 4:** speed/elevation/temperature/weather adjustments, several alternative plans, live charger availability, traffic, observed trips and prediction scoring (Phase 5).
 
 ---
 
@@ -30,7 +30,7 @@ Based on: roadmap Phase 4, [`product-requirements.md`](product-requirements.md) 
 
 | # | Decision | Settled | Changed from plan.md? |
 |---|---|---|---|
-| **D1** | Baseline consumption | A flat `baseline_kwh_per_km` per vehicle **from the static catalog only** (`spec_catalog.py`). 2026 bZ XLE AWD: **0.20 kWh/km** (≈ 322 Wh/mi), EV Database's mild-weather *highway* figure (323 Wh/mi), because planned trips are mostly highway. EPA's 28 kWh/100 mi is measured at the wall and averages city and highway, so it would be optimistic for road trips. No speed/elevation/temperature adjustments; the response lists `adjustments_applied: []`. A vehicle without a catalog baseline **cannot be planned** (`VEHICLE_SPECS_INCOMPLETE`); there is no generic default, because every vehicle is different. | **Yes.** plan.md said "user-editable". Editing needs a new `vehicle_specs` column and changes to `PATCH /vehicles/{id}/specs`, which no Phase 4 feature owns. Deferred to a follow-up (§7). |
+| **D1** | Baseline consumption | A flat `baseline_kwh_per_km` per vehicle **from the static catalog only** (`spec_catalog.py`). 2026 bZ XLE AWD: **0.20 kWh/km** (≈ 322 Wh/mi), EV Database's mild-weather *highway* figure (323 Wh/mi), because planned trips are mostly highway. EPA's 28 kWh/100 mi is measured at the wall and averages city and highway, so it would be optimistic for road trips. No speed/elevation/temperature adjustments; the response lists `adjustments_applied: []`. A vehicle without a catalog baseline **cannot be planned** (`VEHICLE_SPECS_INCOMPLETE`); there is no generic default, because every vehicle is different. | **Yes.** plan.md said "user-editable". Editing needs a new `vehicle_specs` column and changes to `PATCH /vehicles/{id}/specs`, so it is its own follow-up feature, **F8**, which runs after F4 in the migration lane. Until F8 lands, the catalog is the only source. |
 | **D2** | Charging curve | Piecewise-linear `vehicle_specs.charging_curve`, falling back to the catalog curve when the row's curve is empty (D14). The 2026 bZ curve is **derived** from published figures, not measured (§2.3), and every plan says so (`charging_curve_source: "catalog_derived"`). The vehicle's power is capped by the station's power. **A vehicle with no curve cannot be planned** (`VEHICLE_SPECS_INCOMPLETE`). | **Yes.** No "flat `min(station kW, vehicle max kW)`" fallback: with no curve we don't know the vehicle's power, and guessing it is fabricating data. |
 | **D3** | Algorithm | **Dynamic programming over candidate stations in route order**, with state = (station, departure SoC on a 1 % grid). It finds the minimum-time plan at that resolution, chooses how much to charge at each stop, and has no fixed stop limit. See [ADR 0008](adr/0008-route-ordered-dp-charging-optimizer.md) and §4.3. | **Yes.** Bounded enumeration with up to 3 stops over the ~100 DC stations along Frederick → Toronto is about 167,000 orderings (C(100,1) + C(100,2) + C(100,3)) *before* choosing charge amounts, and still needs a rule for how much to charge. The DP is simpler to get right and runs in well under 500 ms. It is architecture §6.5's graph search, reduced to one dimension because the stations sit along a single route. |
 | **D4** | Detour | Estimate: `detour_km = 2 × distance_from_route_km × 1.3` (road factor), `detour_minutes = detour_km / 50 km/h`. Both factors are config settings. The response marks detours as estimates. A station whose detour exceeds `max_detour_minutes` is excluded. No extra Mapbox calls. The detour's energy is charged to the leg that arrives at the station. | Small change: adds the 1.3 road factor and uses 50 km/h (local roads) instead of 60, so off-route distance isn't under-counted. |
@@ -48,7 +48,7 @@ Based on: roadmap Phase 4, [`product-requirements.md`](product-requirements.md) 
 | **D11** | Per-stop overhead | Every stop adds `planner_stop_overhead_minutes` (default **5**) for leaving the road, parking, plugging in, starting the session and the charger's ramp-up. Without it the optimizer treats stopping as free and splits a charge into several stops to save seconds. Other planners do the same: ABRP's "charging overhead" defaults to 5 minutes, and TomTom's EV routing "charging time offset" defaults to 180 s (§8). It is shown in `assumptions`. It is **not** queue or waiting time: waiting stays 0 and Chargewise never invents availability (architecture §6.3). |
 | **D12** | Stations with unknown power | **Never planning candidates.** A station counts only if at least one of its connectors that the vehicle is compatible with has a known `power_kw`. Its planning power is the highest known `power_kw` among those connectors, and the stop uses that connector type. Excluded stations are counted in `candidates.excluded_unknown_power` so the UI can say so; nothing is assumed. (The Charging page still shows them as "power unknown", per phase 3 D10.) |
 | **D13** | Which route; drive time | The request names a `route_index` (default 0) from `POST /routes/directions`. The server calls Mapbox again with the same options and plans on that route. It never trusts geometry or distances sent by the client. Drive time is the same for every plan on one route, so the optimizer minimizes `charging + detour + overhead`. Times at points along the route are interpolated linearly from Mapbox's total duration. No Mapbox annotations and no adapter change in v1. |
-| **D14** | Vehicle specs at plan time | For each of `usable_capacity_kwh`, `connectors` and `charging_curve`: use the `vehicle_specs` row's value if set, otherwise the catalog value for the vehicle's make/model/year, otherwise it is missing. `baseline_kwh_per_km` comes from the catalog only (D1). Any missing → `422 VALIDATION_ERROR`, `details.reason = "VEHICLE_SPECS_INCOMPLETE"`, `details.missing = [...]`. This matters for the real bZ: its specs row was created while the catalog was empty, so it holds `NULL` and `[]`. Each value's source is reported in `assumptions`. |
+| **D14** | Vehicle specs at plan time | For each of `usable_capacity_kwh`, `connectors` and `charging_curve`: use the `vehicle_specs` row's value if set, otherwise the catalog value for the vehicle's make/model/year, otherwise it is missing. `baseline_kwh_per_km` comes from the catalog only until F8 adds the column; from then on it follows the same row-then-catalog rule. Any missing → `422 VALIDATION_ERROR`, `details.reason = "VEHICLE_SPECS_INCOMPLETE"`, `details.missing = [...]`. This matters for the real bZ: its specs row was created while the catalog was empty, so it holds `NULL` and `[]`. Each value's source is reported in `assumptions`. |
 | **D15** | What the energy model ignores (v1) | Charging losses (the curve is power *into the battery*), the time to reach the station's power, temperature, speed, elevation, HVAC, battery ageing, and SoC above the curve's last point (a plan never charges above it). All listed under "not modelled" in architecture §6.7. |
 | **D16** | SoC grid and rounding | Departure SoC is chosen on a 1 % grid (`planner_soc_grid_step = 0.01`) and is the smallest grid value that works, so plans round **up**. Arrival SoC is computed exactly. The API returns SoC as fractions with 3 decimals and minutes as whole minutes, rounded half-up; totals are computed from unrounded values, so per-stop minutes can differ from the total by 1 minute. |
 
@@ -70,7 +70,7 @@ One catalog entry: `make="Toyota"`, `model_prefix="bZ XLE AWD"` (the Smartcar mo
 
 ## 3. Features
 
-Owns lists are in [`plan.md`](plan.md#42-phase-4-charging-aware-trip-planner) §4.2 and are not repeated here. Order and dependencies: F0 → (F1, F2) → F3 → F4 (also needs P3-F5) → F6 (also needs P3-F7); F1 → F7; F5 is independent; F6 + F7 → F9. There is no F8 in Phase 4.
+Owns lists are in [`plan.md`](plan.md#42-phase-4-charging-aware-trip-planner) §4.2 and are not repeated here. Order and dependencies: F0 → (F1, F2) → F3 → F4 (also needs P3-F5) → F6 (also needs P3-F7); F1 → F7; F5 is independent; F6 + F7 → F9. F8 (per-vehicle baseline) follows F4 and doesn't block F9.
 
 | ID | Feature | Branch | Size |
 |---|---|---|---|
@@ -82,6 +82,7 @@ Owns lists are in [`plan.md`](plan.md#42-phase-4-charging-aware-trip-planner) §
 | F5 | Preferences editor | `feature/phase4-preferences-editor` | S |
 | F6 | Planner UI | `feature/phase4-planner-ui` | L |
 | F7 | Trip history UI | `feature/phase4-trip-history` | M |
+| F8 | Per-vehicle consumption baseline (follow-up) | `feature/phase4-vehicle-baseline` | M |
 | F9 | Close-out | `feature/phase4-closeout` | S |
 
 ### F1 — Trips schema + read/save/delete API
@@ -188,6 +189,22 @@ Uses `POST /routes/plan` on the `/trips` page after a route is selected. Owns li
 ### F7 — Trip history UI
 
 `GET /trips` (saved by default) with pagination and empty state; detail from `GET /trips/{id}` rendering the stored plan (no recompute); delete via `DELETE /trips/{id}`. Shows infeasible saved trips with their reason.
+
+### F8 — Per-vehicle consumption baseline (follow-up)
+
+Added after P4-F0 review (D1): every vehicle consumes differently, so the user should be able to set their own baseline, and vehicles without a catalog entry should become plannable. Files and lane: plan.md §4.2 P4-F8.
+
+**Contract first** (§3.4, §3.4a): `specs.baseline_kwh_per_km` in `GET /vehicles/{id}` (value from the row, or `null`) and as an optional `PATCH /vehicles/{id}/specs` key: `> 0` and `<= 1` kWh/km, at most 3 decimals, `null` clears it (back to the catalog value). `GET` also returns `baseline_source: "vehicle" | "catalog" | null` so the Garage can show where the effective value comes from.
+
+**Database:** nullable `vehicle_specs.baseline_kwh_per_km numeric(5,3)` with `CHECK (baseline_kwh_per_km > 0 AND baseline_kwh_per_km <= 1)`. No backfill: an empty value falls back to the catalog (D14).
+
+**Planner:** D14 resolution covers `baseline_kwh_per_km` like the other spec fields (row, then catalog, else `VEHICLE_SPECS_INCOMPLETE`); `assumptions.baseline_source` reports `vehicle` or `catalog`.
+
+**Web:** the Garage specs panel gets a "Consumption" field. The user types it in their unit preference (Wh/mi for imperial, kWh/100 km for metric); the client converts to kWh/km. The field shows the catalog value as a placeholder and says it's a highway estimate.
+
+**Tests:** migration round-trip and one head; PATCH validation (bounds, decimals, `null` clears); GET reports the source; a vehicle with no catalog entry plans once a baseline is set and returns `VEHICLE_SPECS_INCOMPLETE` (missing `baseline_kwh_per_km`) before; a user value overrides the catalog in `/routes/plan`; unit conversion in the web form (imperial and metric).
+
+**Later (not F8):** suggest a personal baseline from observed trips once Phase 5 has data (ML Stage C).
 
 ### F9 — Close-out
 
@@ -523,7 +540,7 @@ F9 fills in the "Test" column with real test names.
 
 ## 7. Open questions and follow-ups
 
-1. **Per-vehicle consumption baseline** (D1, deferred): a `vehicle_specs.baseline_kwh_per_km` column, `PATCH /vehicles/{id}/specs` support, and a Garage field. Unblocks planning for vehicles without a catalog entry. Needs the migration lane and the vehicles module; propose as its own feature after P4-F4.
+1. **Per-vehicle consumption baseline**: now feature **F8** (§3). It needs the migration lane, so the coordinator schedules it (plan.md W7).
 2. **Measured bZ charging curve**: replace the derived curve after a real DC session is logged (Smartcar doesn't report charging power on the bZ yet, smartcar-v3-notes §7, so this may need a manual log).
 3. **Stale threshold**: switch from 15 min to the P2-R2 measured value when it is recorded.
 4. **Preferred-network names**: the editor (P4-F5) stores free text; matching is fuzzy (F4). A follow-up could offer AFDC network values in the editor.
