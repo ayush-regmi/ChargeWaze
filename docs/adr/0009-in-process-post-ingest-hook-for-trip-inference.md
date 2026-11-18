@@ -19,16 +19,16 @@ Constraints:
 
 We will run trip inference **in the API process, after the webhook response**, through a small hook registry owned by `vehicles`:
 
-- `modules/vehicles/ingest_hooks.py` holds `register_ingest_hook(fn)` and a `TelemetryIngested` event (vehicle, user, inserted signal codes, `is_simulated`). It imports nothing from other modules.
+- `modules/vehicles/ingest_hooks.py` holds `register_ingest_hook(fn)` and a `TelemetryIngested` event (vehicle, user, inserted signal codes, the oldest inserted reading's timestamp, `is_simulated`). It imports nothing from other modules.
 - When a delivery is accepted and inserts rows, the webhook router schedules every registered hook with FastAPI `BackgroundTasks`. They run after the response is sent. A hook's exception is logged and never reaches Smartcar.
-- `trips` registers its hook when `trips/observed_router.py` is imported. The hook ignores events without `odometer`, `soc` or `charging_status`, opens its own DB session, takes a per-vehicle `pg_advisory_xact_lock` so runs for one vehicle are serialized, and re-infers from the newest closed leg onward. Every run is idempotent.
+- `trips` registers its hook when `trips/observed_router.py` is imported. The hook ignores events without `odometer`, `soc` or `charging_status`, opens its own DB session, takes a per-vehicle `pg_advisory_xact_lock` so runs for one vehicle are serialized, and re-infers from the newest closed leg onward, or from further back when the delivery carried late readings older than that leg (out-of-order delivery), rebuilding the non-frozen legs those readings touch. Every run is idempotent.
 - `POST /api/v1/observed-trips/recompute` and `scripts/infer_trips.py` remain as catch-up paths.
 
 ## Consequences
 
 - Trips appear a few seconds after the webhook that ends them, with no page visit or button. Webhook latency doesn't change.
 - The dependency direction stays `trips → vehicles`: `vehicles` calls functions it was handed, not `trips` code.
-- Background tasks are lost if the process restarts before they run. Because each run re-infers from the newest closed leg, the next delivery (or the recompute endpoint) catches up; nothing is lost permanently.
+- Background tasks are lost if the process restarts before they run. Because each run re-infers from the newest closed leg (or earlier for late readings), the next delivery (or the recompute endpoint) catches up; nothing is lost permanently.
 - With several API instances, two runs for one vehicle can happen at once on different instances; the advisory lock serializes them in Postgres.
 - Hook registration is an import-time side effect. A test checks it's registered exactly once, and test clients run background tasks synchronously, so the behaviour is covered end to end.
 - If inference ever gets slow (long histories, many vehicles), the same hook can enqueue a job instead; only the registry's caller changes.

@@ -982,7 +982,7 @@ Query params: `?vehicle_id=&review_status=auto|needs_review|confirmed|rejected&f
 - **Quality:** `quality_flag` is `high`, `medium` or `low`, and `quality_reasons` lists every rule the leg missed: `soc_missing`, `soc_increased`, `capacity_unknown`, `soc_delta_small`, `soc_reading_stale`, `start_time_bounded`, `odometer_regression` (definitions in phase5_plan D8).
 - **Review:** `auto` (high/medium), `needs_review` (low), `confirmed` or `rejected` (§3.18c–d). Low-quality legs don't count in analytics until confirmed.
 - `in_progress` is `true` for the newest leg while it may still grow (fewer than 20 minutes since its last reading, with nothing after it yet). It can change on the next telemetry event.
-- `planned_trip_id` / `plan_leg_index` are set when the leg was matched to a plan (§3.18e).
+- `planned_trip_id` is set when the leg was matched to a plan (§3.18e). `plan_leg_index` is derived, not stored: the leg's 1-based position among that plan's legs ordered by `start_time`.
 - No location is ever returned; legs have none.
 
 **Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (bad params or cursor); `NOT_FOUND` (`vehicle_id` isn't the caller's).
@@ -1002,7 +1002,7 @@ Re-runs trip inference and plan matching for one vehicle, synchronously. Inferen
 { "vehicle_id": "vehicle-uuid", "full": false }
 ```
 
-- `full: false` re-infers from the newest finished leg onward; `full: true` rebuilds the vehicle's whole history. Confirmed and rejected legs are never changed or deleted.
+- `full: false` re-infers from the newest finished leg onward (the webhook path also goes back further for late readings); `full: true` rebuilds the vehicle's whole history. Confirmed and rejected legs are never changed or deleted.
 
 **Response 200**
 ```json

@@ -108,8 +108,7 @@ Migration lane. F1 writes `database-design.md` §3.9–3.10 to match this sectio
 | `review_status` | `text` NOT NULL | `'auto'`, `'needs_review'`, `'confirmed'`, `'rejected'` (`CHECK`). |
 | `reviewed_at` | `timestamptz` NULL | Set by confirm/reject. |
 | `closed` | `boolean` NOT NULL | D14. Default `false`. |
-| `planned_trip_id` | `uuid` FK → `planned_trips.id` ON DELETE SET NULL | Set by matching (D4). |
-| `plan_leg_index` | `int` NULL | 1-based position in the matched chain. `CHECK ((planned_trip_id IS NULL) = (plan_leg_index IS NULL))` |
+| `planned_trip_id` | `uuid` FK → `planned_trips.id` ON DELETE SET NULL | Set by matching (D4). The leg's position in the chain is **not stored**: the API derives `plan_leg_index` by ordering the plan's legs by `start_time`. So deleting a plan (`SET NULL`) leaves nothing behind that could break a constraint. |
 | `inference_version` | `text` NOT NULL | `'telemetry-v1'`. |
 | `is_simulated` | `boolean` NOT NULL | Default `false`. |
 | `created_at`, `updated_at` | `timestamptz` NOT NULL | Default `now()`. |
@@ -141,7 +140,7 @@ Constraints and indexes: `UNIQUE (vehicle_id, odometer_start_km)` (the upsert ke
 
 Constraints and indexes: `CHECK ((kind = 'plan') = (planned_trip_id IS NOT NULL))`, `CHECK ((kind = 'leg') = (observed_trip_id IS NOT NULL))`; `UNIQUE (planned_trip_id, model_version) WHERE kind = 'plan'`; `UNIQUE (observed_trip_id, model_version) WHERE kind = 'leg'`; `INDEX (user_id, kind, created_at DESC)`; `INDEX (model_version, created_at)`. RLS on.
 
-**Tests** (`tests/trips/test_observed_models.py`): RLS on both tables; round-trip and one head; every `CHECK` rejects a bad row; the upsert key; cascades (profile → both, vehicle → both, observed trip → its leg prediction, planned trip → its plan prediction and `planned_trip_id` set to `NULL` on legs).
+**Tests** (`tests/trips/test_observed_models.py`): RLS on both tables; round-trip and one head; every `CHECK` rejects a bad row; the upsert key; cascades (profile → both, vehicle → both, observed trip → its leg prediction, planned trip → its plan prediction; deleting a matched plan keeps its legs, with `planned_trip_id` set to `NULL`).
 
 **Note for P6-F5 (retention):** unsaved plans are deleted after 30 days (phase4_plan D6). Only delete `saved_at IS NULL AND status = 'planned'`, so matched (`completed`) plans and their prediction rows are kept.
 
@@ -177,6 +176,7 @@ class TelemetryIngested:
     vehicle_id: uuid.UUID
     user_id: uuid.UUID
     signal_codes: frozenset[str]      # codes actually inserted by this delivery
+    earliest_recorded_at: datetime    # oldest provider timestamp among those rows (late deliveries)
     is_simulated: bool
 
 IngestHook = Callable[[TelemetryIngested], None]
@@ -190,14 +190,18 @@ def registered_ingest_hooks() -> tuple[IngestHook, ...]: ...
 - `trips/observed_router.py` registers `observed_service.on_telemetry_ingested` when it's imported (W0 imports it in `main.py`). A test checks it's registered exactly once.
 
 **Service** (`modules/trips/observed_service.py`):
-- `on_telemetry_ingested(event)`: returns at once unless `signal_codes` includes `odometer`, `soc` or `charging_status`. Otherwise it opens its own session (the request session is closed by then), takes `pg_advisory_xact_lock` on the vehicle (waits, so a run never misses rows committed just before it), calls `infer_for_vehicle(...)` and then the F4 call site `matching.match_and_score_vehicle(...)`, and commits.
-- `infer_for_vehicle(db, *, vehicle_id, user_id, full=False, now=None) -> InferRunSummary`: finds the **anchor**, the newest leg with `closed = true` (none, or `full=True` → all history). It reads readings from the anchor's `end_time` (inclusive) to now, plus the latest `soc` and `charging_status` reading before that, through the new read-only `vehicles.telemetry_service.list_readings(...)`. That function converts units to km/percent the same way `vehicle_state.py` does, and drops errored rows. It resolves capacity (D10) and calls `inference.infer_legs(...)`. Then it upserts each leg on `(vehicle_id, odometer_start_km)`, skipping legs whose odometer range overlaps a frozen leg (D3), and deletes non-frozen legs that start at or after the anchor's end and weren't produced this time. Re-running with no new telemetry changes nothing (`updated_at` is touched only when a value changes).
+- `on_telemetry_ingested(event)`: returns at once unless `signal_codes` includes `odometer`, `soc` or `charging_status`. Otherwise it opens its own session (the request session is closed by then), takes `pg_advisory_xact_lock` on the vehicle (waits, so a run never misses rows committed just before it), calls `infer_for_vehicle(..., since=event.earliest_recorded_at)` and then the F4 call site `matching.match_and_score_vehicle(...)`, and commits.
+- `infer_for_vehicle(db, *, vehicle_id, user_id, since=None, full=False, now=None) -> InferRunSummary`: picks the **window start**, then rebuilds every non-frozen leg from there on.
+  - Normally the window starts at the **anchor**: the `end_time` of the newest leg with `closed = true`.
+  - **Late telemetry:** deliveries can arrive out of order, so when `since` (the oldest reading this delivery inserted) is earlier than the anchor, the window moves back to the `start_time` of the earliest non-frozen leg with `end_time ≥ since`, or to `since` itself if no leg reaches it. That leg and everything after it are rebuilt, so a delayed charging event inside an already closed leg still nulls its energy. Legs that ended before `since` are untouched.
+  - No legs yet, or `full=True` → all history.
+  - It reads readings from the window start to now (plus the last odometer reading before the window start, so the first pair is complete), plus the latest `soc` and `charging_status` reading before that, through the new read-only `vehicles.telemetry_service.list_readings(...)`. That function converts units to km/percent the same way `vehicle_state.py` does, and drops errored rows. It resolves capacity (D10) and calls `inference.infer_legs(...)`. Then it upserts each leg on `(vehicle_id, odometer_start_km)`, skipping legs whose odometer range overlaps a frozen leg (D3), and deletes non-frozen legs that start at or after the window start and weren't produced this time. A leg whose energy or distance changed, or that was deleted, has its backtest recomputed or removed and its plan re-scored or un-matched (F4). Re-running with no new telemetry changes nothing (`updated_at` is touched only when a value changes).
 - `confirm(db, user_id, trip_id)`, `reject(...)`: ownership 404, set `review_status` and `reviewed_at`, idempotent. Reject also clears the leg's `planned_trip_id` and asks F4 to re-score that plan.
 - `scripts/infer_trips.py --vehicle-id <uuid> | --all [--full]`: the same function, for catch-up. Prints counts only.
 
 **Endpoints:** `GET /observed-trips`, `GET /observed-trips/{id}`, `POST /observed-trips/recompute`, `POST /observed-trips/{id}/confirm`, `POST /observed-trips/{id}/reject`. They live under `/observed-trips`, not `/trips/observed`: W0 registers `trips.router` (with `GET /trips/{id}`) before `trips.observed_router`, so `/trips/observed` would match `/trips/{id}` first and fail UUID validation.
 
-**Tests:** a signed webhook fixture that inserts an odometer reading triggers inference (the test client runs background tasks) and creates a leg; a delivery with only `range` doesn't; a duplicate delivery doesn't re-run; a hook exception still returns 200 to Smartcar; idempotent re-runs; the anchor window (legs before the anchor untouched); a frozen leg survives a `full` re-run; ownership 404s on every route; confirm/reject idempotent; recompute for another user's vehicle → 404; simulated vehicle → simulated legs.
+**Tests:** a signed webhook fixture that inserts an odometer reading triggers inference (the test client runs background tasks) and creates a leg; a delivery with only `range` doesn't; a duplicate delivery doesn't re-run; a hook exception still returns 200 to Smartcar; idempotent re-runs; the anchor window (legs before the anchor untouched); a late delivery with a charging event inside an already closed leg sets that leg's energy to `null` (`soc_increased`) and removes its backtest, without a `full` run; a frozen leg survives a `full` re-run; ownership 404s on every route; confirm/reject idempotent; recompute for another user's vehicle → 404; simulated vehicle → simulated legs.
 
 ### F4 — Plan ↔ observation matching + backtests
 
@@ -350,7 +354,7 @@ def infer_legs(
 6. **Short legs.** Drop legs with `distance_km < min_leg_km` (count).
 7. **SoC and energy** for each leg:
    - `soc_start` = the latest SoC reading with `recorded_at ≤ start_time`. `soc_end` = the earliest with `recorded_at ≥ end_time`, or, if there is none yet, the latest one at or before `end_time` that is later than every SoC reading before `start_time_latest`.
-   - If either is missing → `soc_missing`. If any SoC reading in `[start_time, end_time]` is above `soc_start + tolerance` → `soc_increased`. If capacity is `None` → `capacity_unknown`. Any of these → `energy_kwh = None`.
+   - If either is missing → `soc_missing`. If, walking the SoC readings in `[start_time, end_time]` in time order from `soc_start`, any reading is more than `tolerance` above the **lowest reading before it** (not only above `soc_start`: 80 → 20 → 60 → 50 is caught at 60), **or** a charging session (step 2) overlaps `[start_time, end_time]` → `soc_increased`. If capacity is `None` → `capacity_unknown`. Any of these → `energy_kwh = None`.
    - Otherwise `energy_kwh = (soc_start − soc_end) / 100 × capacity`, rounded to 3 decimals, and `energy_kwh_uncertainty = capacity × soc_resolution_points / 100`.
    - Quality and reasons by D8.
 
@@ -391,7 +395,7 @@ class MatchSettings:
 @dataclass(frozen=True)
 class PlanMatch:
     trip_id: uuid.UUID
-    leg_ids: tuple[uuid.UUID, ...]    # chain order = plan_leg_index 1..n
+    leg_ids: tuple[uuid.UUID, ...]    # in drive order; the API's plan_leg_index is this order (not stored)
     observed_distance_km: float
     distance_error_km: float          # observed − planned
 
@@ -496,7 +500,7 @@ The 48-point SoC rise during the charging session is never counted as driving en
 **Matching (D4):**
 - Window: `departure_time` 08:00 ± 2 h; leg 1 starts 08:02 ✓.
 - Chain: leg 1 + leg 2 (gap 10:32 → 10:53 = 21 min ≤ 120) = **406.00 km**. Error 406.00 − 402.6 = **+3.40 km**, within max(5, 40.26) ✓. Leg 1 alone (222.40 km) is outside the tolerance.
-- Result: legs get `planned_trip_id` = the plan, `plan_leg_index` 1 and 2; the plan becomes `completed`.
+- Result: legs get `planned_trip_id` = the plan (the API derives `plan_leg_index` 1 and 2 from their start times); the plan becomes `completed`.
 
 **Plan score (`kind = 'plan'` row):**
 
