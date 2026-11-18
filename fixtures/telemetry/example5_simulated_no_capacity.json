@@ -1,0 +1,118 @@
+{
+  "description": "Example 5: simulated rows dropped, unknown capacity (energy null, low).",
+  "source": "docs/phase5_plan.md §5 (synthetic)",
+  "inputs": {
+    "vehicle_is_simulated": false,
+    "usable_capacity_kwh": null,
+    "now": "2026-11-09T17:00:00Z"
+  },
+  "readings": [
+    {
+      "recorded_at": "2026-11-09T16:00:00Z",
+      "signal": "odometer_km",
+      "value": 5100.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T16:00:00Z",
+      "signal": "soc_percent",
+      "value": 90,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T16:05:00Z",
+      "signal": "odometer_km",
+      "value": 5104.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T16:05:00Z",
+      "signal": "soc_percent",
+      "value": 89,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T16:07:00Z",
+      "signal": "odometer_km",
+      "value": 5300.0,
+      "is_simulated": true
+    },
+    {
+      "recorded_at": "2026-11-09T16:10:00Z",
+      "signal": "odometer_km",
+      "value": 5108.5,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T16:10:00Z",
+      "signal": "soc_percent",
+      "value": 88,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T16:12:00Z",
+      "signal": "odometer_km",
+      "value": 5400.0,
+      "is_simulated": true
+    },
+    {
+      "recorded_at": "2026-11-09T16:15:00Z",
+      "signal": "odometer_km",
+      "value": 5113.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T16:15:00Z",
+      "signal": "soc_percent",
+      "value": 87,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T16:20:00Z",
+      "signal": "odometer_km",
+      "value": 5500.0,
+      "is_simulated": true
+    },
+    {
+      "recorded_at": "2026-11-09T16:50:00Z",
+      "signal": "odometer_km",
+      "value": 5113.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T16:50:00Z",
+      "signal": "soc_percent",
+      "value": 87,
+      "is_simulated": false
+    }
+  ],
+  "expected": {
+    "legs": [
+      {
+        "start_time": "2026-11-09T16:00:00Z",
+        "start_time_latest": "2026-11-09T16:00:00Z",
+        "end_time": "2026-11-09T16:15:00Z",
+        "odometer_start_km": 5100.0,
+        "odometer_end_km": 5113.0,
+        "distance_km": 13.0,
+        "soc_start_percent": 90,
+        "soc_start_recorded_at": "2026-11-09T16:00:00Z",
+        "soc_end_percent": 87,
+        "soc_end_recorded_at": "2026-11-09T16:15:00Z",
+        "energy_kwh": null,
+        "energy_kwh_uncertainty": null,
+        "quality_flag": "low",
+        "quality_reasons": [
+          "capacity_unknown",
+          "soc_delta_small"
+        ],
+        "closed": true
+      }
+    ],
+    "charging_sessions": [],
+    "dropped_simulated": 3,
+    "dropped_duplicates": 0,
+    "dropped_odometer_regressions": 0,
+    "dropped_short_legs": 0
+  }
+}

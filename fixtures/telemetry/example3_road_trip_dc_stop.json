@@ -1,0 +1,397 @@
+{
+  "description": "Example 3: road trip with one DC stop; two high legs, charging never counted.",
+  "source": "docs/phase5_plan.md §5 (synthetic)",
+  "inputs": {
+    "vehicle_is_simulated": false,
+    "usable_capacity_kwh": 71.0,
+    "now": "2026-11-08T13:45:00Z"
+  },
+  "readings": [
+    {
+      "recorded_at": "2026-11-07T22:00:00Z",
+      "signal": "odometer_km",
+      "value": 30000.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-07T22:00:00Z",
+      "signal": "soc_percent",
+      "value": 80,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T08:02:00Z",
+      "signal": "is_charging",
+      "value": 0.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T08:02:00Z",
+      "signal": "odometer_km",
+      "value": 30000.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T08:02:00Z",
+      "signal": "soc_percent",
+      "value": 80,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T08:17:00Z",
+      "signal": "odometer_km",
+      "value": 30022.1,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T08:17:00Z",
+      "signal": "soc_percent",
+      "value": 77,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T08:32:00Z",
+      "signal": "odometer_km",
+      "value": 30045.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T08:32:00Z",
+      "signal": "soc_percent",
+      "value": 71,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T08:47:00Z",
+      "signal": "odometer_km",
+      "value": 30067.5,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T08:47:00Z",
+      "signal": "soc_percent",
+      "value": 64,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T09:02:00Z",
+      "signal": "odometer_km",
+      "value": 30090.2,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T09:02:00Z",
+      "signal": "soc_percent",
+      "value": 57,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T09:17:00Z",
+      "signal": "odometer_km",
+      "value": 30112.8,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T09:17:00Z",
+      "signal": "soc_percent",
+      "value": 51,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T09:32:00Z",
+      "signal": "odometer_km",
+      "value": 30135.4,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T09:32:00Z",
+      "signal": "soc_percent",
+      "value": 45,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T09:47:00Z",
+      "signal": "odometer_km",
+      "value": 30157.9,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T09:47:00Z",
+      "signal": "soc_percent",
+      "value": 38,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:02:00Z",
+      "signal": "odometer_km",
+      "value": 30180.1,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:02:00Z",
+      "signal": "soc_percent",
+      "value": 31,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:17:00Z",
+      "signal": "odometer_km",
+      "value": 30201.3,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:17:00Z",
+      "signal": "soc_percent",
+      "value": 24,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:32:00Z",
+      "signal": "odometer_km",
+      "value": 30222.4,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:32:00Z",
+      "signal": "soc_percent",
+      "value": 18,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:33:00Z",
+      "signal": "is_charging",
+      "value": 1.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:33:00Z",
+      "signal": "soc_percent",
+      "value": 18,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:40:00Z",
+      "signal": "soc_percent",
+      "value": 41,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:45:00Z",
+      "signal": "odometer_km",
+      "value": 30222.4,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:45:00Z",
+      "signal": "soc_percent",
+      "value": 56,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:51:00Z",
+      "signal": "is_charging",
+      "value": 0.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:51:00Z",
+      "signal": "soc_percent",
+      "value": 66,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:53:00Z",
+      "signal": "odometer_km",
+      "value": 30222.4,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:53:00Z",
+      "signal": "soc_percent",
+      "value": 66,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:55:00Z",
+      "signal": "odometer_km",
+      "value": 30223.1,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T10:55:00Z",
+      "signal": "soc_percent",
+      "value": 66,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T11:10:00Z",
+      "signal": "odometer_km",
+      "value": 30244.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T11:10:00Z",
+      "signal": "soc_percent",
+      "value": 62,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T11:25:00Z",
+      "signal": "odometer_km",
+      "value": 30266.5,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T11:25:00Z",
+      "signal": "soc_percent",
+      "value": 57,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T11:40:00Z",
+      "signal": "odometer_km",
+      "value": 30289.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T11:40:00Z",
+      "signal": "soc_percent",
+      "value": 51,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T11:55:00Z",
+      "signal": "odometer_km",
+      "value": 30311.4,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T11:55:00Z",
+      "signal": "soc_percent",
+      "value": 45,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T12:10:00Z",
+      "signal": "odometer_km",
+      "value": 30333.9,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T12:10:00Z",
+      "signal": "soc_percent",
+      "value": 39,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T12:25:00Z",
+      "signal": "odometer_km",
+      "value": 30356.2,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T12:25:00Z",
+      "signal": "soc_percent",
+      "value": 33,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T12:40:00Z",
+      "signal": "odometer_km",
+      "value": 30378.6,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T12:40:00Z",
+      "signal": "soc_percent",
+      "value": 27,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T12:55:00Z",
+      "signal": "odometer_km",
+      "value": 30400.9,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T12:55:00Z",
+      "signal": "soc_percent",
+      "value": 20,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T13:00:00Z",
+      "signal": "odometer_km",
+      "value": 30406.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T13:00:00Z",
+      "signal": "soc_percent",
+      "value": 15,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T13:40:00Z",
+      "signal": "odometer_km",
+      "value": 30406.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T13:40:00Z",
+      "signal": "soc_percent",
+      "value": 15,
+      "is_simulated": false
+    }
+  ],
+  "expected": {
+    "legs": [
+      {
+        "start_time": "2026-11-08T08:02:00Z",
+        "start_time_latest": "2026-11-08T08:02:00Z",
+        "end_time": "2026-11-08T10:32:00Z",
+        "odometer_start_km": 30000.0,
+        "odometer_end_km": 30222.4,
+        "distance_km": 222.4,
+        "soc_start_percent": 80,
+        "soc_start_recorded_at": "2026-11-08T08:02:00Z",
+        "soc_end_percent": 18,
+        "soc_end_recorded_at": "2026-11-08T10:32:00Z",
+        "energy_kwh": 44.02,
+        "energy_kwh_uncertainty": 0.71,
+        "quality_flag": "high",
+        "quality_reasons": [],
+        "closed": true
+      },
+      {
+        "start_time": "2026-11-08T10:53:00Z",
+        "start_time_latest": "2026-11-08T10:53:00Z",
+        "end_time": "2026-11-08T13:00:00Z",
+        "odometer_start_km": 30222.4,
+        "odometer_end_km": 30406.0,
+        "distance_km": 183.6,
+        "soc_start_percent": 66,
+        "soc_start_recorded_at": "2026-11-08T10:53:00Z",
+        "soc_end_percent": 15,
+        "soc_end_recorded_at": "2026-11-08T13:00:00Z",
+        "energy_kwh": 36.21,
+        "energy_kwh_uncertainty": 0.71,
+        "quality_flag": "high",
+        "quality_reasons": [],
+        "closed": true
+      }
+    ],
+    "charging_sessions": [
+      {
+        "start": "2026-11-08T10:33:00Z",
+        "end": "2026-11-08T10:51:00Z",
+        "soc_start_percent": 18,
+        "soc_end_percent": 66
+      }
+    ],
+    "dropped_simulated": 0,
+    "dropped_duplicates": 0,
+    "dropped_odometer_regressions": 0,
+    "dropped_short_legs": 0
+  }
+}

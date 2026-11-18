@@ -1,0 +1,151 @@
+{
+  "description": "Example 1: dense feed, one commute leg (high).",
+  "source": "docs/phase5_plan.md §5 (synthetic)",
+  "inputs": {
+    "vehicle_is_simulated": false,
+    "usable_capacity_kwh": 71.0,
+    "now": "2026-11-09T09:35:00Z"
+  },
+  "readings": [
+    {
+      "recorded_at": "2026-11-08T18:12:00Z",
+      "signal": "is_charging",
+      "value": 0.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T18:12:00Z",
+      "signal": "odometer_km",
+      "value": 24650.3,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-08T18:12:00Z",
+      "signal": "soc_percent",
+      "value": 80,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T07:58:00Z",
+      "signal": "odometer_km",
+      "value": 24650.3,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T07:58:00Z",
+      "signal": "soc_percent",
+      "value": 80,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T08:03:00Z",
+      "signal": "odometer_km",
+      "value": 24655.1,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T08:03:00Z",
+      "signal": "soc_percent",
+      "value": 79,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T08:10:00Z",
+      "signal": "odometer_km",
+      "value": 24664.8,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T08:10:00Z",
+      "signal": "soc_percent",
+      "value": 77,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T08:20:00Z",
+      "signal": "odometer_km",
+      "value": 24679.9,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T08:20:00Z",
+      "signal": "soc_percent",
+      "value": 74,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T08:31:00Z",
+      "signal": "odometer_km",
+      "value": 24696.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T08:31:00Z",
+      "signal": "soc_percent",
+      "value": 70,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T08:40:00Z",
+      "signal": "odometer_km",
+      "value": 24708.5,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T08:40:00Z",
+      "signal": "soc_percent",
+      "value": 67,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T08:44:00Z",
+      "signal": "odometer_km",
+      "value": 24712.3,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T08:44:00Z",
+      "signal": "soc_percent",
+      "value": 66,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T09:30:00Z",
+      "signal": "odometer_km",
+      "value": 24712.3,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T09:30:00Z",
+      "signal": "soc_percent",
+      "value": 66,
+      "is_simulated": false
+    }
+  ],
+  "expected": {
+    "legs": [
+      {
+        "start_time": "2026-11-09T07:58:00Z",
+        "start_time_latest": "2026-11-09T07:58:00Z",
+        "end_time": "2026-11-09T08:44:00Z",
+        "odometer_start_km": 24650.3,
+        "odometer_end_km": 24712.3,
+        "distance_km": 62.0,
+        "soc_start_percent": 80,
+        "soc_start_recorded_at": "2026-11-09T07:58:00Z",
+        "soc_end_percent": 66,
+        "soc_end_recorded_at": "2026-11-09T08:44:00Z",
+        "energy_kwh": 9.94,
+        "energy_kwh_uncertainty": 0.71,
+        "quality_flag": "high",
+        "quality_reasons": [],
+        "closed": true
+      }
+    ],
+    "charging_sessions": [],
+    "dropped_simulated": 0,
+    "dropped_duplicates": 0,
+    "dropped_odometer_regressions": 0,
+    "dropped_short_legs": 0
+  }
+}
