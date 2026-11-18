@@ -411,7 +411,7 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 | P3-F5 | merged 2026-11-18 | `feature/phase3-stations-api` / #29 | Adds `stations_cursor_secret` (signed pagination cursor); polyline overflow → 422 fix (Codex review). |
 | P4-F0 | merged 2026-11-18 | `feature/phase4-design` / #28 | Settles P4-D1…D16 in `phase4_plan.md` §2; adds P4-F8 and ADR 0008. |
 | P4-F5 | merged 2026-11-18 | `feature/phase4-preferences-editor` / #27 | One unreproduced flaky test run noted in the PR. |
-| P3-F6 | ready (not started) | — | Holds the dependency lane (`mapbox-gl`) once started. |
+| P3-F6 | in progress (W2) | `feature/phase3-charging-page` | Holds the dependency lane (`mapbox-gl`). |
 | P4-F1 | in progress (W2) | `feature/phase4-trips-schema` | Holds the migration lane. |
 | P4-F2 | in progress (W2) | `feature/phase4-energy-model` | |
 | P5-F0 | in progress (W2) | `feature/phase5-design` | |
