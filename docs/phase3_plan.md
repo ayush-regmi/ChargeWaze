@@ -192,6 +192,8 @@ F2 and F3 don't share files, and neither do F4 and F5. Either pair could run in 
 
 **Acceptance:** with real keys, `curl` against local FastAPI returns suggestions for "Toronto" and 1–3 routes from Frederick to Toronto.
 
+**As built:** contract §3.13–3.15. Responses carry the extra fields F2 already returns: `kind` and `country_code` on places, and `countries` on each route (for the border label). `no_route_reason` is `null`, `no_route` or `no_road_near_point` (D5), not just `no_route`. `q` is trimmed before the 3–200 length check; `lat`/`lon` must come together; `limit` is 1–10, default 5. An unknown place ID (Mapbox 404 or empty result) is `NOT_FOUND`. The 50 m check uses haversine and returns `VALIDATION_ERROR`. Shared `Coordinates` model in `app/schemas/geo.py` (F5 reuses it). **D13 gap closed:** uvicorn's access log printed the full path with query string, which for `/places/suggest` includes search text and coordinates; `app.main` now strips query strings from `uvicorn.access` records (checked against a running uvicorn). The real-key `curl` acceptance check is still to run.
+
 ---
 
 ### F5 — Stations API + cache (compatible-stations slice, backend)
