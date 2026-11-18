@@ -95,6 +95,10 @@ class Settings(BaseSettings):
     # so parallel branches never edit the same lines.
 
     # ---- Stations API + cache (Phase 3 F5) ----
+    # GET /stations/{id} refreshes a cached row older than this (phase3_plan.md D7).
+    stations_cache_ttl_hours: float = Field(default=24.0, gt=0)
+    # HMAC key for GET /stations cursors. Empty disables paging (next_cursor null).
+    stations_cursor_secret: str = ""
 
     # ---- Energy model (Phase 4 F2) ----
 

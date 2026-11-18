@@ -217,6 +217,36 @@ F2 and F3 don't share files, and neither do F4 and F5. Either pair could run in 
 
 **Acceptance:** all of the above pass; with a real key, along-route for the Frederick → Toronto route returns stations in both countries.
 
+**As built (2026-11-18):** contract §3.10, §3.16, §3.17. Tests in `tests/stations/` (81 cases; a real `AfdcProvider` over `httpx.MockTransport` with the F0 fixtures, plus a provider-free fake for the service).
+- **For P4-F4**, call the service directly (no HTTP types; it flushes, the caller commits):
+  ```python
+  from app.modules.stations.service import search_along_route
+
+  def search_along_route(
+      db: Session,
+      provider: StationProvider,
+      *,
+      route: Sequence[LatLon],                          # decoded (lat, lon), ≥ 2 points
+      corridor_km: float,
+      filters: StationFilters,                          # limit/offset ignored; paged here
+      min_power_kw: float | None = None,
+      vehicle_connectors: frozenset[ConnectorType] | None = None,
+      max_results: int = 200,
+      route_max_points: int = 1000,                     # pass settings.stations_route_max_points
+      now: datetime | None = None,
+  ) -> AlongRouteResponse  # items: list[RouteStationOut] (StationOut + distance_along_route_km,
+                           # distance_from_route_km), total_results, unknown_power_count, truncated
+  ```
+  `connectors_for_vehicle(db, user_id=, vehicle_id=)` gives the vehicle's connectors (404 if not owned). `ValueError` for fewer than two points.
+- **Cursor:** `GET /stations` cursors are `base64url(payload).base64url(HMAC-SHA256[:16])`, keyed by the new `STATIONS_CURSOR_SECRET`, with the payload bound to the caller and a digest of the exact query. Bad, tampered or reused cursors are `422 VALIDATION_ERROR`. With no secret, paging is off (`next_cursor: null`). **P6-F3 must set the secret in each deployed environment.**
+- **Along-route has no cursor:** results are sorted along the whole route, so the service pages AFDC (200 per request) until it has all matches or `limit` (≤ 1,000) stations, and reports `truncated`. Restricted stations don't count towards `limit`; a short page is topped up from the next offset.
+- **Route order:** the route is simplified once (0.1 km, point cap) and that line is sent to AFDC *and* used to project stations (local equirectangular per segment, bounding-box shortcut with a full scan fallback). The 119-station cross-border fixture on the 9,719-point route A runs in well under a second.
+- **Charging level:** along-route defaults to `dc_fast` (D6) and accepts `all`; `GET /stations` defaults to every level.
+- **Response extras:** `max_power_kw`, `restricted_access` (read from `raw_payload` for cached rows), `total_results`, and `compatible: null` when there is no vehicle or its connectors are unknown. `fetched_at` stands in for §1's `recorded_at`. `GET /stations/{id}` also takes `?vehicle_id=`.
+- **Stale detail:** a failed refresh *and* a provider 404 both return the cached row with `is_stale: true`. Simulated rows are never refreshed.
+- **Settings:** `STATIONS_CACHE_TTL_HOURS` (24) and `STATIONS_CURSOR_SECRET`.
+- **Still manual:** the real-key along-route run for Frederick → Toronto (E2 live half).
+
 ---
 
 ### F6 — Map foundation + Charging Stations page
