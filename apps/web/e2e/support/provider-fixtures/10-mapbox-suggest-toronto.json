@@ -1,0 +1,5 @@
+{
+  "description": "Search Box suggest for 'Toronto' (real capture, fixtures/mapbox).",
+  "match": { "method": "GET", "path": "/mapbox/search/searchbox/v1/suggest", "query": { "q": "toronto" } },
+  "response": { "status": 200, "bodyFile": "../../../../../fixtures/mapbox/suggest_toronto.json" }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Directions Frederick, MD → Toronto, ON: two real routes, A via the QEW (748 km) and B via I-99 (805 km).",
+  "match": {
+    "method": "GET",
+    "pathPrefix": "/mapbox/directions/v5/mapbox/driving/",
+    "waypointsNear": { "points": [{ "lat": 39.41, "lon": -77.41 }, { "lat": 43.65, "lon": -79.38 }], "km": 25 }
+  },
+  "response": { "status": 200, "bodyFile": "../../../../../fixtures/mapbox/directions_frederick_toronto.json" }
+}

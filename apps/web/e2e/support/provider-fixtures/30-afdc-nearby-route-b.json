@@ -1,0 +1,17 @@
+{
+  "description": "AFDC nearby-route for route B (I-99): only route B passes Rochester, NY (route A stays about 34 km away). Derived from the route A capture (see the _fixture_note in data/afdc-nearby-route-b.json): 83 stations, 34 US / 49 CA.",
+  "match": {
+    "method": "POST",
+    "path": "/afdc/nearby-route.json",
+    "routeNear": {
+      "lat": 43.05,
+      "lon": -77.65,
+      "km": 10
+    }
+  },
+  "response": {
+    "status": 200,
+    "bodyFile": "data/afdc-nearby-route-b.json",
+    "paginate": "afdc"
+  }
+}

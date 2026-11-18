@@ -1,0 +1,5 @@
+{
+  "description": "Search Box suggest for 'Tesla Supercharger Frederick' (real capture, fixtures/mapbox).",
+  "match": { "method": "GET", "path": "/mapbox/search/searchbox/v1/suggest", "query": { "q": "frederick" } },
+  "response": { "status": 200, "bodyFile": "../../../../../fixtures/mapbox/suggest_tesla_supercharger_frederick.json" }
+}
