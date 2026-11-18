@@ -131,6 +131,29 @@ describe("PlaceSearch", () => {
     expect(next).not.toBe(tokens[0]);
   });
 
+  it("a pick before the debounce fires cancels the pending suggest (review fix)", async () => {
+    let resolveRetrieve: (v: unknown) => void = () => {};
+    retrievePlace.mockImplementationOnce(() => new Promise((r) => (resolveRetrieve = r)));
+    const { input, onSelect } = setup();
+    await type(input, "Toronto");
+    await flushDebounce();
+    expect(suggestPlaces).toHaveBeenCalledTimes(1);
+
+    // Edit while the list is still open, then pick before 250 ms pass.
+    await type(input, "Toronto J");
+    await act(async () => {
+      fireEvent.mouseDown(screen.getAllByRole("option")[1]);
+    });
+    await flushDebounce(); // the old timer would fire here
+    await act(async () =>
+      resolveRetrieve({ place: { ...TORONTO_JUNCTION, location: { lat: 43.66, lon: -79.46 } } }),
+    );
+
+    expect(suggestPlaces).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "junction" }));
+    expect(input).toHaveValue("Toronto Junction");
+  });
+
   it("ignores a slow response that a newer query replaced", async () => {
     let resolveFirst: (v: unknown) => void = () => {};
     suggestPlaces.mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)));

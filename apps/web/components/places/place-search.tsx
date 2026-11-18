@@ -127,6 +127,12 @@ export function PlaceSearch({
   };
 
   const choose = async (s: PlaceSuggestion) => {
+    // A suggest still waiting on the debounce would start after this pick and
+    // win the request-id check, dropping the pick. Cancel it.
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
     const req = ++requestRef.current;
     setLoading(true);
     const result = await retrievePlace({ id: s.id, sessionToken: session() });
