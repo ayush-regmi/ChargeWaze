@@ -268,6 +268,30 @@ F2 and F3 don't share files, and neither do F4 and F5. Either pair could run in 
 
 **Acceptance:** with real keys, searching "Frederick, MD" shows nearby compatible stations on the map and in the list; the detail page opens; a hard reload keeps the filters.
 
+**As built (2026-11-18):**
+- **Dependencies:** `mapbox-gl` pinned at `3.34.2`. It was the newest release out for about two weeks; 3.34.3 and 3.35.1 came out the same day. Also `@types/geojson` as a dev-only types package, because mapbox-gl's typings use the global `GeoJSON` namespace but list it only as their own devDependency. No other runtime dependency.
+- **Map interface for F7 and P4-F6.** Import `LazyMapView` from `components/map/lazy-map-view.tsx`. It loads mapbox-gl with `next/dynamic({ ssr: false })`, shows "Map unavailable" when `NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN` is empty, and catches map errors (no WebGL, …) in an error boundary. The props are `MapViewProps` in `components/map/types.ts`:
+  - `routes: { index, geometry_polyline6 }[]`, `selectedRouteIndex`, `onSelectRoute(index)`: route lines. The selected one is drawn on top in blue; a line that fails to decode is skipped.
+  - `stations: { id, location, name?, compatible? }[]`, `selectedStationId`, `onSelect(id)`: station markers. They are green when compatible, grey when not, and blue when unknown.
+  - `center`, `label`, `className`.
+  - The view fits to everything drawn when that set changes, but not when only the selection changes.
+  - `components/map/attribution.tsx` holds the Mapbox/OSM and NREL AFDC attribution line; Mapbox's own control stays on the map.
+- **Place search (D2):** `components/places/place-search.tsx` calls the server actions in `components/places/actions.ts` (`suggestPlaces`, `retrievePlace`), so the Supabase token never reaches the browser's own requests. It waits 250 ms after typing and needs at least 3 characters.
+  - A session token comes from `crypto.randomUUID` on the first suggest. The same token goes to `places/{id}` and is dropped after a pick.
+  - A slow response that a newer query replaced is ignored.
+  - `components/places/use-my-location.tsx` is the opt-in geolocation button (D12).
+- **Charging page:** a server component that reads its filters from the URL.
+  - URL params: `lat`, `lon` (rounded to 4 decimals), `place` (label), `connector` (repeatable, or `any`), `network`, `level`, `min_kw`, `radius` (km).
+  - It calls `GET /stations` with the Dashboard's vehicle (primary, else newest connected) as `vehicle_id`, so `compatible` is set.
+  - With no `connector` param, the vehicle's connectors from `GET /vehicles/{id}` specs are selected. "Any connector" sends all four types, because a missing `connector` with `vehicle_id` means the vehicle default on the API.
+  - Radius options are in the user's units; "50 mi" is capped at the API's 80 km.
+  - The list is sorted by straight-line distance from the centre, computed on the client.
+  - No cursor paging: it shows up to 100 stations and says so when there are more.
+  - The network dropdown lists the networks in the current results plus the user's preferred networks, so a network filter must be cleared to pick another.
+- **Detail page:** `/charging/[id]` receives the list's filters as its query string. They are re-parsed, never echoed raw, so "Back" returns to the same search. A failed load shows an error, and an unknown ID gives 404.
+- **Not done here:** E2E specs (`e2e/charging.spec.ts` is F9; the provider stub is F7). Without an AFDC key the page shows the `STATIONS_NOT_CONFIGURED` state, which a local Playwright run confirmed along with filters surviving a reload.
+- **Still manual:** the real-key acceptance run (Frederick, MD → map and list, open a detail page, hard reload) with a screenshot.
+
 ---
 
 ### F7 — Trip Planner: search, routes, stations along each route

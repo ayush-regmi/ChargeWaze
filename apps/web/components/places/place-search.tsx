@@ -1,0 +1,247 @@
+"use client";
+
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+
+import { cn } from "@/lib/utils";
+
+import {
+  retrievePlace,
+  suggestPlaces,
+  type Place,
+  type PlaceErrorCode,
+  type PlaceSuggestion,
+} from "./actions";
+
+export const SUGGEST_DEBOUNCE_MS = 250;
+export const MIN_QUERY_LENGTH = 3;
+
+/** A Search Box session token (D2): one per typing → pick cycle. */
+export function newSessionToken(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // RFC 4122 v4 from getRandomValues, for older browsers.
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+function errorText(code: PlaceErrorCode): string {
+  if (code === "unauthenticated") return "Your session has ended. Sign in again to search.";
+  if (code === "not_found") return "That place couldn't be found. Try another result.";
+  return "Place search isn't available right now. Please try again.";
+}
+
+const KIND_LABELS: Record<PlaceSuggestion["kind"], string> = {
+  address: "Address",
+  poi: "Place of interest",
+  place: "Place",
+};
+
+export type PlaceSearchProps = {
+  /** Visible label, e.g. "Search near" or "From". */
+  label: string;
+  placeholder?: string;
+  /** Proximity bias: the map centre or the other trip endpoint (D2). */
+  near?: { lat: number; lon: number } | null;
+  /** Text shown before the user types, e.g. the current place's label. */
+  initialValue?: string;
+  onSelect: (place: Place) => void;
+  className?: string;
+};
+
+/**
+ * Place search combobox (WAI-ARIA combobox with listbox popup). Debounced
+ * 250 ms, at least 3 characters, and one session token per search session
+ * that ends when a result is picked (D2, D15). Used by the Charging page and
+ * the Trip Planner.
+ */
+export function PlaceSearch({
+  label,
+  placeholder = "City, address or place",
+  near = null,
+  initialValue = "",
+  onSelect,
+  className,
+}: PlaceSearchProps) {
+  const id = useId();
+  const inputId = `${id}-input`;
+  const listId = `${id}-list`;
+  const [value, setValue] = useState(initialValue);
+  const [items, setItems] = useState<PlaceSuggestion[]>([]);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<PlaceErrorCode | null>(null);
+  const [searched, setSearched] = useState(false);
+
+  const sessionRef = useRef<string | null>(null);
+  const requestRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nearRef = useRef(near);
+  useEffect(() => {
+    nearRef.current = near;
+  });
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
+
+  const session = () => (sessionRef.current ??= newSessionToken());
+
+  const runSuggest = async (q: string) => {
+    const req = ++requestRef.current;
+    setLoading(true);
+    const result = await suggestPlaces({ q, sessionToken: session(), near: nearRef.current });
+    if (req !== requestRef.current) return; // a newer keystroke won
+    setLoading(false);
+    setSearched(true);
+    if ("error" in result) {
+      setItems([]);
+      setError(result.error);
+      setOpen(true);
+      return;
+    }
+    setError(null);
+    setItems(result.items);
+    setActive(result.items.length > 0 ? 0 : -1);
+    setOpen(true);
+  };
+
+  const onChange = (next: string) => {
+    setValue(next);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const q = next.trim();
+    if (q.length < MIN_QUERY_LENGTH) {
+      requestRef.current++;
+      setItems([]);
+      setOpen(false);
+      setLoading(false);
+      setError(null);
+      setSearched(false);
+      return;
+    }
+    timerRef.current = setTimeout(() => void runSuggest(q), SUGGEST_DEBOUNCE_MS);
+  };
+
+  const choose = async (s: PlaceSuggestion) => {
+    const req = ++requestRef.current;
+    setLoading(true);
+    const result = await retrievePlace({ id: s.id, sessionToken: session() });
+    if (req !== requestRef.current) return;
+    setLoading(false);
+    if ("error" in result) {
+      setError(result.error);
+      setOpen(true);
+      return;
+    }
+    // The pick ends this session; the next search starts a new one.
+    sessionRef.current = null;
+    setValue(result.place.name);
+    setItems([]);
+    setOpen(false);
+    setActive(-1);
+    setError(null);
+    setSearched(false);
+    onSelect(result.place);
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      if (items.length === 0) return;
+      e.preventDefault();
+      setOpen(true);
+      setActive((i) => (i + 1) % items.length);
+    } else if (e.key === "ArrowUp") {
+      if (items.length === 0) return;
+      e.preventDefault();
+      setOpen(true);
+      setActive((i) => (i <= 0 ? items.length - 1 : i - 1));
+    } else if (e.key === "Enter") {
+      if (open && active >= 0 && items[active]) {
+        e.preventDefault();
+        void choose(items[active]);
+      }
+    } else if (e.key === "Escape") {
+      if (open) {
+        e.preventDefault();
+        setOpen(false);
+        setActive(-1);
+      }
+    }
+  };
+
+  const optionId = (i: number) => `${id}-opt-${i}`;
+  const showList = open && items.length > 0;
+
+  return (
+    <div className={cn("relative space-y-1", className)}>
+      <label htmlFor={inputId} className="text-sm font-medium">
+        {label}
+      </label>
+      <input
+        id={inputId}
+        type="text"
+        role="combobox"
+        autoComplete="off"
+        spellCheck={false}
+        aria-autocomplete="list"
+        aria-expanded={showList}
+        aria-controls={listId}
+        aria-activedescendant={showList && active >= 0 ? optionId(active) : undefined}
+        aria-busy={loading || undefined}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+        onBlur={() => setOpen(false)}
+        onFocus={() => items.length > 0 && setOpen(true)}
+        className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-neutral-700 dark:bg-neutral-950"
+      />
+      <ul
+        id={listId}
+        role="listbox"
+        aria-label={`${label} suggestions`}
+        hidden={!showList}
+        className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-800 dark:bg-neutral-950"
+      >
+        {items.map((s, i) => (
+          <li
+            key={s.id}
+            id={optionId(i)}
+            role="option"
+            aria-selected={i === active}
+            // mousedown, not click: it runs before the input's blur closes the list.
+            onMouseDown={(e) => {
+              e.preventDefault();
+              void choose(s);
+            }}
+            onMouseEnter={() => setActive(i)}
+            className={cn(
+              "cursor-pointer px-3 py-2 text-sm",
+              i === active && "bg-neutral-100 dark:bg-neutral-800",
+            )}
+          >
+            <span className="block font-medium">{s.name}</span>
+            <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+              {s.full_address || KIND_LABELS[s.kind]}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div aria-live="polite" className="text-xs">
+        {loading ? <span className="text-neutral-500">Searching…</span> : null}
+        {!loading && error ? (
+          <span role="alert" className="text-red-600 dark:text-red-400">
+            {errorText(error)}
+          </span>
+        ) : null}
+        {!loading && !error && searched && open && items.length === 0 ? (
+          <span className="text-neutral-500">No places found.</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
