@@ -1,0 +1,72 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { connection } from "next/server";
+import { Suspense } from "react";
+
+import { StationDetail } from "@/components/stations/station-detail";
+import { requireSessionApi } from "@/lib/session-api";
+import { parseFilters, serializeFilters } from "@/lib/stations";
+import { pickDashboardVehicle } from "@/lib/vehicles";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default function StationPage(props: Props) {
+  return (
+    <section className="mx-auto max-w-3xl space-y-6">
+      <Suspense fallback={<p className="text-sm text-neutral-500">Loading station…</p>}>
+        <Station {...props} />
+      </Suspense>
+    </section>
+  );
+}
+
+async function Station({ params, searchParams }: Props) {
+  await connection();
+  const { id } = await params;
+  if (!UUID_RE.test(id)) notFound();
+
+  // The list passes its filters along so "Back" returns to the same search.
+  // They are re-parsed, never echoed raw.
+  const qs = serializeFilters(parseFilters(await searchParams));
+  const back = qs ? `/charging?${qs}` : "/charging";
+
+  const api = await requireSessionApi(`/charging/${id}${qs ? `?${qs}` : ""}`);
+  const [{ data: me }, { data: vehicles }] = await Promise.all([
+    api.GET("/api/v1/me"),
+    api.GET("/api/v1/vehicles"),
+  ]);
+  const vehicle = vehicles
+    ? pickDashboardVehicle(vehicles.items, me?.preferences.primary_vehicle_id)
+    : null;
+
+  const { data, response } = await api.GET("/api/v1/stations/{station_id}", {
+    params: {
+      path: { station_id: id },
+      query: vehicle ? { vehicle_id: vehicle.id } : {},
+    },
+  });
+  if (response.status === 404) notFound();
+
+  return (
+    <>
+      <Link
+        href={back}
+        className="text-sm text-neutral-600 hover:underline dark:text-neutral-400"
+      >
+        ← Back to Charging
+      </Link>
+      {data ? (
+        <StationDetail station={data} />
+      ) : (
+        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+          Couldn&apos;t load this station. Please refresh to try again.
+        </p>
+      )}
+    </>
+  );
+}
