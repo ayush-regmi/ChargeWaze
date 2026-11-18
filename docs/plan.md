@@ -402,10 +402,10 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 
 | ID | Status | Branch / PR | Notes |
 |---|---|---|---|
-| W0 | built, PR pending | `feature/phase3-parallel-prewiring` | This plan + pre-wiring |
-| P3-F5 | ready after W0 | — | |
-| P4-F0 | ready after W0 | — | |
-| P4-F5 | ready after W0 | — | |
+| W0 | merged 2026-11-18 | `feature/phase3-parallel-prewiring` / #26 | This plan + pre-wiring |
+| P3-F5 | PR open, CI green | `feature/phase3-stations-api` / #29 | Adds `stations_cursor_secret` (signed pagination cursor). |
+| P4-F0 | PR open | `feature/phase4-design` / #28 | Settles P4-D1…D16 in `phase4_plan.md` §2; adds P4-F8. Unblocks P4-F1, P4-F2, P5-F0 on merge. |
+| P4-F5 | PR open | `feature/phase4-preferences-editor` / #27 | One unreproduced flaky test run noted in the PR. |
 | P3-F6 | blocked (P3-F5) | — | |
 | P4-F1 | blocked (P4-F0) | — | |
 | P4-F2 | blocked (P4-F0) | — | |
@@ -420,6 +420,7 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 | P4-F6 | blocked (P3-F7, P4-F4) | — | |
 | P5-F1 | blocked (P5-F0, P4-F1, P3-F8) | — | |
 | P4-F9 | blocked (P4-F6, P4-F7) | — | |
+| P4-F8 | blocked (P4-F2, P4-F4) | — | Added by P4-F0 (#28). Migration lane; W7. Not a dependency of P4-F9. |
 | P5-F3 | blocked (P5-F1, P5-F2) | — | |
 | P5-F5 | blocked (P5-F1) | — | |
 | P6-F1 | scheduled W6 | — | |
