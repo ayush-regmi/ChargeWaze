@@ -72,7 +72,9 @@ Reserved codes (grow this list as the API grows):
 | `GET` | `/api/v1/trips/{id}` | One trip with its stored plan and observation. |
 | `DELETE` | `/api/v1/trips/{id}` | Delete a trip. |
 | `POST` | `/api/v1/trips/{id}/save` | Save a stored plan to trip history. |
-| `GET` | `/api/v1/stations` | Search compatible charging stations. |
+| `GET` | `/api/v1/stations` | Search compatible charging stations near a point. |
+| `GET` | `/api/v1/stations/{id}` | One cached station (refreshed after the cache TTL). |
+| `POST` | `/api/v1/stations/along-route` | Stations within a corridor of a route, in route order. |
 | `GET` | `/api/v1/places/suggest` | Autocomplete addresses, places and POIs (Mapbox Search Box). |
 | `GET` | `/api/v1/places/{id}` | Coordinates and address for a suggestion. |
 | `POST` | `/api/v1/routes/directions` | Driving routes between two points (no charging plan). |
@@ -558,33 +560,72 @@ Marks a stored plan as saved, so it appears in `GET /trips` (§3.8). No body. Id
 
 ### 3.10 `GET /api/v1/stations`
 
-Search chargers independent of trip planning.
+Search chargers near a point, independent of trip planning ([`phase3_plan.md`](phase3_plan.md) F5). Results always come from the provider (AFDC) and are upserted into the `charging_stations` cache, so each station's `id` is a stable Chargewise UUID (D7).
 
-Query params: `?lat=&lon=&radius_km=&connector=&network=&min_power_kw=&limit=&cursor=`.
+| Param | Required | Meaning |
+|---|---|---|
+| `lat`, `lon` | yes | Search centre. |
+| `radius_km` | no | Greater than 0, at most 80. Default 25. |
+| `connector` | no | Repeatable: `NACS`, `CCS1`, `CHAdeMO`, `J1772`. Overrides the vehicle default. |
+| `network` | no | Repeatable provider network name (up to 20). |
+| `charging_level` | no | `level2` or `dc_fast`. Omitted = every level. |
+| `min_power_kw` | no | 0–1000. Hides stations whose *known* maximum power is lower; stations with unknown power stay (D10). |
+| `vehicle_id` | no | One of the caller's vehicles (else `404 NOT_FOUND`). Its connectors become the default `connector` filter, and each item gets `compatible`. |
+| `limit` | no | 1–200, default 50. |
+| `cursor` | no | `next_cursor` from the previous page of the *same* search. |
+
+Defaults: only `status = open`, `access = public`, and not `restricted_access` stations; `country=all` (US and Canada).
 
 **Response 200**
 ```json
 {
   "items": [
     {
-      "id": "station-uuid",
+      "id": "8f0c7f8e-2b8e-4a55-9c1b-7d1a0e6f3c21",
       "provider": "afdc",
-      "external_id": "AFDC-12345",
-      "name": "Tesla Supercharger - Frederick",
-      "operator": "Tesla",
+      "external_id": "307447",
+      "name": "POTOMAC EDISON MAX KEHNE DC1",
+      "operator": null,
+      "network": "ChargePoint Network",
+      "street_address": "1108 W 7th St",
+      "city": "Frederick",
+      "region": "MD",
+      "postal_code": "21701",
+      "country": "US",
+      "location": { "lat": 39.427863, "lon": -77.419265 },
       "connectors": [
-        { "type": "NACS", "count": 8, "power_kw": 250 },
-        { "type": "CCS1", "count": 0, "power_kw": null }
+        { "type": "CCS1", "count": 1, "power_kw": 62.0 },
+        { "type": "CHAdeMO", "count": 1, "power_kw": 62.5 }
       ],
-      "location": { "lat": 39.4150, "lon": -77.4120 },
-      "live_availability": null
+      "max_power_kw": 62.5,
+      "access": "public",
+      "access_detail": null,
+      "restricted_access": false,
+      "status": "open",
+      "pricing_text": null,
+      "compatible": true,
+      "live_availability": null,
+      "source_updated_at": "2026-11-17T02:35:33Z",
+      "fetched_at": "2026-11-18T19:00:00Z",
+      "is_stale": false
     }
   ],
-  "next_cursor": null
+  "next_cursor": "eyJvIjo1MCwicSI6Ii4uLiJ9.2kH9…",
+  "total_results": 26,
+  "unknown_power_count": 0
 }
 ```
 
-`live_availability` is `null` unless the provider returns verified live data. It is **never** fabricated.
+- `connectors` has one entry per type, at that type's highest known power; `count` is how many connectors of that type run at that power. `count` and `power_kw` are **nullable** and are never derived from level totals (D9).
+- `max_power_kw` is the highest *known* connector power, or `null`.
+- `compatible` is `true`/`false` only when `vehicle_id` is given and that vehicle's connectors are known; otherwise `null`. It compares connector types only (D9).
+- `live_availability` is always `null` in Phase 3: no provider returns verified live data, and it is **never** fabricated.
+- Freshness: `fetched_at` is when Chargewise last fetched the station (it plays the role of `recorded_at` from §1); `source_updated_at` is the provider's own timestamp, or `null`. Search results are always fresh (`is_stale: false`).
+- `total_results` is the provider's match count (it counts restricted stations, and is taken before `min_power_kw`). `unknown_power_count` counts the items on this page with unknown power. A page can hold fewer than `limit` items because of those two filters.
+- `next_cursor` is opaque and HMAC-signed (`STATIONS_CURSOR_SECRET`). It is bound to the caller and the exact query; a tampered, expired (secret rotated) or reused-with-other-params cursor is `422 VALIDATION_ERROR`, and the client should restart the search. When the server has no cursor secret, `next_cursor` is always `null`.
+- Coordinates and filters are never logged (D13).
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (bad params or cursor); `NOT_FOUND` (`vehicle_id` not the caller's); `STATIONS_NOT_CONFIGURED` (503); `STATIONS_UNREACHABLE` (502/504).
 
 ### 3.11 `GET /api/v1/analytics/consumption`
 
@@ -725,6 +766,69 @@ Plain driving directions between two points: up to three alternatives, best firs
 - Nothing is stored. Coordinates and geometry are never logged (D13).
 
 **Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (missing/out-of-range coordinates, points within 50 m); `MAPBOX_NOT_CONFIGURED` (503); `MAPBOX_UNREACHABLE` (502/504); `MAPBOX_ERROR` (502).
+
+### 3.16 `GET /api/v1/stations/{id}`
+
+One station from the cache (`id` is the Chargewise UUID from §3.10 / §3.17). Optional `?vehicle_id=` sets `compatible`, as in §3.10.
+
+**Response 200:** one station object, the same shape as a §3.10 item.
+
+- If the row's `fetched_at` is older than `STATIONS_CACHE_TTL_HOURS` (default 24), the server refreshes it from the provider first ([`phase3_plan.md`](phase3_plan.md) D7).
+- If that refresh fails (provider down or not configured) or the provider no longer lists the station, the cached row is returned with `is_stale: true`. Detail never fails just because the provider is down.
+- Restricted stations (`restricted_access: true`) are still returned here, so a cached or favorited one stays viewable.
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (`id` is not a UUID); `NOT_FOUND` (unknown station, or `vehicle_id` not the caller's).
+
+### 3.17 `POST /api/v1/stations/along-route`
+
+Stations within a corridor around a route, in order along the route. Stateless: the client sends a `geometry_polyline6` it got from §3.15. It is a `POST` because an encoded route is too long for a URL.
+
+**Request**
+```json
+{
+  "geometry_polyline6": "iwsdjAdlwsrCg@...",
+  "corridor_km": 3,
+  "connector": ["CCS1"],
+  "network": [],
+  "charging_level": "dc_fast",
+  "min_power_kw": 50,
+  "vehicle_id": "3c9e…",
+  "limit": 200
+}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `geometry_polyline6` | yes | Encoded polyline, precision 6, at most 200,000 characters, at least two in-range points. |
+| `corridor_km` | no | 0.5–16, default 3. |
+| `connector`, `network`, `min_power_kw`, `vehicle_id` | no | As in §3.10. |
+| `charging_level` | no | `dc_fast` (default, D6), `level2` or `all`. |
+| `limit` | no | 1–1000, default 200: the most stations collected from the provider. |
+
+**Response 200**
+```json
+{
+  "items": [
+    {
+      "id": "8f0c7f8e-…",
+      "…": "every field of a §3.10 item",
+      "distance_along_route_km": 12.481,
+      "distance_from_route_km": 0.734
+    }
+  ],
+  "total_results": 122,
+  "unknown_power_count": 0,
+  "truncated": false
+}
+```
+
+- The server decodes the route and simplifies it with Douglas–Peucker (0.1 km, at most `STATIONS_ROUTE_MAX_POINTS` points, D6). That simplified line is both sent to the provider and used to measure each station.
+- Items are sorted by `distance_along_route_km`, which the server computes by projecting each station onto the route. The provider's own order is only approximate.
+- There is no cursor: results are ordered along the whole route, so the server pages through the provider itself until it has every match or `limit` stations. `truncated: true` means the provider had more; because the provider returns stations roughly in route order, a truncated list is usually missing the end of the route, so the client should narrow the filters.
+- Every result is upserted into the cache, so `id`s match §3.10 and §3.16.
+- The route and coordinates are never logged (D13).
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (geometry too large, not a valid polyline, fewer than two points or out of range; other bad fields); `NOT_FOUND` (`vehicle_id` not the caller's); `STATIONS_NOT_CONFIGURED` (503); `STATIONS_UNREACHABLE` (502/504).
 
 ## 4. OpenAPI and typed client
 
