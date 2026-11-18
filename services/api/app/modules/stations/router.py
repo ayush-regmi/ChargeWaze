@@ -177,7 +177,9 @@ def _effective_connectors(
 def _decode_route(encoded: str) -> list[tuple[float, float]]:
     try:
         points = decode_polyline(encoded)
-    except ValueError:
+    # OverflowError: a long run of continuation bytes decodes to an integer too
+    # large for a float. It is a malformed polyline, not a server error.
+    except (ValueError, OverflowError):
         raise _invalid_geometry("geometry_polyline6 is not a valid polyline6 string.") from None
     if len(points) < 2:
         raise _invalid_geometry("geometry_polyline6 needs at least two points.")

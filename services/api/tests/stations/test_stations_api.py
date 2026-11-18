@@ -445,6 +445,8 @@ def test_along_route_compatibility(
         ({"geometry_polyline6": "@@@"}, "truncated"),
         ({"geometry_polyline6": encode_polyline([(39.4, -77.4)])}, "one point"),
         ({"geometry_polyline6": "~~~~~~~~~~~~~~~~"}, "bad"),
+        # Huge varints decode to an int too big for a float (OverflowError).
+        ({"geometry_polyline6": "~" * 210 + "???"}, "overflow"),
         ({"geometry_polyline6": encode_polyline([(39.4, -77.4), (95.0, -77.4)])}, "range"),
         ({"corridor_km": 0.4}, "corridor"),
         ({"corridor_km": 16.1}, "corridor"),
