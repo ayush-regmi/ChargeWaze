@@ -157,6 +157,7 @@ flowchart LR
     P4F5[P4-F5 preferences editor]
     P4F6 --> P4F9[P4-F9 close-out]
     P4F7 --> P4F9
+    P4F4 --> P4F8[P4-F8 per-vehicle baseline]
   end
   subgraph P5[Phase 5]
     P5F0[P5-F0 design] --> P5F2[P5-F2 inference engine]
@@ -208,12 +209,12 @@ A wave is a set of sessions that run together. Waves are a guide; the real rule 
 | **W4** | P3-F8 · P4-F4 ★ | migration (F8) | P4-F4 composes F5 + P4-F1 + P4-F3. |
 | **W5** | P3-F9 · P4-F6 ★ · P5-F1 | CI (F9), migration (P5-F1) | Phase 3 closes here. |
 | **W6** | P4-F9 · P5-F3 · P5-F5 · P6-F1 | dependency (P6-F1) | Phase 4 closes here. |
-| **W7** | P5-F4 · P5-F6 · P6-F3 | dependency (P5-F6, after P6-F1 merges), CI (P6-F3) | P5-F6 waits for P6-F1 to release the dependency lane. |
+| **W7** | P5-F4 · P5-F6 · P6-F3 · P4-F8 | dependency (P5-F6, after P6-F1 merges), CI (P6-F3), migration (P4-F8) | P5-F6 waits for P6-F1 to release the dependency lane. P4-F8 is a Phase 4 follow-up (added by P4-F0); it can start any time after P4-F4 once the migration lane is free. |
 | **W8** | P5-F7 · P6-F4 · P6-F5 | CI (P6-F4), migration (P6-F5) | |
 | **W9** | P5-F8 · then P6-F2 | — | Phase 5 closes here. P6-F2 seeds every table, so it waits for P5-F8. |
 | **W10** | P6-F6 | — | MVP done. |
 
-That's 11 waves for 30 sessions (W0 + 29 features; one at a time would be 30 steps). The critical path (W0 → F5 → F6 → F7 → P4-F4/F6 → P4-F9) sets the minimum; adding sessions beyond 3–4 doesn't shorten it.
+That's 11 waves for 31 sessions (W0 + 30 features; one at a time would be 31 steps). The critical path (W0 → F5 → F6 → F7 → P4-F4/F6 → P4-F9) sets the minimum; adding sessions beyond 3–4 doesn't shorten it.
 
 **W0 pre-wiring** (one small PR, branch `feature/phase3-parallel-prewiring`, includes this plan):
 - `app/main.py`: `V1_ROUTER_MODULES` lists `app.modules.stations.router`, `app.modules.trips.router`, `app.modules.trips.observed_router` and `app.modules.analytics.router` up front. Registration now skips only a router module (or package) that doesn't exist; a router whose own imports fail raises instead of silently dropping its endpoints (`tests/test_router_registration.py`). `DELETE /me` (P6-F5) goes in the existing users router.
@@ -261,7 +262,7 @@ Each entry is a session brief: scope, dependencies, files it **owns**, lane, and
 
 ### 4.2 Phase 4: Charging-aware trip planner
 
-Detailed plan: `docs/phase4_plan.md`, written by P4-F0. The decisions it must settle (with my recommendation) are:
+Detailed plan: [`phase4_plan.md`](phase4_plan.md), written by P4-F0. **Settled 2026-11-18 in phase4_plan.md §2**: D1, D2, D3, D4 and D6 changed from the recommendations below (catalog-only baseline with a per-vehicle follow-up P4-F8; no flat-curve fallback; route-ordered DP, ADR 0008; road-factor detour; `saved_at` + `POST /trips/{id}/save`), and D10–D16 were added. The table below is kept as the original recommendation; the phase plan wins. The decisions it had to settle (with my recommendation) were:
 
 | # | Decision | Recommendation |
 |---|---|---|
@@ -309,6 +310,10 @@ Detailed plan: `docs/phase4_plan.md`, written by P4-F0. The decisions it must se
 **P4-F7 Trip history UI** · M · Depends: P4-F1 · Lane: — · Branch `feature/phase4-trip-history`
 - Owns: `app/(app)/trips/saved/` and `app/(app)/trips/[id]/` (new routes), `components/trips/` (new), matching tests.
 - Acceptance: list with pagination and empty state, detail page rendering a stored `plan_payload` (static map + stops), delete. Doesn't touch `trips/page.tsx`; a link from the planner page to "Saved trips" is added by P4-F6.
+
+**P4-F8 Per-vehicle consumption baseline** (follow-up from P4-F0 D1) · M · Depends: P4-F2, P4-F4 · Lane: migration · Branch `feature/phase4-vehicle-baseline`
+- Owns: new migration (`vehicle_specs.baseline_kwh_per_km`, nullable, `CHECK (> 0 AND <= 1)`), `alembic/env.py` if needed, `modules/vehicles/{models,schemas,garage}.py` (column, `PATCH /vehicles/{id}/specs` field, `GET /vehicles/{id}` output), the baseline-resolution lines in `modules/routing/planner_service.py` (P4-F4 is merged by then), `apps/web/components/garage/specs-panel.tsx`, `apps/web/lib/vehicle-specs.ts`, matching tests (`tests/test_vehicle_settings.py`, `tests/test_vehicle_garage.py`, `tests/routing/test_plan_endpoint.py` additions, `apps/web/tests/specs-editor.test.tsx`, `vehicle-specs.test.ts`), `docs/api-contracts.md` §3.4 and §3.4a, `docs/database-design.md` §3.4, phase4_plan §F8.
+- Acceptance: phase4_plan F8. Vehicles without a catalog entry can be planned once the user enters a baseline; plans report `baseline_source: "vehicle"`. Not a dependency of P4-F9.
 
 **P4-F9 Phase 4 close-out** · S · Depends: P4-F6, P4-F7 · Lane: — · Branch `feature/phase4-closeout`
 - Owns: acceptance-matrix mapping table in `phase4_plan.md`, roadmap status, latency record for a ~500 mi trip, real-key manual run with screenshot.
