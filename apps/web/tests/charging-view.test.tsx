@@ -106,6 +106,77 @@ describe("ChargingView", () => {
     expect(lastNavigatedFilters()).toMatchObject({ level: "dc_fast", location: FREDERICK });
   });
 
+  it("keeps an earlier edit whose navigation hasn't finished (review fix)", () => {
+    // The mocked router never navigates, so the `filters` prop stays stale,
+    // as it does in the app while the server navigation is in flight.
+    renderView();
+    fireEvent.click(screen.getByRole("button", { name: "CCS1" }));
+    fireEvent.change(screen.getByLabelText("Charging level"), { target: { value: "dc_fast" } });
+
+    expect(router.replace).toHaveBeenCalledTimes(2);
+    const second = parseFilters(
+      new URL(String(router.replace.mock.calls[1][0]), "http://x").searchParams,
+    );
+    expect(second).toEqual({
+      ...EMPTY_FILTERS,
+      location: FREDERICK,
+      connectors: ["CCS1", "NACS"],
+      level: "dc_fast",
+    });
+    // The controls and the detail links show the merged state too.
+    expect(screen.getByRole("button", { name: "CCS1", pressed: true })).toBeInTheDocument();
+    expect(screen.getByLabelText("Charging level")).toHaveValue("dc_fast");
+  });
+
+  it("keeps pending filter edits when the location changes", () => {
+    renderView();
+    fireEvent.change(screen.getByLabelText("Minimum power"), { target: { value: "150" } });
+    // "Use my location" goes through the browser's geolocation API.
+    const getCurrentPosition = vi.fn((ok: PositionCallback) =>
+      ok({ coords: { latitude: 40.1, longitude: -76.9 } } as GeolocationPosition),
+    );
+    Object.defineProperty(navigator, "geolocation", {
+      configurable: true,
+      value: { getCurrentPosition },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Use my location" }));
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(lastNavigatedFilters()).toMatchObject({
+      minPowerKw: 150,
+      location: { lat: 40.1, lon: -76.9, label: "My location" },
+    });
+  });
+
+  it("resyncs to the URL on back/forward but skips its own intermediate navigations", () => {
+    const { rerender } = renderView();
+    const view = (filters: ChargingFilters) => (
+      <ChargingView
+        filters={filters}
+        units="imperial"
+        vehicle={vehicle}
+        result={{ items: [], more: false, unknownPowerCount: 0 }}
+        error={null}
+        networkOptions={[]}
+      />
+    );
+    const base = { ...EMPTY_FILTERS, location: FREDERICK };
+    fireEvent.click(screen.getByRole("button", { name: "CCS1" }));
+    fireEvent.change(screen.getByLabelText("Charging level"), { target: { value: "dc_fast" } });
+
+    // The first navigation lands while the second is still pending: keep the second.
+    rerender(view({ ...base, connectors: ["CCS1", "NACS"] }));
+    expect(screen.getByLabelText("Charging level")).toHaveValue("dc_fast");
+
+    // The second lands.
+    rerender(view({ ...base, connectors: ["CCS1", "NACS"], level: "dc_fast" }));
+    expect(screen.getByLabelText("Charging level")).toHaveValue("dc_fast");
+
+    // Back/forward to an unrelated URL wins over local state.
+    rerender(view({ ...base, level: "level2" }));
+    expect(screen.getByLabelText("Charging level")).toHaveValue("level2");
+    expect(screen.getByRole("button", { name: "CCS1", pressed: false })).toBeInTheDocument();
+  });
+
   it("hints to connect a vehicle when there is none", () => {
     renderView({ vehicle: null });
     expect(screen.getByRole("link", { name: "Connect a vehicle" })).toHaveAttribute("href", "/garage");

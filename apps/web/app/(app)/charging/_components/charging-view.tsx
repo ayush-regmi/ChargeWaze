@@ -24,6 +24,8 @@ import {
 } from "@/lib/stations";
 import type { UnitSystem } from "@/lib/units";
 
+import { useUrlFilters } from "./use-url-filters";
+
 export type ChargingVehicle = {
   id: string;
   title: string;
@@ -66,8 +68,13 @@ export function ChargingView({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // `filters` is what the current results were loaded for; `current` also
+  // holds edits whose navigation hasn't finished. Every edit builds on
+  // `current`, so a quick second edit doesn't drop the first.
+  const [current, setCurrent] = useUrlFilters(filters);
 
   const go = (next: ChargingFilters, mode: "push" | "replace" = "replace") => {
+    setCurrent(next);
     startTransition(() => {
       router[mode](chargingHref(next), { scroll: false });
     });
@@ -88,7 +95,7 @@ export function ChargingView({
       })),
     [rows],
   );
-  const detailQuery = serializeFilters(filters);
+  const detailQuery = serializeFilters(current);
 
   const selectStation = (id: string) => {
     setSelectedId(id);
@@ -100,7 +107,7 @@ export function ChargingView({
   const onPlace = (place: Place) => {
     setSelectedId(null);
     go(
-      { ...filters, location: { lat: place.location.lat, lon: place.location.lon, label: place.name } },
+      { ...current, location: { lat: place.location.lat, lon: place.location.lon, label: place.name } },
       "push",
     );
   };
@@ -109,17 +116,17 @@ export function ChargingView({
     <div className="space-y-5">
       <div className="flex flex-wrap items-end gap-3">
         <PlaceSearch
-          key={center ? `${center.lat},${center.lon}` : "none"}
+          key={current.location ? `${current.location.lat},${current.location.lon}` : "none"}
           label="Search near"
-          near={center}
-          initialValue={center?.label ?? ""}
+          near={current.location}
+          initialValue={current.location?.label ?? ""}
           onSelect={onPlace}
           className="min-w-64 flex-1"
         />
         <UseMyLocation
           onLocate={(p) => {
             setSelectedId(null);
-            go({ ...filters, location: { ...p, label: "My location" } }, "push");
+            go({ ...current, location: { ...p, label: "My location" } }, "push");
           }}
         />
       </div>
@@ -147,7 +154,7 @@ export function ChargingView({
       ) : null}
 
       <StationFilters
-        filters={filters}
+        filters={current}
         units={units}
         vehicleConnectors={vehicle?.connectors ?? []}
         networkOptions={networkOptions}
@@ -175,7 +182,7 @@ export function ChargingView({
               <StationsError
                 code={error}
                 onRetry={() => startTransition(() => router.refresh())}
-                onReset={() => go({ ...EMPTY_FILTERS, location: center })}
+                onReset={() => go({ ...EMPTY_FILTERS, location: current.location })}
               />
             ) : result ? (
               <>
