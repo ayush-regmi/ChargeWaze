@@ -408,13 +408,13 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 | ID | Status | Branch / PR | Notes |
 |---|---|---|---|
 | W0 | merged 2026-11-18 | `feature/phase3-parallel-prewiring` / #26 | This plan + pre-wiring |
-| P3-F5 | PR open, CI green | `feature/phase3-stations-api` / #29 | Adds `stations_cursor_secret` (signed pagination cursor). |
-| P4-F0 | PR open | `feature/phase4-design` / #28 | Settles P4-D1…D16 in `phase4_plan.md` §2; adds P4-F8. Unblocks P4-F1, P4-F2, P5-F0 on merge. |
-| P4-F5 | PR open | `feature/phase4-preferences-editor` / #27 | One unreproduced flaky test run noted in the PR. |
-| P3-F6 | blocked (P3-F5) | — | |
-| P4-F1 | blocked (P4-F0) | — | |
-| P4-F2 | blocked (P4-F0) | — | |
-| P5-F0 | blocked (P4-F0) | — | |
+| P3-F5 | merged 2026-11-18 | `feature/phase3-stations-api` / #29 | Adds `stations_cursor_secret` (signed pagination cursor); polyline overflow → 422 fix (Codex review). |
+| P4-F0 | merged 2026-11-18 | `feature/phase4-design` / #28 | Settles P4-D1…D16 in `phase4_plan.md` §2; adds P4-F8 and ADR 0008. |
+| P4-F5 | merged 2026-11-18 | `feature/phase4-preferences-editor` / #27 | One unreproduced flaky test run noted in the PR. |
+| P3-F6 | ready (not started) | — | Holds the dependency lane (`mapbox-gl`) once started. |
+| P4-F1 | in progress (W2) | `feature/phase4-trips-schema` | Holds the migration lane. |
+| P4-F2 | in progress (W2) | `feature/phase4-energy-model` | |
+| P5-F0 | in progress (W2) | `feature/phase5-design` | |
 | P3-F7 | blocked (P3-F6) | — | |
 | P4-F3 | blocked (P4-F2) | — | |
 | P4-F7 | blocked (P4-F1) | — | |
