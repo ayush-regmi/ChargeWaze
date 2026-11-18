@@ -212,6 +212,8 @@ describe("PreferencesEditor", () => {
     expect(await within(form).findByRole("alert")).toHaveTextContent(
       "Couldn't save your preferences. Please try again.",
     );
+    // Checked synchronously on purpose: the error and the end of saving must
+    // commit together, never an error beside a "Saving…" button.
     expect(screen.getByRole("form", { name: "Edit preferences" })).toBeInTheDocument();
     expect(within(form).getByRole("button", { name: "Save preferences" })).toBeEnabled();
   });

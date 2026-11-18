@@ -151,8 +151,14 @@ function PreferencesForm({
     setErrors({});
     startTransition(async () => {
       const res = await updatePreferences(result.body);
-      if ("error" in res) setServerError(res.error);
-      else onSaved(res.preferences);
+      // Updates after an `await` are no longer part of the transition, so
+      // without this wrapper the error renders while `pending` is still true
+      // ("Saving…" button) and `pending` flips in a later commit. Wrapping
+      // them makes the result and the end of saving commit together.
+      startTransition(() => {
+        if ("error" in res) setServerError(res.error);
+        else onSaved(res.preferences);
+      });
     });
   }
 
