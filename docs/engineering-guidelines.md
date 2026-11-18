@@ -34,7 +34,7 @@ If the docs contradict each other, flag it in your PR and propose a fix before w
 
 1. Read the relevant documentation before editing anything.
 2. For substantial features, propose a plan first (a short design note or GitHub issue).
-3. Work on one feature at a time. Vertical slices — database, backend, frontend, tests — in that order.
+3. Each session works on one feature at a time. Vertical slices — database, backend, frontend, tests — in that order. Several sessions may build different features in parallel only under the rules in [`plan.md`](plan.md#1-can-sessions-run-in-parallel-yes-with-four-conditions) (merged dependencies, disjoint files, one feature per lane, isolated databases and ports).
 4. Define acceptance criteria before you implement. Link them to the phase in the roadmap.
 5. Add unit tests for business logic. Add integration tests for anything that crosses a module boundary.
 6. Run the relevant tests and lint checks locally before opening a PR.

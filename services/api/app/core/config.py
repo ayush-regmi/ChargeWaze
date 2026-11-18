@@ -90,7 +90,25 @@ class Settings(BaseSettings):
     # Readings older than this are flagged stale (phase2_plan.md D11).
     telemetry_stale_after_minutes: int = Field(default=15, gt=0)
 
-    # ---- Observability ----
+    # The blocks below are reserved for features built in parallel
+    # (docs/plan.md §2.3). Each feature adds settings only inside its own block,
+    # so parallel branches never edit the same lines.
+
+    # ---- Stations API + cache (Phase 3 F5) ----
+
+    # ---- Energy model (Phase 4 F2) ----
+
+    # ---- Trip planner (Phase 4 F4) ----
+
+    # ---- Trips (Phase 4 F1, Phase 5 F3/F4) ----
+
+    # ---- Analytics (Phase 5 F5) ----
+
+    # ---- Demo mode (Phase 6 F2) ----
+
+    # ---- Privacy and retention (Phase 6 F5) ----
+
+    # ---- Observability (Phase 6 F1, F4) ----
     sentry_dsn_backend: str = ""
 
     @property

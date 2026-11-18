@@ -15,6 +15,10 @@ import { API_DIR, API_ENV, API_PORT, API_URL, WEB_PORT } from "./e2e/support/e2e
  * Specs that need data seed it themselves in `beforeAll` (see
  * `e2e/support/seed.ts`), so retries start from a clean state.
  *
+ * Ports default to 3100 (web), 8765 (API) and 54399 (Auth stub); set
+ * `E2E_WEB_PORT`, `E2E_API_PORT`, `E2E_AUTH_PORT` and `E2E_DATABASE_URL` to
+ * run beside another session's suite (docs/plan.md §2.4).
+ *
  * Needs Postgres on localhost:5432 (`docker compose up -d`) and `uv`. The
  * credentialed sign-in flows (email, Google, Apple) run in a separate manual
  * workflow.

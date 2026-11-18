@@ -16,7 +16,24 @@
 import { createHmac } from "node:crypto";
 
 export const E2E_JWT_SECRET = "e2e-only-jwt-secret-not-a-real-key-0000000000";
-export const AUTH_STUB_PORT = 54399;
+/**
+ * Reads a port from the environment, falling back to `fallback`.
+ *
+ * Parallel agent sessions each run Playwright from their own worktree. With
+ * fixed ports and `reuseExistingServer`, a second run would silently test the
+ * first run's servers, so each session sets its own ports (docs/plan.md §2.4).
+ */
+export function envPort(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`${name} must be a port number, got ${JSON.stringify(raw)}`);
+  }
+  return port;
+}
+
+export const AUTH_STUB_PORT = envPort("E2E_AUTH_PORT", 54399);
 export const AUTH_STUB_URL = `http://127.0.0.1:${AUTH_STUB_PORT}`;
 
 // Must match services/api/scripts/e2e_backend.py.
