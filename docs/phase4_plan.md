@@ -106,6 +106,28 @@ Owns lists are in [`plan.md`](plan.md#42-phase-4-charging-aware-trip-planner) §
 
 **Tests:** RLS present; Alembic round-trip and one head; ownership 404s on all four routes; cursor pagination (stable order, last page has `next_cursor: null`); `saved=false` lists unsaved; save is idempotent (keeps the first `saved_at`); delete then get → 404; cascade on profile delete; `create_planned_trip` stores stops in order and the `plan_payload` unchanged.
 
+**As built:**
+- **Migration and models:** migration `20261118_01` (revises `20261117_01`). Models are in `app/modules/trips/models.py`.
+- **Two extra indexes:** besides the two in the plan, `planned_trips_vehicle_idx (vehicle_id)` and `planned_stops_station_idx (station_id)`. They keep the vehicle → trips cascade and the station → stops SET NULL from scanning the whole table.
+- **Other constraints:** `planned_stops.sequence >= 1` and `charging_minutes >= 0`. All SoC and minute columns are `NOT NULL`.
+- **`create_planned_trip`:** the signature is exactly §4.4.
+  - It flushes but **doesn't commit**, so F4 owns the transaction.
+  - It raises `ValueError` unless the stop sequences are `1..n` in order.
+  - `plan_payload` must be JSON-serializable (dump the §3.7 model with `mode="json"`). It is stored as given.
+  - `TripEndpoint`, `NewPlannedStop` and `create_planned_trip` are importable from `app.modules.trips.service`.
+- **List order and cursor:**
+  - Saved trips are ordered by `saved_at DESC, id ASC` and unsaved ones by `created_at DESC, id ASC`, which matches the partial index. Paging is keyset.
+  - The cursor is unsigned base64url JSON `{m: "saved"|"unsaved", k: <timestamp>, i: <id>}`. Queries always filter on the caller, so a forged cursor can only move within the caller's own rows. No config was needed.
+  - A malformed cursor, or one from the other list (`saved=` mismatch), returns 422 `VALIDATION_ERROR` with `details.reason = "INVALID_CURSOR"`.
+- **List-item fields:**
+  - `distance_km` is read from `plan_payload.route.distance_km`, which is null only when there is no route. An infeasible plan that has a route still shows its distance.
+  - `total_minutes` is read from `plan_payload.totals.total_minutes`, which is null for every infeasible plan.
+  - `stop_count` counts the `planned_stops` rows.
+- **`vehicle_id` filter:** ownership is checked through `vehicles.garage.get_vehicle_detail`, so a disconnected vehicle still counts as the caller's.
+- **Save:** a single `UPDATE … SET saved_at = coalesce(saved_at, now())`, which is idempotent and race-free.
+- **Delete:** a single `DELETE … RETURNING`; the stops cascade in the database.
+- **Tests:** `tests/trips/` has 47 tests covering every item in the list above. It also checks that the trip models match the migrated schema, that a station delete sets `station_id` to null, the CHECK constraints, 401 and 422 responses, and that the saved list follows `saved_at`, not `created_at`.
+
 ### F2 — Energy model + bZ catalog entry
 
 Pure functions, no DB, no HTTP. Signatures in §4.2. Also adds the bZ entry and the two new `CatalogSpec` fields (§2.3). Config block "energy": none needed in v1 (left empty; everything comes from the catalog).

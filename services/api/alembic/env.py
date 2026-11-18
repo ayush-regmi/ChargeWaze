@@ -17,6 +17,7 @@ from app.db.session import Base
 
 # Import every module's models so Base.metadata is complete.
 from app.modules.stations import models as _stations_models  # noqa: F401
+from app.modules.trips import models as _trips_models  # noqa: F401
 from app.modules.users import models as _users_models  # noqa: F401
 from app.modules.vehicles import models as _vehicles_models  # noqa: F401
 
