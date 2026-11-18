@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { PreferencesEditor } from "@/components/profile/preferences-editor";
 import { createApi } from "@/lib/api";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 
@@ -45,16 +46,9 @@ async function ProfileDetails() {
   return (
     <section className="mx-auto max-w-2xl space-y-6">
       <div className="space-y-2">
-        <span className="inline-block rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-          Phase 1 slice 2
-        </span>
         <h1 className="text-2xl font-semibold">Profile</h1>
         <p className="text-neutral-600 dark:text-neutral-400">
-          Signed in via Supabase Auth. Data below comes from{" "}
-          <code className="rounded bg-neutral-100 px-1 py-0.5 text-xs dark:bg-neutral-800">
-            GET /api/v1/me
-          </code>
-          .
+          Your account and the defaults the trip planner uses.
         </p>
       </div>
       <dl className="grid grid-cols-1 gap-4 rounded-lg border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:grid-cols-2">
@@ -62,20 +56,8 @@ async function ProfileDetails() {
         <Field label="Email" value={me.email ?? "\u2014"} />
         <Field label="Profile id" value={me.id} mono />
         <Field label="Created at" value={createdAt} />
-        <Field label="Units" value={me.preferences.units} />
-        <Field
-          label="Reserve SoC"
-          value={`${(me.preferences.reserve_soc * 100).toFixed(0)}%`}
-        />
-        <Field
-          label="Preferred charge-to"
-          value={`${(me.preferences.preferred_charge_to * 100).toFixed(0)}%`}
-        />
-        <Field
-          label="Max detour"
-          value={`${me.preferences.max_detour_minutes} minutes`}
-        />
       </dl>
+      <PreferencesEditor preferences={me.preferences} />
       <SignOutButton />
     </section>
   );
