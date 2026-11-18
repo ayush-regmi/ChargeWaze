@@ -415,10 +415,10 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 | P4-F1 | merged 2026-11-18 | `feature/phase4-trips-schema` / #33 | Migration lane released. Codex fix: wrong-typed cursor fields → 422. |
 | P4-F2 | merged 2026-11-18 | `feature/phase4-energy-model` / #32 | Also edited `tests/test_vehicle_connect.py` (coordinator-approved). |
 | P5-F0 | merged 2026-11-18 | `feature/phase5-design` / #34 | Settles P5-D1…D14 in `phase5_plan.md` §2; ADR 0009. |
-| P3-F7 | ready (W3) | — | Will hold the E2E-harness lane. |
-| P4-F3 | ready (W3) | — | |
-| P4-F7 | ready (W3) | — | |
-| P5-F2 | ready (W3) | — | |
+| P3-F7 | in progress (W3) | `feature/phase3-trip-planner-map` | Holds the E2E-harness lane. |
+| P4-F3 | in progress (W3) | `feature/phase4-optimizer` | |
+| P4-F7 | in progress (W3) | `feature/phase4-trip-history` | |
+| P5-F2 | in progress (W3) | `feature/phase5-trip-inference` | |
 | P3-F8 | blocked (P3-F7) | — | |
 | P4-F4 | blocked (P3-F5, P4-F1, P4-F3) | — | |
 | P3-F9 | blocked (P3-F7, P3-F8, P3-R1) | — | |
