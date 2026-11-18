@@ -299,7 +299,7 @@ function NumberField({
 }) {
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="text-sm">
+      <label htmlFor={id} className="block text-sm">
         {label}
       </label>
       <input
