@@ -410,15 +410,15 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 | W0 | merged 2026-11-18 | `feature/phase3-parallel-prewiring` / #26 | This plan + pre-wiring |
 | P3-F5 | merged 2026-11-18 | `feature/phase3-stations-api` / #29 | Adds `stations_cursor_secret` (signed pagination cursor); polyline overflow → 422 fix (Codex review). |
 | P4-F0 | merged 2026-11-18 | `feature/phase4-design` / #28 | Settles P4-D1…D16 in `phase4_plan.md` §2; adds P4-F8 and ADR 0008. |
-| P4-F5 | merged 2026-11-18 | `feature/phase4-preferences-editor` / #27 | One unreproduced flaky test run noted in the PR. |
-| P3-F6 | in progress (W2) | `feature/phase3-charging-page` | Holds the dependency lane (`mapbox-gl`). |
-| P4-F1 | in progress (W2) | `feature/phase4-trips-schema` | Holds the migration lane. |
-| P4-F2 | in progress (W2) | `feature/phase4-energy-model` | |
-| P5-F0 | in progress (W2) | `feature/phase5-design` | |
-| P3-F7 | blocked (P3-F6) | — | |
-| P4-F3 | blocked (P4-F2) | — | |
-| P4-F7 | blocked (P4-F1) | — | |
-| P5-F2 | blocked (P5-F0) | — | |
+| P4-F5 | merged 2026-11-18 | `feature/phase4-preferences-editor` / #27 | Flaky save-error test fixed in #36 (race in `PreferencesEditor`). |
+| P3-F6 | merged 2026-11-18 | `feature/phase3-charging-page` / #35 | Dependency lane released. Codex fixes: in-flight filter edits, pending place suggest. Real-key Frederick check still manual. |
+| P4-F1 | merged 2026-11-18 | `feature/phase4-trips-schema` / #33 | Migration lane released. Codex fix: wrong-typed cursor fields → 422. |
+| P4-F2 | merged 2026-11-18 | `feature/phase4-energy-model` / #32 | Also edited `tests/test_vehicle_connect.py` (coordinator-approved). |
+| P5-F0 | merged 2026-11-18 | `feature/phase5-design` / #34 | Settles P5-D1…D14 in `phase5_plan.md` §2; ADR 0009. |
+| P3-F7 | in progress (W3) | `feature/phase3-trip-planner-map` | Holds the E2E-harness lane. |
+| P4-F3 | in progress (W3) | `feature/phase4-optimizer` | |
+| P4-F7 | in progress (W3) | `feature/phase4-trip-history` | |
+| P5-F2 | in progress (W3) | `feature/phase5-trip-inference` | |
 | P3-F8 | blocked (P3-F7) | — | |
 | P4-F4 | blocked (P3-F5, P4-F1, P4-F3) | — | |
 | P3-F9 | blocked (P3-F7, P3-F8, P3-R1) | — | |
