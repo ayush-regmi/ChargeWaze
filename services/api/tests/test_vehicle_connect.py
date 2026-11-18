@@ -15,6 +15,7 @@ import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
@@ -321,7 +322,9 @@ def test_callback_happy_path_creates_vehicle_and_specs(
         "soc",
     ]
     assert vehicle.specs is not None
-    assert vehicle.specs.usable_capacity_kwh is None  # no catalog entry; never guessed
+    # Defaults come from the cited catalog entry (phase4_plan.md §2.3), never guessed.
+    assert vehicle.specs.usable_capacity_kwh == Decimal("71.0")
+    assert vehicle.specs.connectors == ["NACS", "CCS1", "J1772"]
     # The callback reads Smartcar with the redirect's user, never another.
     assert all(r.headers.get("sc-user-id") in (None, SC_USER_ID) for r in smartcar.requests)
 

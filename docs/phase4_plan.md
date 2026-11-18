@@ -128,6 +128,23 @@ Below the curve's first point the first point's power holds; above its last poin
 - The per-segment numbers in §5.
 - `lookup_spec("TOYOTA", "bZ XLE AWD", 2026)` returns the entry (case-insensitive); `"bZ XLE FWD"` returns `None`.
 
+**As built (P4-F2, 2026-11-18):**
+- `app/modules/energy/`: `types.py`, `model.py`, `charging.py`, `__init__.py` (re-exports). The §4.2 signatures are implemented **unchanged**.
+- `EnergyVehicle.__post_init__` checks its inputs and raises `ValueError` for: capacity or baseline not > 0 (or non-finite), fewer than 2 curve points, SoC outside [0, 1] or not strictly increasing, or power not > 0. F4 can rely on any constructed `EnergyVehicle` being plannable.
+- `segment_energy_kwh` raises `ValueError` for a negative or non-finite distance. `arrival_soc` is never clamped.
+- `charging_minutes` / `cumulative_charge_minutes`: the station cap is applied by splitting each curve piece where it crosses the station power, then using the exact log formula per piece. `log1p` keeps nearly flat pieces accurate. SoCs within 1e-9 of 0 or `max_charge_soc` are clamped, so float noise from grid arithmetic doesn't raise. `cumulative_charge_minutes` precomputes the breakpoints and looks up a SoC by bisection. Both functions raise `ValueError` for a bad station power at construction time.
+- Catalog: `CatalogSpec` gains `baseline_kwh_per_km: Decimal | None = None` and `charging_curve_source: Literal["measured", "derived"] | None = None`. Both have defaults, so existing constructors are unchanged. There is one entry, 2026 `bZ XLE AWD`, with the §2.3 values and `charging_curve_source = "derived"`. Newly connected bZ XLE AWD vehicles now get 71.0 kWh, `NACS/CCS1/J1772` and the curve in their `vehicle_specs` row. The real car's existing row still holds `NULL`/`[]`; D14's row-then-catalog rule in F4 covers it.
+- Config: no "energy" settings (the block stays empty).
+- Tests (`tests/energy/`, 60 tests):
+  - 10→80 % = **27.356 min**, and 20→50 % at 50 kW = **25.56 min**.
+  - Zero energy and `to <= from` give 0. Every `ValueError` path is covered.
+  - The closed form matches a midpoint-rule integral to 1e-6.
+  - Fixed-grid property tests (15 SoCs × 9 station powers): strictly monotonic in target SoC, never faster at a lower station power, additive, and cumulative F(b) − F(a) equal to `charging_minutes`.
+  - All §5 per-leg SoCs and every charging piece and stop total, to 5e-4 min: trip 2 B = 16.648, trip 3 W/B/Q = 14.617 / 12.443 / 18.269, sum 45.329, energy 150.92 kWh.
+  - The bZ lookup is case-insensitive; `bZ XLE FWD`, `bZ Limited` and 2025 return `None`.
+- **Doc discrepancy in §5 trip 2:** the "L only" rejection says arrival 0.46018. The leg is 120 + 2 × 0.2 × 1.3 = 120.52 km, which gives **0.46051**. The conclusion (needs 0.93873 > 0.80) is unchanged. The test asserts 0.46051. The table is left as written because it isn't in F2's section.
+- **Out-of-Owns edit (approved by the coordinator):** `tests/test_vehicle_connect.py`. The connect happy-path test asserted `usable_capacity_kwh is None` ("no catalog entry"). It now asserts the catalog's 71.0 kWh and connectors. `scripts/e2e_backend.py` also picks up the entry. No E2E spec asserts capacity, so it is unchanged.
+
 ### F3 — Optimizer
 
 `routing/plan_types.py` (shared types, §4.1) and `routing/optimizer.py` (§4.3). Pure. Input is already filtered (only compatible, known-power, within-detour candidates); filtering lives in F4 so its counts are reported.
