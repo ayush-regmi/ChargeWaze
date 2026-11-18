@@ -242,19 +242,35 @@ def decode_cursor(cursor: str, *, mode: ListMode) -> tuple[datetime, uuid.UUID]:
     try:
         padded = cursor + "=" * (-len(cursor) % 4)
         data = json.loads(base64.urlsafe_b64decode(padded.encode()))
-        if not isinstance(data, dict) or data.get("m") != mode:
-            raise ValueError("wrong list")
-        key = datetime.fromisoformat(data["k"])
-        if key.tzinfo is None:
-            raise ValueError("naive timestamp")
-        return key, uuid.UUID(data["i"])
-    except (ValueError, TypeError, KeyError, binascii.Error, UnicodeDecodeError):
-        raise ApiError(
-            "VALIDATION_ERROR",
-            "Invalid cursor; list the trips again without it.",
-            status_code=422,
-            details={"reason": "INVALID_CURSOR"},
-        ) from None
+    except (ValueError, binascii.Error, UnicodeDecodeError):
+        raise _invalid_cursor() from None
+
+    # The payload is client-controlled JSON: check every field's type before
+    # using it, so a wrong type is a 422 and never an unexpected exception.
+    if not isinstance(data, dict):
+        raise _invalid_cursor()
+    raw_mode, raw_key, raw_id = data.get("m"), data.get("k"), data.get("i")
+    if not (isinstance(raw_mode, str) and isinstance(raw_key, str) and isinstance(raw_id, str)):
+        raise _invalid_cursor()
+    if raw_mode != mode:
+        raise _invalid_cursor()  # a cursor from the other list
+    try:
+        key = datetime.fromisoformat(raw_key)
+        trip_id = uuid.UUID(raw_id)
+    except ValueError:
+        raise _invalid_cursor() from None
+    if key.tzinfo is None:
+        raise _invalid_cursor()
+    return key, trip_id
+
+
+def _invalid_cursor() -> ApiError:
+    return ApiError(
+        "VALIDATION_ERROR",
+        "Invalid cursor; list the trips again without it.",
+        status_code=422,
+        details={"reason": "INVALID_CURSOR"},
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import uuid
 from collections.abc import Callable
 
@@ -279,6 +280,54 @@ def test_bad_cursor_is_validation_error(api: TestClient, auth: Auth, cursor: str
     response = api.get(f"/api/v1/trips?cursor={cursor}", headers=auth())
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def _cursor_json(payload: object) -> str:
+    return base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
+
+
+_GOOD_KEY = BASE_TIME.isoformat()
+_GOOD_ID = str(uuid.uuid4())
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        # Wrong-typed id (was a 500: uuid.UUID(123) raises AttributeError).
+        {"m": "saved", "k": _GOOD_KEY, "i": 123},
+        {"m": "saved", "k": _GOOD_KEY, "i": []},
+        {"m": "saved", "k": _GOOD_KEY, "i": {}},
+        {"m": "saved", "k": _GOOD_KEY, "i": None},
+        # Wrong-typed timestamp and mode.
+        {"m": "saved", "k": 123, "i": _GOOD_ID},
+        {"m": "saved", "k": [], "i": _GOOD_ID},
+        {"m": ["saved"], "k": _GOOD_KEY, "i": _GOOD_ID},
+        # Missing fields, naive timestamp.
+        {"m": "saved", "k": _GOOD_KEY},
+        {"m": "saved", "k": "2026-11-06T18:00:00", "i": _GOOD_ID},
+        # Not a dict.
+        [1, 2],
+        "saved",
+        123,
+        None,
+    ],
+)
+def test_wrong_typed_cursor_fields_are_validation_errors(
+    api: TestClient, auth: Auth, payload: object
+) -> None:
+    response = api.get(f"/api/v1/trips?cursor={_cursor_json(payload)}", headers=auth())
+    assert response.status_code == 422
+    body = response.json()["error"]
+    assert body["code"] == "VALIDATION_ERROR"
+    assert body["details"] == {"reason": "INVALID_CURSOR"}
+
+
+def test_well_formed_handmade_cursor_is_accepted(api: TestClient, auth: Auth) -> None:
+    """Control for the cases above: the same encoding with correct types works."""
+
+    cursor = _cursor_json({"m": "saved", "k": _GOOD_KEY, "i": _GOOD_ID})
+    response = api.get(f"/api/v1/trips?cursor={cursor}", headers=auth())
+    assert response.status_code == 200
 
 
 @pytest.mark.parametrize("query", ["limit=0", "limit=201", "status=lost", "saved=maybe"])
