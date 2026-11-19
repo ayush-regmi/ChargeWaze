@@ -117,7 +117,10 @@ describe("TripPlanner", () => {
       destination: { lat: TORONTO.lat, lon: TORONTO.lon },
     });
     // Only the selected route is asked for until its stations arrive (D15).
-    expect(actions.getStationsAlongRoute).toHaveBeenCalledTimes(1);
+    // The request starts in an effect that can run a tick after the routes
+    // render, so wait for it rather than asserting straight away. The first
+    // response is held back, so a second request can't sneak in meanwhile.
+    await waitFor(() => expect(actions.getStationsAlongRoute).toHaveBeenCalledTimes(1));
     expect(actions.getStationsAlongRoute.mock.calls[0][0]).toEqual({
       geometry: "geometry-0",
       filters: {
