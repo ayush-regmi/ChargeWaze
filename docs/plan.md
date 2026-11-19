@@ -421,7 +421,7 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 | P5-F2 | merged 2026-11-18 | `feature/phase5-trip-inference` / #39 | Pure engine. Codex fix: each leg's SoC endpoints bounded to its own window. |
 | P3-F8 | merged 2026-11-19 | `feature/phase3-favorites` / #44 | Migration lane released (head `20261119_01`). New `FAVORITES_LIMIT` (409) at 500 favorites. Codex fixes: cap race (profile row lock), Favorites tab kept through the station page. Nothing manual left. |
 | P4-F4 | merged 2026-11-19 | `feature/phase4-plan-endpoint` / #43 | ★ `POST /routes/plan`. Unblocks P4-F6 and P4-F8. |
-| P3-F9 | blocked (P3-R1) | — | Only the manual real-key check M-03 is left. |
+| P3-F9 | blocked (P3-R1: M-03) | — | Code dependencies are merged. To start, it needs M-03 (Places + directions with real keys). To finish, it also needs M-04, M-05 and M-06 (live cross-border stations, Charging page, Trip Planner), which phase3_plan §F9 requires. |
 | P4-F6 | in progress (W5) | `feature/phase4-planner-ui` | ★ critical path. Also adds the limiting-segment map highlight left by P4-F7. |
 | P5-F1 | in progress (W5) | `feature/phase5-observed-schema` | Holds the migration lane. |
 | P4-F9 | blocked (P4-F6) | — | |
@@ -442,4 +442,4 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 
 ## 7. Next step
 
-W4 is merged (#43, #44). W5 is running: **P4-F6** (Planner UI, critical path), **P5-F1** (observed-trips schema, holds the migration lane) and **P6-F1** (Sentry, holds the dependency lane; started early because it was ready). When P5-F1 merges, start P5-F3, P5-F5 and P4-F8 (migration lane). When P4-F6 merges, start P4-F9. P3-F9 starts once you've passed M-03 (P3-R1) in [`manual-test-log.md`](manual-test-log.md), which also lists the other manual checks waiting on you.
+W4 is merged (#43, #44). W5 is running: **P4-F6** (Planner UI, critical path), **P5-F1** (observed-trips schema, holds the migration lane) and **P6-F1** (Sentry, holds the dependency lane; started early because it was ready). When P5-F1 merges, start P5-F3, P5-F5 and P4-F8 (migration lane). When P4-F6 merges, start P4-F9. P3-F9 starts once you've passed M-03 (P3-R1). It can't close until M-04, M-05 and M-06 pass too. All four are in [`manual-test-log.md`](manual-test-log.md), along with the other manual checks waiting on you.
