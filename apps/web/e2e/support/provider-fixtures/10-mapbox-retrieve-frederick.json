@@ -1,0 +1,8 @@
+{
+  "description": "Retrieve the first 'Tesla Supercharger' suggestion: Frederick, MD (real capture).",
+  "match": {
+    "method": "GET",
+    "path": "/mapbox/search/searchbox/v1/retrieve/dXJuOm1ieHBvaTo5ODY2MDU4My1hMjEyLTQ2ZmMtYmI0ZS04MDgyY2E2MDM5YWI"
+  },
+  "response": { "status": 200, "bodyFile": "../../../../../fixtures/mapbox/retrieve_tesla_supercharger_frederick.json" }
+}

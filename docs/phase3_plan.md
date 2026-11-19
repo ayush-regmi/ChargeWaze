@@ -309,6 +309,59 @@ F2 and F3 don't share files, and neither do F4 and F5. Either pair could run in 
 
 **Acceptance:** E1 manually with real keys, with a screenshot of Frederick → Toronto showing stations on both sides of the border (E2, manual half).
 
+**As built (2026-11-18):**
+- **Page.** `app/(app)/trips/page.tsx` is a server component. It loads units, preferred networks and the Dashboard vehicle with its connectors, the same way `/charging` does. It then renders `_components/trip-planner.tsx`, a client component. Directions and along-route calls go through the server actions in `_components/actions.ts` (`getDirections`, `getStationsAlongRoute`), so the Supabase token stays on the server, as with `components/places/actions.ts`.
+- **URL state (`lib/trip-url.ts`).** The URL is the source of truth, written with `history.replaceState`. A filter or route change doesn't re-run the server page or call Directions again.
+  - Params: `from_lat`/`from_lon`/`from` and `to_lat`/`to_lon`/`to` (rounded to 4 decimals, plus a label; never the session token); `route` (selected index); the F6 params `connector`, `network`, `min_kw`; `level`; `corridor` (km, 0.5–16, default 3).
+  - `level` is missing for DC fast, which is the along-route default (D6). It is `all` or `level2` otherwise. The Charging page's `lat`/`lon`/`radius` params are ignored.
+  - `toAlongRouteFilters()` builds the `POST /stations/along-route` body. As on `/charging`, "any connector" with a vehicle sends all four types.
+- **Fetching.** Directions are requested once per origin/destination pair. Stations for the selected route are requested first; the other routes are requested after that answer arrives (D15). Results are cached per route and filter set, so switching routes doesn't refetch. Station errors aren't cached, so "Try again" re-asks.
+- **UI.**
+  - Origin and destination use `PlaceSearch`. Each one biases its suggestions toward the other endpoint. There is also "Start from my location" (D12) and a swap button.
+  - Route list:
+    - Rows are "Route A/B/C" with distance and duration in the user's units, a "Shortest" mark, "via …" and the countries crossed.
+    - Each row also says "N compatible chargers within X". With a vehicle, only `compatible: true` stations count; without one, every station counts.
+  - The map is `LazyMapView` with all routes and the selected route's stations. `StationFilters` is shown with `showRadius={false}`, plus a "Distance from route" slider that commits after 300 ms.
+  - Station cards show "X along · Y off route" and link to `/charging/{id}`.
+  - States: no route (both reasons), Mapbox down or not configured (retry), stations down with routes still shown (retry), no vehicle or no connectors (banner), truncated results, and unknown power count.
+  - The amber note "Charging stops and arrival battery are planned in the next release…" is always shown. P4-F6 removes it (`data-testid="next-release-note"`).
+- **F6 components were used unchanged.** No follow-up PR is needed for F7. `loadVehicle` is duplicated from the Charging page (about 15 lines) because it isn't exported there.
+- **E2E provider stub (shared; P4-F6 and later extend it with fixtures only).**
+  - Files:
+    - `e2e/support/provider-stub.mjs` is the entry point.
+    - `e2e/support/provider-stub-lib.mjs` holds the constants, the fixture loader and matcher, and the server. It has no `import.meta`, because Playwright compiles the config's imports to CommonJS.
+  - `e2e-servers.ts` points the API's `MAPBOX_API_BASE_URL` at `<stub>/mapbox` and `AFDC_API_BASE_URL` at `<stub>/afdc`. It sets test-only `MAPBOX_SECRET_TOKEN` and `AFDC_API_KEY` values, which the stub requires; any other key gets 401/403. Before this change, a real key in `services/api/.env` could have been used during an E2E run.
+  - `next dev` gets `NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN=""`, so the browser never loads real tiles. The map shows "Map unavailable" and specs assert the DOM.
+  - Port: `E2E_PROVIDER_PORT`, which defaults to `E2E_AUTH_PORT` + 1 (54400 by default, 54500 for a session on 54499), so the §2.4 +100 scheme still works without a new variable.
+  - **To stub a new request, add a JSON file to `e2e/support/provider-fixtures/`. No code changes are needed.**
+    - Files are tried in filename order and the first match wins. Numeric prefixes keep that order readable: `1x` search, `2x` directions, `3x` AFDC.
+    - A request no fixture matches gets a 404 and a `[provider-stub] no fixture for …` log line, so the backend returns `MAPBOX_ERROR`/`STATIONS_UNREACHABLE` and the spec fails visibly.
+    - Shape: `{ "description", "match": { "method", "path" | "pathPrefix", "query": { param: "substring" }, "waypointsNear": { "points": [{lat, lon}, …], "km" }, "routeNear": { "lat", "lon", "km" } }, "response": { "status", "body" | "bodyFile", "paginate": "afdc" } }`.
+    - `query` matches query-string and form-body params, case-insensitively.
+    - `waypointsNear` matches a Directions request's `lon,lat;lon,lat` waypoints, in order.
+    - `routeNear` matches when the AFDC `nearby-route` WKT `route` passes within `km` of a point.
+    - `bodyFile` is relative to the fixture file and may point at the repo's real captures in `fixtures/`.
+    - `paginate: "afdc"` slices `fuel_stations` by `offset`/`limit`.
+    - The full reference is in the comment at the top of `provider-stub-lib.mjs`. `tests/provider-stub.test.ts` checks that every fixture loads and that the real route A and route B geometries each select their own AFDC fixture.
+  - Fixtures:
+    - Suggest and retrieve for "Tesla Supercharger Frederick" and "Toronto", directions Frederick → Toronto (2 routes), and AFDC nearby-route for route A. These are all the real captures in `fixtures/`.
+    - AFDC route B (`provider-fixtures/data/afdc-nearby-route-b.json`) is **derived, not captured**. It holds the 83 stations from the route A capture that lie within 3 km of real route B. Records are unchanged, and the file's `_fixture_note` says how it was made.
+  - Three stations in both AFDC files are `restricted_access`, and the API leaves them out (F5), so the page lists 119 for route A and 80 for route B.
+- **Playwright runs with `workers: 1`** (`fullyParallel: false`). Every spec signs in as the one E2E user, and the seeding specs reset that user, so spec files running at once would race. The suite takes about 20 s. Per-spec users would allow parallel runs again.
+- **Tests.**
+  - Vitest:
+    - `tests/trip-url.test.ts`: round-trip and validation.
+    - `tests/trip-route-list.test.tsx`: units, the Shortest label, selection and charger text.
+    - `tests/trip-planner.test.tsx`: selected route first, cache on switch, filter refetch without Directions, swap, map route pick, both no-route reasons, Mapbox outage retry, stations outage retry, no vehicle, URL restore, fallback for an out-of-range `route`, truncation.
+    - `tests/provider-stub.test.ts`.
+  - Playwright `e2e/trip-planner.spec.ts` (E1 on the stub):
+    1. Sign in and search both endpoints.
+    2. Check two routes, with A marked Shortest and US → CA.
+    3. Check that 119 stations are listed for A and that B's summary loads in the background.
+    4. Select B and check 80 stations and `route=1` in the URL.
+    5. Reload and check that the same plan comes back.
+- **Still manual:** E1/E2 with real keys, meaning a Frederick → Toronto screenshot showing stations on both sides of the border.
+
 ---
 
 ### F8 — Favorite stations (optional)

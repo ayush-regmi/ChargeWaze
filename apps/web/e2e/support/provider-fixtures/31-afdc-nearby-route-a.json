@@ -1,0 +1,17 @@
+{
+  "description": "AFDC nearby-route for route A (QEW): only route A passes Batavia, NY (route B stays about 30 km away). The real cross-border capture: 122 DC fast stations, 41 US / 81 CA (the E2 fixture).",
+  "match": {
+    "method": "POST",
+    "path": "/afdc/nearby-route.json",
+    "routeNear": {
+      "lat": 42.75,
+      "lon": -78.24,
+      "km": 10
+    }
+  },
+  "response": {
+    "status": 200,
+    "bodyFile": "../../../../../fixtures/stations/afdc/nearby_route_cross_border_dc_fast.json",
+    "paginate": "afdc"
+  }
+}

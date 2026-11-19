@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { E2E_JWT_SECRET, envPort } from "./e2e-auth.mjs";
+import { E2E_AFDC_API_KEY, E2E_MAPBOX_TOKEN, PROVIDER_STUB_URL } from "./provider-stub-lib.mjs";
 
 /**
  * Ports and backend settings shared by `playwright.config.ts` and the seed
@@ -31,6 +32,13 @@ export const API_ENV: Record<string, string> = {
   // Any accidental live Smartcar call fails fast instead of leaving the box.
   SMARTCAR_API_BASE_URL: "http://127.0.0.1:9/v3",
   SMARTCAR_AUTH_URL: "http://127.0.0.1:9/oauth2/token",
+  // Mapbox and AFDC go to the fixture-backed provider stub
+  // (provider-stub.mjs) with test-only credentials, so a real key in
+  // services/api/.env is never used by the suite.
+  MAPBOX_SECRET_TOKEN: E2E_MAPBOX_TOKEN,
+  MAPBOX_API_BASE_URL: `${PROVIDER_STUB_URL}/mapbox`,
+  AFDC_API_KEY: E2E_AFDC_API_KEY,
+  AFDC_API_BASE_URL: `${PROVIDER_STUB_URL}/afdc`,
   SENTRY_DSN_BACKEND: "",
   ALLOWED_ORIGINS: `http://localhost:${WEB_PORT}`,
 };

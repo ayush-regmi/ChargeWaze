@@ -1,0 +1,5 @@
+{
+  "description": "Retrieve the first 'Toronto' suggestion: Toronto, ON (real capture).",
+  "match": { "method": "GET", "path": "/mapbox/search/searchbox/v1/retrieve/dXJuOm1ieHBsYzpCK3dJSnc" },
+  "response": { "status": 200, "bodyFile": "../../../../../fixtures/mapbox/retrieve_toronto.json" }
+}
