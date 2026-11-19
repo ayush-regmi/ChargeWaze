@@ -13,7 +13,7 @@ const MapView = dynamic(() => import("./map-view"), {
   loading: () => (
     <div
       aria-busy="true"
-      className="flex h-full min-h-72 w-full items-center justify-center rounded-lg bg-neutral-100 text-sm text-neutral-500 dark:bg-neutral-900"
+      className="flex h-full min-h-72 w-full items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground"
     >
       Loading map…
     </div>
@@ -25,12 +25,12 @@ export function MapUnavailable({ className, reason }: { className?: string; reas
     <div
       role="status"
       className={cn(
-        "flex h-full min-h-72 w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-6 text-center dark:border-neutral-700 dark:bg-neutral-900",
+        "flex h-full min-h-72 w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-muted/50 p-6 text-center",
         className,
       )}
     >
       <p className="text-sm font-medium">Map unavailable</p>
-      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+      <p className="text-xs text-muted-foreground">
         {reason ?? "The list still works."}
       </p>
     </div>

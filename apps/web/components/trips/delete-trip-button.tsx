@@ -55,7 +55,7 @@ export function DeleteTripButton({ tripId, tripName }: { tripId: string; tripNam
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error ? (
-          <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+          <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
         ) : null}

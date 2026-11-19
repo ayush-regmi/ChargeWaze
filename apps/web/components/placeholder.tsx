@@ -19,14 +19,14 @@ export function PagePlaceholder({
   return (
     <section className="mx-auto max-w-3xl space-y-6">
       <div className="space-y-2">
-        <span className="inline-block rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+        <span className="inline-block rounded-full bg-accent px-3 py-1 text-xs font-medium text-foreground">
           {phase}
         </span>
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        <p className="text-neutral-600 dark:text-neutral-400">{summary}</p>
+        <p className="text-muted-foreground">{summary}</p>
       </div>
       {children ? (
-        <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="rounded-lg border border-border bg-background p-6">
           {children}
         </div>
       ) : null}

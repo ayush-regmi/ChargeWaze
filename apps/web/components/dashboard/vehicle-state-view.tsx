@@ -1,4 +1,9 @@
+import { ArrowUpRight, CarFront } from "lucide-react";
 import Link from "next/link";
+
+import { buttonVariants } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { cn } from "@/lib/utils";
 
 import { LocalTime } from "@/components/garage/local-time";
 import {
@@ -28,24 +33,27 @@ export function VehicleStateView({ vehicle, state, units }: Props) {
   const awaiting = !state.recorded_at;
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{vehicleTitle(vehicle)}</h1>
-        {state.recorded_at ? (
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Last update <LocalTime iso={state.recorded_at} />
-          </p>
-        ) : null}
-      </div>
+    <div className="mx-auto max-w-5xl space-y-8">
+      <PageHeader
+        title={vehicleTitle(vehicle)}
+        description={
+          state.recorded_at ? (
+            <>
+              Last update <LocalTime iso={state.recorded_at} />
+            </>
+          ) : undefined
+        }
+        actions={<QuickLinks vehicleId={vehicle.id} />}
+      />
 
       {awaiting ? (
         <div
           role="status"
           data-testid="awaiting-first-update"
-          className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100"
+          className="rounded-lg border border-border bg-muted/50 p-4 text-sm"
         >
           <p className="font-medium">Connected — awaiting first update from your vehicle.</p>
-          <p className="mt-1">
+          <p className="mt-1 text-muted-foreground">
             It can take a few minutes after connecting for your car to report its battery
             state. This page will show it once it arrives.
           </p>
@@ -56,18 +64,19 @@ export function VehicleStateView({ vehicle, state, units }: Props) {
             <div
               role="alert"
               data-testid="stale-banner"
-              className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+              className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
             >
               Data may be stale — last update{" "}
               <TimeAgo iso={state.recorded_at as string} />.
             </div>
           ) : null}
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border lg:grid-cols-4">
             <StatCard
               title="Battery"
               quantity={formatPercent(signals.soc_percent)}
               recordedAt={at.soc_percent}
+              meter={signals.soc_percent ?? null}
             />
             <StatCard
               title="Range"
@@ -89,8 +98,6 @@ export function VehicleStateView({ vehicle, state, units }: Props) {
           </div>
         </>
       )}
-
-      <QuickLinks vehicleId={vehicle.id} />
     </div>
   );
 }
@@ -107,18 +114,13 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section
-      aria-label={title}
-      className="space-y-2 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800"
-    >
-      <div>
-        <h2 className="text-sm font-medium text-neutral-600 dark:text-neutral-400">{title}</h2>
-        {subtitle ? (
-          <p className="text-xs text-neutral-500 dark:text-neutral-500">{subtitle}</p>
-        ) : null}
+    <section aria-label={title} className="flex flex-col gap-3 bg-background p-5">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-sm text-muted-foreground">{title}</h2>
+        {subtitle ? <p className="text-xs text-muted-foreground">{subtitle}</p> : null}
       </div>
-      {children}
-      <p className="text-xs text-neutral-500">
+      <div className="flex-1 space-y-2">{children}</div>
+      <p className="text-xs text-muted-foreground">
         {recordedAt ? (
           <>
             As of <LocalTime iso={recordedAt} />
@@ -136,23 +138,42 @@ function StatCard({
   subtitle,
   quantity,
   recordedAt,
+  meter,
 }: {
   title: string;
   subtitle?: string;
   quantity: Quantity | null;
   recordedAt?: string;
+  /** 0–100: draws a charge bar, colored only when the charge is low. */
+  meter?: number | null;
 }) {
   return (
     <Card title={title} subtitle={subtitle} recordedAt={quantity ? recordedAt : undefined}>
       {quantity ? (
-        <p className="text-3xl font-semibold tabular-nums">
+        <p className="text-3xl font-semibold tracking-tight tabular-nums">
           {quantity.value}
-          <span className="ml-1 text-base font-normal text-neutral-500">{quantity.unit}</span>
+          <span className="ml-1 text-sm font-normal text-muted-foreground">{quantity.unit}</span>
         </p>
       ) : (
-        <p className="text-lg text-neutral-500">Not reported</p>
+        <p className="pt-2 text-sm text-muted-foreground">Not reported</p>
       )}
+      {quantity && meter != null ? <ChargeMeter percent={meter} /> : null}
     </Card>
+  );
+}
+
+function ChargeMeter({ percent }: { percent: number }) {
+  const clamped = Math.max(0, Math.min(100, percent));
+  return (
+    <div aria-hidden className="h-1 overflow-hidden rounded-full bg-muted">
+      <div
+        className={cn(
+          "h-full rounded-full",
+          clamped < 15 ? "bg-destructive" : clamped < 30 ? "bg-warning" : "bg-foreground",
+        )}
+        style={{ width: `${clamped}%` }}
+      />
+    </div>
   );
 }
 
@@ -175,25 +196,34 @@ function ChargingCard({
   const power = formatPowerKw(powerKw);
   return (
     <Card title="Charging" recordedAt={isCharging === null ? undefined : recordedAt}>
-      <p className="text-lg font-semibold">
+      <p className="flex items-center gap-2 pt-1 text-base font-medium">
         {isCharging === null ? (
-          <span className="font-normal text-neutral-500">Not reported</span>
+          <span className="text-sm font-normal text-muted-foreground">Not reported</span>
         ) : isCharging ? (
-          "Charging"
+          <>
+            <span aria-hidden className="relative flex size-2">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
+              <span className="relative inline-flex size-2 rounded-full bg-success" />
+            </span>
+            Charging
+          </>
         ) : (
-          "Not charging"
+          <>
+            <span aria-hidden className="size-2 rounded-full bg-muted-foreground/40" />
+            Not charging
+          </>
         )}
       </p>
       {isCharging ? (
         <p
           data-testid="charging-power"
-          className="text-sm text-neutral-600 dark:text-neutral-400"
+          className="text-sm text-muted-foreground"
         >
           {power ? (
             <>
               {`${power.value} ${power.unit}`}
               {powerRecordedAt ? (
-                <span className="text-xs text-neutral-500">
+                <span className="text-xs text-muted-foreground">
                   {" "}
                   · as of <LocalTime iso={powerRecordedAt} />
                 </span>
@@ -210,17 +240,17 @@ function ChargingCard({
 
 function QuickLinks({ vehicleId }: { vehicleId: string }) {
   const links = [
-    { href: "/trips", label: "Plan Trip" },
-    { href: "/charging", label: "Find Chargers" },
-    { href: `/garage/${vehicleId}`, label: "View Vehicle" },
+    { href: `/garage/${vehicleId}`, label: "View Vehicle", primary: false },
+    { href: "/charging", label: "Find Chargers", primary: false },
+    { href: "/trips", label: "Plan Trip", primary: true },
   ];
   return (
-    <nav aria-label="Quick links" className="flex flex-wrap gap-3">
+    <nav aria-label="Quick links" className="flex flex-wrap gap-2">
       {links.map((link) => (
         <Link
           key={link.href}
           href={link.href}
-          className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+          className={buttonVariants({ variant: link.primary ? "default" : "outline", size: "sm" })}
         >
           {link.label}
         </Link>
@@ -234,17 +264,18 @@ export function NoVehicle() {
   return (
     <div
       data-testid="no-vehicle"
-      className="space-y-3 rounded-lg border border-dashed border-neutral-300 p-6 text-center dark:border-neutral-700"
+      className="mx-auto flex max-w-xl flex-col items-center gap-3 rounded-lg border border-dashed border-border px-6 py-14 text-center"
     >
-      <h1 className="text-xl font-semibold">No vehicle connected</h1>
-      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+      <span className="flex size-10 items-center justify-center rounded-full border border-border">
+        <CarFront aria-hidden className="size-5 text-muted-foreground" strokeWidth={1.75} />
+      </span>
+      <h1 className="text-lg font-semibold tracking-tight">No vehicle connected</h1>
+      <p className="max-w-sm text-sm text-muted-foreground">
         Connect your EV in the Garage to see its battery level, range and charging status here.
       </p>
-      <Link
-        href="/garage"
-        className="inline-block rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-      >
+      <Link href="/garage" className={cn(buttonVariants({ size: "sm" }), "mt-2")}>
         Go to Garage
+        <ArrowUpRight aria-hidden />
       </Link>
     </div>
   );

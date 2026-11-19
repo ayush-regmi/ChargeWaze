@@ -15,9 +15,9 @@ import {
   type ConnectorType,
 } from "@/lib/stations";
 import type { UnitSystem } from "@/lib/units";
+import { fieldClass } from "@/components/ui/field";
 
-const selectClass =
-  "h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm dark:border-neutral-700 dark:bg-neutral-950";
+const selectClass = `${fieldClass} w-full px-2`;
 
 /**
  * Station filters: connector (multi-select), network, charging level, minimum
@@ -71,8 +71,8 @@ export function StationFilters({
                 className={cn(
                   "h-8 rounded-full border px-3 text-xs font-medium",
                   on
-                    ? "border-blue-600 bg-blue-600 text-white"
-                    : "border-neutral-300 bg-white text-neutral-700 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-300",
+                    ? "border-foreground bg-primary text-primary-foreground"
+                    : "border-border bg-background text-foreground",
                 )}
               >
                 {connectorLabel(type)}
@@ -83,7 +83,7 @@ export function StationFilters({
             <button
               type="button"
               onClick={() => set({ connectors: "any" })}
-              className="text-xs text-neutral-600 underline-offset-2 hover:underline dark:text-neutral-400"
+              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
             >
               Any connector
             </button>
@@ -92,13 +92,13 @@ export function StationFilters({
             <button
               type="button"
               onClick={() => set({ connectors: null })}
-              className="text-xs text-neutral-600 underline-offset-2 hover:underline dark:text-neutral-400"
+              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
             >
               Use my vehicle&apos;s connectors
             </button>
           ) : null}
         </div>
-        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="text-xs text-muted-foreground">
           {isVehicleDefault
             ? "Showing your vehicle's connectors."
             : selected.length === 0

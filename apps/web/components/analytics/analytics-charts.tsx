@@ -32,9 +32,9 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+    <section className="rounded-lg border border-border p-4">
       <h2 className="text-sm font-semibold">{title}</h2>
-      <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
+      <p className="mb-3 text-xs text-muted-foreground">
         {description}
       </p>
       {children}
@@ -100,7 +100,7 @@ export function AnalyticsCharts({
           (b) =>
             b.observed_kwh_per_km === null && b.estimated_kwh_per_km === null,
         ) ? (
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          <p className="text-sm text-muted-foreground">
             No consumption to compare in this range yet.
           </p>
         ) : (
@@ -140,7 +140,7 @@ export function AnalyticsCharts({
           }
         >
           {scatter.length === 0 ? (
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+            <p className="text-sm text-muted-foreground">
               No drives with both an observed and an estimated energy yet.
             </p>
           ) : (

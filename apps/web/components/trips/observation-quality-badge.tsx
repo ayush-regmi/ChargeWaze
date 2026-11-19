@@ -7,9 +7,9 @@ import {
 } from "./observation-format";
 
 const QUALITY_CLASSES: Record<QualityFlag, string> = {
-  high: "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300",
-  medium: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300",
-  low: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
+  high: "bg-success/10 text-success",
+  medium: "bg-warning/10 text-warning",
+  low: "bg-destructive/10 text-destructive",
 };
 
 /** High / Medium / Low measurement quality (phase5_plan D8). */
@@ -35,7 +35,7 @@ export function QualityReasons({ reasons }: { reasons: readonly string[] }) {
     <ul
       aria-label="Why this quality"
       data-testid="quality-reasons"
-      className="list-disc space-y-0.5 pl-5 text-xs text-neutral-600 dark:text-neutral-400"
+      className="list-disc space-y-0.5 pl-5 text-xs text-muted-foreground"
     >
       {reasons.map((code) => (
         <li key={code} data-reason={code}>
@@ -47,10 +47,10 @@ export function QualityReasons({ reasons }: { reasons: readonly string[] }) {
 }
 
 const REVIEW_CLASSES: Record<ReviewStatus, string> = {
-  auto: "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300",
-  needs_review: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300",
-  confirmed: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  rejected: "bg-neutral-200 text-neutral-700 line-through dark:bg-neutral-800 dark:text-neutral-400",
+  auto: "bg-muted text-foreground",
+  needs_review: "bg-warning/10 text-warning",
+  confirmed: "bg-muted text-foreground",
+  rejected: "bg-muted text-foreground line-through",
 };
 
 export function ReviewStatusBadge({ status }: { status: ReviewStatus }) {

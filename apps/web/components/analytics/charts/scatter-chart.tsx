@@ -47,7 +47,7 @@ export function ScatterChart({
         role="img"
         aria-label={label}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="h-auto w-full"
+        className="mx-auto h-auto w-full max-w-xl"
         data-chart="scatter"
       >
         <YAxis ticks={ticks} y={y} label={yLabel} />
@@ -57,8 +57,8 @@ export function ScatterChart({
           y1={y(d0)}
           x2={x(d1)}
           y2={y(d1)}
-          strokeDasharray="4 4"
-          className="stroke-neutral-400 dark:stroke-neutral-600"
+          strokeDasharray="4"
+          className="stroke-muted-foreground"
           data-reference="y=x"
         >
           <title>Observed equals estimated</title>
@@ -73,8 +73,8 @@ export function ScatterChart({
             data-hollow={p.hollow ? "true" : "false"}
             className={
               p.hollow
-                ? "fill-transparent stroke-amber-600 dark:stroke-amber-400"
-                : "fill-blue-600 stroke-blue-600 dark:fill-blue-400 dark:stroke-blue-400"
+                ? "fill-transparent stroke-warning"
+                : "fill-chart-2 stroke-chart-2"
             }
           >
             <title>{`${p.rowLabel}: estimated ${format(p.x)}, observed ${format(p.y)} (${p.note})`}</title>

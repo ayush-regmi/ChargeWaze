@@ -6,10 +6,10 @@ import { env } from "@/lib/env";
 
 export default function SignUpPage() {
   return (
-    <div className="space-y-6 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="space-y-8">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold">Create your Chargewise account</h1>
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        <h1 className="text-2xl font-semibold tracking-tight">Create your Chargewise account</h1>
+        <p className="text-sm text-muted-foreground">
           You will receive a confirmation email if required by your project.
         </p>
       </div>
@@ -20,12 +20,9 @@ export default function SignUpPage() {
           appleEnabled={env.appleAuthEnabled}
         />
       </Suspense>
-      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+      <p className="text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link
-          href="/sign-in"
-          className="font-medium text-emerald-700 hover:underline dark:text-emerald-400"
-        >
+        <Link href="/sign-in" className="font-medium link">
           Sign in
         </Link>
       </p>

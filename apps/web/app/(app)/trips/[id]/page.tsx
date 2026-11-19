@@ -17,7 +17,7 @@ type Props = { params: Promise<{ id: string }> };
 export default function TripPage(props: Props) {
   return (
     <section className="mx-auto max-w-3xl space-y-6">
-      <Suspense fallback={<p className="text-sm text-neutral-500">Loading trip…</p>}>
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Loading trip…</p>}>
         <Trip {...props} />
       </Suspense>
     </section>
@@ -45,7 +45,7 @@ async function Trip({ params }: Props) {
     <>
       <Link
         href="/trips/saved"
-        className="text-sm text-neutral-600 hover:underline dark:text-neutral-400"
+        className="text-sm text-muted-foreground underline-offset-[3px] hover:text-foreground hover:underline"
       >
         ← Saved trips
       </Link>
@@ -61,7 +61,7 @@ async function Trip({ params }: Props) {
           ) : null}
         </>
       ) : (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-destructive">
           Couldn&apos;t load this trip. Please refresh to try again.
         </p>
       )}

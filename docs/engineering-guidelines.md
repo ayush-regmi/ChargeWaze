@@ -68,6 +68,15 @@ If the docs contradict each other, flag it in your PR and propose a fix before w
 - Document meaningful architectural decisions with a new ADR in [`adr/`](adr/).
 - Do not add features outside the current task. If you find something that needs fixing, open a separate issue.
 
+## UI design
+
+The web app is monochrome and minimal: black, white and grays, hairline borders, no decorative shadows or gradients. Color carries meaning only.
+
+- Use the design tokens in `apps/web/app/globals.css` (`bg-background`, `text-muted-foreground`, `border-border`, `bg-primary`, …), never raw palette classes such as `text-neutral-500` or `bg-emerald-600`. Tokens already switch for dark mode, so no `dark:` color overrides are needed.
+- Color is for status and data only: `success`, `warning`, `destructive` and `info` for feedback and badges; `chart-1` / `chart-2` for compared data series; the map's route and station markers. Buttons, navigation, tabs, links and selection stay black and white.
+- One primary (filled) button per view; other actions use `outline` or `ghost`. Build buttons with `Button` / `buttonVariants`, inputs and selects with `fieldClass`, page titles with `PageHeader`, and status pills with `Badge` (all in `components/ui/`). Inline links use the `link` utility.
+- Icons come from `lucide-react`, sized by the component (`size-4` by default), and are `aria-hidden` when a text label is present.
+
 ## Commands
 
 Tooling is **npm workspaces + Turborepo** on the JS side and **`uv`** on the Python side. See [`adr/0005-npm-turborepo-uv-tooling.md`](adr/0005-npm-turborepo-uv-tooling.md).

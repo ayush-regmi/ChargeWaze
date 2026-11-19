@@ -1,7 +1,9 @@
+import { History } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
+import { buttonVariants } from "@/components/ui/button";
 import type { ApiClient } from "@/lib/api";
 import { requireSessionApi } from "@/lib/session-api";
 import { vehicleConnectorTypes } from "@/lib/stations";
@@ -19,20 +21,18 @@ export default function TripsPage({ searchParams }: { searchParams: SearchParams
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Trip Planner</h1>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+          <p className="text-sm text-muted-foreground">
             Compare driving routes, see the chargers along each one and plan where to charge.
           </p>
         </div>
-        <Link
-          href="/trips/saved"
-          className="text-sm font-medium text-blue-700 underline-offset-2 hover:underline dark:text-blue-400"
-        >
-          Saved trips →
+        <Link href="/trips/saved" className={buttonVariants({ variant: "outline", size: "sm" })}>
+          <History aria-hidden />
+          Saved trips
         </Link>
       </div>
       <Suspense
         fallback={
-          <p role="status" className="text-sm text-neutral-500">
+          <p role="status" className="text-sm text-muted-foreground">
             Loading…
           </p>
         }

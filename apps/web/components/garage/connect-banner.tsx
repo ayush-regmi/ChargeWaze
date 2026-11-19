@@ -39,10 +39,10 @@ const BANNERS: Record<ConnectFlag, Banner> = {
 
 const TONE_CLASSES: Record<Banner["tone"], string> = {
   success:
-    "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100",
-  info: "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100",
+    "border-success/30 bg-success/10 text-success",
+  info: "border-border bg-muted/50 text-foreground",
   error:
-    "border-red-300 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100",
+    "border-destructive/30 bg-destructive/10 text-destructive",
 };
 
 export function connectBanner(value: string | null | undefined): Banner | null {

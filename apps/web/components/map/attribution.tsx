@@ -4,7 +4,7 @@
  */
 export function DataAttribution() {
   return (
-    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+    <p className="text-xs text-muted-foreground">
       Map data © Mapbox © OpenStreetMap. Station data: U.S. DOE / NREL Alternative Fuels Data
       Center (includes Natural Resources Canada data).
     </p>

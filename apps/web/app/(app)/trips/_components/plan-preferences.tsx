@@ -9,6 +9,7 @@ import {
   type PreferencesFormErrors,
 } from "@/components/profile/preferences";
 import { Button } from "@/components/ui/button";
+import { fieldClass } from "@/components/ui/field";
 import {
   changedPlanPreferences,
   parseSocPercent,
@@ -43,9 +44,9 @@ function Field({
         {label}
       </label>
       {children}
-      {hint ? <p className="text-xs text-neutral-500">{hint}</p> : null}
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       {error ? (
-        <p id={`${id}-error`} role="alert" className="text-xs text-red-700 dark:text-red-300">
+        <p id={`${id}-error`} role="alert" className="text-xs text-destructive">
           {error}
         </p>
       ) : null}
@@ -64,8 +65,7 @@ function withoutNulls(p: PlanPreferences | null): Partial<Preferences> {
   return out;
 }
 
-const INPUT =
-  "w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900";
+const INPUT = `${fieldClass} w-full`;
 
 /**
  * "Re-plan with different preferences" (phase4_plan F6). Starts from the
@@ -123,7 +123,7 @@ export function PlanPreferencesPanel({
     errors[key] ? { "aria-invalid": true, "aria-describedby": `${field}-error` } : {};
 
   return (
-    <details className="rounded-lg border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+    <details className="rounded-lg border border-border p-3 text-sm">
       <summary className="cursor-pointer font-medium">Re-plan with different preferences</summary>
       <form
         aria-label="Re-plan with different preferences"
@@ -194,7 +194,7 @@ export function PlanPreferencesPanel({
             {...described("networks", `${id}-networks`)}
           />
         </Field>
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted-foreground">
           Applies to this plan only. Change your saved preferences on the Profile page.
         </p>
         <Button type="submit" size="sm" disabled={pending}>

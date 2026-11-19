@@ -45,17 +45,17 @@ function DriveItem({ trip, units }: { trip: ObservedTrip; units: UnitSystem }) {
         <QualityBadge flag={trip.quality_flag} />
         <ReviewStatusBadge status={trip.review_status} />
         {trip.in_progress ? (
-          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
             In progress
           </span>
         ) : null}
         {trip.is_simulated ? (
-          <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
             Simulated
           </span>
         ) : null}
       </div>
-      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+      <p className="text-sm text-muted-foreground">
         <DriveTimes leg={trip} />
       </p>
       <p className="text-sm">
@@ -68,7 +68,7 @@ function DriveItem({ trip, units }: { trip: ObservedTrip; units: UnitSystem }) {
         <p className="text-sm">
           <Link
             href={`/trips/${trip.planned_trip_id}`}
-            className="text-blue-700 hover:underline dark:text-blue-400"
+            className="link"
           >
             Matched to a planned trip
             {trip.plan_leg_index !== null ? ` (leg ${trip.plan_leg_index})` : ""} →
@@ -76,7 +76,7 @@ function DriveItem({ trip, units }: { trip: ObservedTrip; units: UnitSystem }) {
         </p>
       ) : null}
       {trip.in_progress ? (
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted-foreground">
           Still being recorded. You can review it once the drive has ended.
         </p>
       ) : (
@@ -125,8 +125,8 @@ export function ObservationList({
             aria-current={filter === f.key ? "page" : undefined}
             className={
               filter === f.key
-                ? "rounded-full bg-neutral-900 px-3 py-1 font-medium text-white dark:bg-neutral-100 dark:text-neutral-900"
-                : "rounded-full border border-neutral-300 px-3 py-1 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
+                ? "rounded-full bg-primary px-3 py-1 font-medium text-primary-foreground"
+                : "rounded-full border border-border px-3 py-1 hover:bg-accent"
             }
           >
             {f.label}
@@ -136,20 +136,20 @@ export function ObservationList({
 
       {items.length === 0 ? (
         firstHref ? (
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">No more drives.</p>
+          <p className="text-sm text-muted-foreground">No more drives.</p>
         ) : (
-          <div className="rounded-lg border border-dashed border-neutral-300 p-8 text-center dark:border-neutral-700">
+          <div className="rounded-lg border border-dashed border-border p-8 text-center">
             {filter === "needs_review" ? (
               <>
                 <p className="font-medium">Nothing to review</p>
-                <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Drives whose measurements are uncertain show up here for you to confirm.
                 </p>
               </>
             ) : (
               <>
                 <p className="font-medium">No drives yet</p>
-                <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Drives appear here automatically after you drive a connected car.
                 </p>
               </>
@@ -159,7 +159,7 @@ export function ObservationList({
       ) : (
         <ul
           aria-label="Observed drives"
-          className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800"
+          className="divide-y divide-border rounded-lg border border-border"
         >
           {items.map((trip) => (
             <DriveItem key={trip.id} trip={trip} units={units} />
@@ -170,12 +170,12 @@ export function ObservationList({
       {nextHref || firstHref ? (
         <nav aria-label="Observed drives pages" className="flex gap-4 text-sm">
           {firstHref ? (
-            <Link href={firstHref} className="text-blue-700 hover:underline dark:text-blue-400">
+            <Link href={firstHref} className="link">
               ← First page
             </Link>
           ) : null}
           {nextHref ? (
-            <Link href={nextHref} className="text-blue-700 hover:underline dark:text-blue-400">
+            <Link href={nextHref} className="link">
               Older drives →
             </Link>
           ) : null}

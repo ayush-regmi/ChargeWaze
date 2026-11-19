@@ -5,6 +5,7 @@ import { useId, useState, useTransition } from "react";
 import { updateVehicleSpecs } from "@/app/(app)/garage/actions";
 import { Button } from "@/components/ui/button";
 import type { UnitSystem } from "@/lib/units";
+import { fieldClass } from "@/components/ui/field";
 import {
   CONNECTORS,
   MAX_CAPACITY_KWH,
@@ -54,9 +55,8 @@ export function SpecsEditor({
   );
 }
 
-const inputClass =
-  "w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-950 aria-[invalid=true]:border-red-500";
-const errorClass = "text-xs text-red-700 dark:text-red-400";
+const inputClass = `${fieldClass} w-full`;
+const errorClass = "text-xs text-destructive";
 
 function SpecsForm({
   vehicleId,
@@ -114,7 +114,7 @@ function SpecsForm({
       onSubmit={onSubmit}
       noValidate
       aria-label="Edit specs"
-      className="space-y-4 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+      className="space-y-4 rounded-lg border border-border bg-background p-4"
     >
       <h2 className="text-sm font-medium">Edit specs</h2>
 
@@ -131,7 +131,7 @@ function SpecsForm({
           aria-invalid={errors.capacityKwh ? true : undefined}
           aria-describedby={`${ids}-capacity-help`}
         />
-        <p id={`${ids}-capacity-help`} className="text-xs text-neutral-500 dark:text-neutral-400">
+        <p id={`${ids}-capacity-help`} className="text-xs text-muted-foreground">
           Leave empty if unknown. Up to {MAX_CAPACITY_KWH} kWh.
         </p>
         {errors.capacityKwh ? (
@@ -157,7 +157,7 @@ function SpecsForm({
         />
         <p
           id={`${ids}-consumption-help`}
-          className="text-xs text-neutral-500 dark:text-neutral-400"
+          className="text-xs text-muted-foreground"
         >
           {catalogDisplay
             ? `Leave empty to use the catalog's highway estimate (${catalogDisplay} ${consumptionUnit(units)}).`
@@ -193,13 +193,13 @@ function SpecsForm({
 
       <fieldset className="space-y-2">
         <legend className="text-sm">Charging curve</legend>
-        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+        <p className="text-xs text-muted-foreground">
           Max charging power at each battery level, lowest level first.
         </p>
         {values.curve.length > 0 ? (
           <table className="text-sm">
             <thead>
-              <tr className="text-left text-neutral-500 dark:text-neutral-400">
+              <tr className="text-left text-muted-foreground">
                 <th className="pr-3 font-normal">Battery (%)</th>
                 <th className="pr-3 font-normal">Max power (kW)</th>
                 <th>
@@ -271,7 +271,7 @@ function SpecsForm({
       </fieldset>
 
       {serverError ? (
-        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+        <p role="alert" className="text-sm text-destructive">
           {serverError}
         </p>
       ) : null}

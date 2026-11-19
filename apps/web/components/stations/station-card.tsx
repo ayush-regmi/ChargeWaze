@@ -13,14 +13,14 @@ import { FavoriteToggle } from "./favorite-toggle";
 
 export function ConnectorChips({ connectors }: { connectors: readonly StationConnector[] }) {
   if (connectors.length === 0) {
-    return <p className="text-xs text-neutral-500">Connector types not reported</p>;
+    return <p className="text-xs text-muted-foreground">Connector types not reported</p>;
   }
   return (
     <ul aria-label="Connectors" className="flex flex-wrap gap-1.5">
       {connectors.map((c) => (
         <li
           key={c.type}
-          className="rounded-md bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+          className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground"
         >
           <span className="font-medium">{connectorLabel(c.type)}</span>{" "}
           <span>{connectorDetail(c)}</span>
@@ -33,11 +33,11 @@ export function ConnectorChips({ connectors }: { connectors: readonly StationCon
 export function CompatibilityBadge({ compatible }: { compatible: boolean | null }) {
   if (compatible === null) return null;
   return compatible ? (
-    <span className="rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-950 dark:text-green-300">
+    <span className="rounded-md bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
       Compatible
     </span>
   ) : (
-    <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+    <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
       Not compatible
     </span>
   );
@@ -45,7 +45,7 @@ export function CompatibilityBadge({ compatible }: { compatible: boolean | null 
 
 export function PowerUnknownBadge() {
   return (
-    <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+    <span className="rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
       Power unknown
     </span>
   );
@@ -84,10 +84,10 @@ export function StationCard({
       data-station-id={station.id}
       onClick={onSelect ? () => onSelect(station.id) : undefined}
       className={cn(
-        "space-y-2 rounded-lg border bg-white p-3 shadow-sm dark:bg-neutral-900",
+        "space-y-2 rounded-lg border bg-background p-3",
         selected
-          ? "border-blue-500 ring-2 ring-blue-500/30"
-          : "border-neutral-200 dark:border-neutral-800",
+          ? "border-foreground ring-2 ring-foreground/10"
+          : "border-border",
         onSelect && "cursor-pointer",
       )}
     >
@@ -98,13 +98,13 @@ export function StationCard({
               {station.name}
             </Link>
           </h3>
-          <p className="text-xs text-neutral-600 dark:text-neutral-400">
+          <p className="text-xs text-muted-foreground">
             {station.network ?? "Network not reported"}
           </p>
         </div>
         <div className="flex shrink-0 items-start gap-1">
           {distanceText ? (
-            <span className="pt-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300">
+            <span className="pt-1.5 text-xs font-medium text-foreground">
               {distanceText}
             </span>
           ) : null}
@@ -123,7 +123,7 @@ export function StationCard({
         <CompatibilityBadge compatible={station.compatible} />
         {unknownPower ? <PowerUnknownBadge /> : null}
         {liveAvailability !== null && liveAvailability !== undefined ? (
-          <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+          <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
             Live availability reported
           </span>
         ) : null}

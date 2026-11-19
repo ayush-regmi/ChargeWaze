@@ -168,7 +168,7 @@ export function ChargingView({
       </div>
 
       {vehicle === null ? (
-        <p className="rounded-md bg-neutral-100 px-3 py-2 text-sm text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+        <p className="rounded-md bg-muted px-3 py-2 text-sm text-foreground">
           Showing every connector type.{" "}
           <Link href="/garage" className="font-medium underline-offset-2 hover:underline">
             Connect a vehicle
@@ -176,7 +176,7 @@ export function ChargingView({
           to filter by its connectors and see which stations are compatible.
         </p>
       ) : vehicle.connectors.length === 0 ? (
-        <p className="rounded-md bg-neutral-100 px-3 py-2 text-sm text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+        <p className="rounded-md bg-muted px-3 py-2 text-sm text-foreground">
           Your {vehicle.title}&apos;s connectors aren&apos;t set, so compatibility can&apos;t be
           checked.{" "}
           <Link
@@ -222,7 +222,7 @@ export function ChargingView({
               />
             ) : result ? (
               <>
-                <p role="status" className="text-sm text-neutral-600 dark:text-neutral-400">
+                <p role="status" className="text-sm text-muted-foreground">
                   {pending
                     ? "Updating…"
                     : `${rows.length} ${rows.length === 1 ? "station" : "stations"}${
@@ -233,7 +233,7 @@ export function ChargingView({
                     : null}
                 </p>
                 {result.more ? (
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-muted-foreground">
                     Showing the nearest {rows.length}. Narrow the filters or the radius to see
                     others.
                   </p>
@@ -277,12 +277,12 @@ function ChargingTabs({
 }) {
   const tab = (active: boolean) =>
     active
-      ? "border-blue-600 text-blue-700 dark:border-blue-400 dark:text-blue-300"
-      : "border-transparent text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100";
+      ? "border-foreground text-foreground"
+      : "border-transparent text-muted-foreground hover:text-foreground";
   return (
     <nav
       aria-label="Charging views"
-      className="flex gap-4 border-b border-neutral-200 text-sm font-medium dark:border-neutral-800"
+      className="flex gap-4 border-b border-border text-sm font-medium"
     >
       <Link
         href={nearbyHref}
@@ -342,7 +342,7 @@ function FavoritesPanel({
 
   if (favorites === null) {
     return (
-      <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+      <p role="alert" className="text-sm text-destructive">
         Couldn&apos;t load your favorite stations. Please refresh to try again.
       </p>
     );
@@ -371,7 +371,7 @@ function FavoritesPanel({
         aria-busy={pending || undefined}
         className="space-y-3"
       >
-        <p role="status" className="text-sm text-neutral-600 dark:text-neutral-400">
+        <p role="status" className="text-sm text-muted-foreground">
           {pending
             ? "Updating…"
             : `${rows.length} favorite ${rows.length === 1 ? "station" : "stations"}`}

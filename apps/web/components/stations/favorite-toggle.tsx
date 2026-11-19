@@ -10,7 +10,7 @@ function StarIcon({ filled }: { filled: boolean }) {
   return (
     <svg
       aria-hidden="true"
-      viewBox="0 0 20 20"
+      viewBox="0 20"
       className="size-5"
       fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
@@ -79,14 +79,14 @@ export function FavoriteToggle({
         disabled={pending}
         onClick={toggle}
         className={cn(
-          "rounded-md p-1 transition-colors hover:bg-neutral-100 disabled:opacity-60 dark:hover:bg-neutral-800",
-          on ? "text-amber-500" : "text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300",
+          "rounded-md p-1 transition-colors hover:bg-accent disabled:opacity-60",
+          on ? "text-warning" : "text-muted-foreground hover:text-muted-foreground",
         )}
       >
         <StarIcon filled={on} />
       </button>
       {error ? (
-        <p role="alert" className="max-w-48 text-right text-xs text-red-700 dark:text-red-400">
+        <p role="alert" className="max-w-48 text-right text-xs text-destructive">
           {error}
         </p>
       ) : null}

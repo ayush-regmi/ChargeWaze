@@ -11,13 +11,13 @@ export type LineSeries = {
 
 const STYLES = {
   primary: {
-    stroke: "stroke-emerald-600 dark:stroke-emerald-400",
-    fill: "fill-emerald-600 dark:fill-emerald-400",
+    stroke: "stroke-chart-1",
+    fill: "fill-chart-1",
     dash: undefined,
   },
   secondary: {
-    stroke: "stroke-blue-600 dark:stroke-blue-400",
-    fill: "fill-blue-600 dark:fill-blue-400",
+    stroke: "stroke-chart-2",
+    fill: "fill-chart-2",
     dash: "6 4",
   },
 } as const;
@@ -67,7 +67,7 @@ export function LineChart({
   return (
     <figure>
       <ul
-        className="mb-1 flex flex-wrap gap-4 text-xs text-neutral-600 dark:text-neutral-400"
+        className="mb-1 flex flex-wrap gap-4 text-xs text-muted-foreground"
         aria-hidden="true"
       >
         {series.map((s) => (

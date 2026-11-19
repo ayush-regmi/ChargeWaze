@@ -1,10 +1,10 @@
 import type { GroupBy } from "./format";
+import { fieldClass } from "@/components/ui/field";
 
 export type VehicleOption = { id: string; label: string };
 
-const FIELD =
-  "mt-1 block rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
-const LABEL = "text-xs font-medium text-neutral-600 dark:text-neutral-400";
+const FIELD = `${fieldClass} mt-1 block px-2`;
+const LABEL = "text-xs font-medium text-muted-foreground";
 
 /**
  * The Analytics filters as a plain GET form, so they work without JavaScript
@@ -88,7 +88,7 @@ export function AnalyticsFilters({
       {tz ? <input type="hidden" name="tz" value={tz} /> : null}
       <button
         type="submit"
-        className="rounded-md bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+        className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
       >
         Apply
       </button>

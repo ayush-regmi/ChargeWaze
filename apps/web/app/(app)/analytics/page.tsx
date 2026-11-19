@@ -24,7 +24,7 @@ const TRIPS_PAGE_LIMIT = 200;
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-const LINK = "text-blue-700 hover:underline dark:text-blue-400";
+const LINK = "link";
 
 export default function AnalyticsPage({
   searchParams,
@@ -35,7 +35,7 @@ export default function AnalyticsPage({
     <section className="mx-auto max-w-6xl space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        <p className="text-sm text-muted-foreground">
           How much energy your drives really used, compared with what the
           planner&apos;s model expected.
         </p>
@@ -45,7 +45,7 @@ export default function AnalyticsPage({
       </Suspense>
       <Suspense
         fallback={
-          <p className="text-sm text-neutral-500">Loading analytics…</p>
+          <p className="text-sm text-muted-foreground">Loading analytics…</p>
         }
       >
         <Analytics searchParams={searchParams} />
@@ -100,7 +100,7 @@ async function Analytics({ searchParams }: { searchParams: SearchParams }) {
     return message ? (
       <p
         role="alert"
-        className="text-sm text-neutral-700 dark:text-neutral-300"
+        className="text-sm text-foreground"
       >
         {message}{" "}
         <Link href={reset} className={LINK}>
@@ -117,7 +117,7 @@ async function Analytics({ searchParams }: { searchParams: SearchParams }) {
       return (
         <p
           role="alert"
-          className="text-sm text-neutral-700 dark:text-neutral-300"
+          className="text-sm text-foreground"
         >
           That page link has expired.{" "}
           <Link
@@ -154,7 +154,7 @@ async function Analytics({ searchParams }: { searchParams: SearchParams }) {
       <AnalyticsFilters
         vehicles={vehicles.items.map((v) => ({
           id: v.id,
-          label: `${vehicleTitle(v)}${v.connection_status === "connected" ? "" : " (disconnected)"}`,
+          label: `${vehicleTitle(v)}${v.connection_status === "connected" ? "" : "(disconnected)"}`,
         }))}
         vehicleId={vehicle.id}
         from={data.range.from}
@@ -170,7 +170,7 @@ async function Analytics({ searchParams }: { searchParams: SearchParams }) {
         excludeHref={`/analytics${analyticsSearch({ ...view, includeSimulated: false })}`}
       />
       {exportError ? (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-destructive">
           {exportError === "too_large"
             ? "Too many drives to export at once (the limit is 10,000). Pick a shorter range and try again."
             : "Couldn't export your drives. Please try again."}
@@ -193,7 +193,7 @@ async function Analytics({ searchParams }: { searchParams: SearchParams }) {
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <div>
                 <h2 className="text-lg font-semibold">Drives</h2>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                <p className="text-xs text-muted-foreground">
                   Newest first. Drives marked “Not in totals” are still in
                   progress, need review, or are simulated.
                 </p>
@@ -203,7 +203,7 @@ async function Analytics({ searchParams }: { searchParams: SearchParams }) {
               </a>
             </div>
             {items.length === 0 ? (
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+              <p className="text-sm text-muted-foreground">
                 No more drives in this range.
               </p>
             ) : (
@@ -240,12 +240,12 @@ function EmptyState() {
   return (
     <div
       data-testid="analytics-empty"
-      className="rounded-lg border border-dashed border-neutral-300 p-8 text-center dark:border-neutral-700"
+      className="rounded-lg border border-dashed border-border p-8 text-center"
     >
       <p className="font-medium">
         No trips yet. Trips appear here automatically after you drive.
       </p>
-      <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+      <p className="mt-1 text-sm text-muted-foreground">
         Try a longer date range if you expected to see drives here.
       </p>
     </div>
@@ -254,14 +254,14 @@ function EmptyState() {
 
 function NoVehicles() {
   return (
-    <div className="space-y-3 rounded-lg border border-dashed border-neutral-300 p-6 text-center dark:border-neutral-700">
+    <div className="space-y-3 rounded-lg border border-dashed border-border p-6 text-center">
       <p className="font-medium">No vehicle connected</p>
-      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+      <p className="text-sm text-muted-foreground">
         Connect your EV in the Garage. Its drives show up here automatically.
       </p>
       <Link
         href="/garage"
-        className="inline-block rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+        className="inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
       >
         Go to Garage
       </Link>
@@ -271,7 +271,7 @@ function NoVehicles() {
 
 function LoadError() {
   return (
-    <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+    <p role="alert" className="text-sm text-destructive">
       Couldn&apos;t load your analytics. Please refresh to try again.
     </p>
   );

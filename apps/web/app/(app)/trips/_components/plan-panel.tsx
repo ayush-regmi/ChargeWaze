@@ -38,8 +38,8 @@ function Notice({ tone, children }: { tone: "error" | "info"; children: React.Re
       role="alert"
       className={
         tone === "error"
-          ? "space-y-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
-          : "space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+          ? "space-y-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+          : "space-y-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning"
       }
     >
       {children}
@@ -123,18 +123,18 @@ export function PlanPanel({
       </div>
 
       {!vehicleId ? (
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        <p className="text-sm text-muted-foreground">
           <Link href="/garage" className="font-medium underline-offset-2 hover:underline">
             Connect a vehicle
           </Link>{" "}
           to plan charging stops for its battery.
         </p>
       ) : pending ? (
-        <p role="status" className="text-sm text-neutral-500">
+        <p role="status" className="text-sm text-muted-foreground">
           Planning charging stops on {routeName}…
         </p>
       ) : !outcome ? (
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        <p className="text-sm text-muted-foreground">
           Find where to charge your {vehicleTitle ?? "vehicle"} on {routeName}, how long each
           stop takes and the total trip time.
         </p>

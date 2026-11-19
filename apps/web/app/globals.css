@@ -3,52 +3,77 @@
 
 /*
  * Design tokens. Names follow shadcn/ui (components/ui/*) so its components
- * work unmodified. Dark mode follows the OS (prefers-color-scheme), which is
- * what every existing `dark:` utility in the app relies on — so there is
- * deliberately no `.dark` class variant here.
+ * work unmodified. Dark mode follows the OS (prefers-color-scheme), so there
+ * is deliberately no `.dark` class variant here.
+ *
+ * The palette is monochrome on purpose: surfaces, text, borders and the
+ * primary action are black, white and grays. Color is reserved for meaning:
+ *   - success / warning / destructive / info: status and feedback only;
+ *   - chart-1 / chart-2: the two data series a chart compares;
+ *   - the map's route and station markers (components/map/map-view.tsx).
+ * Use the tokens (`text-muted-foreground`, `bg-success/10`, …), never raw
+ * palette classes such as `text-neutral-500` or `bg-emerald-600`.
  */
 :root {
-  --radius: 0.625rem;
+  /* Native controls (date pickers, select menus, scrollbars) follow the theme. */
+  color-scheme: light dark;
+  --radius: 0.5rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: oklch(0.145 0 0);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
+  --secondary-foreground: oklch(0.145 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --muted-foreground: oklch(0.48 0 0);
+  --accent: oklch(0.955 0 0);
+  --accent-foreground: oklch(0.145 0 0);
+  --border: oklch(0.92 0 0);
+  --input: oklch(0.89 0 0);
+  --ring: oklch(0.145 0 0 / 35%);
+  --sidebar: oklch(0.985 0 0);
+
+  --destructive: oklch(0.55 0.21 27);
+  --success: oklch(0.52 0.13 152);
+  --warning: oklch(0.6 0.14 65);
+  --info: oklch(0.52 0.17 255);
+
+  --chart-1: oklch(0.145 0 0);
+  --chart-2: oklch(0.58 0.19 255);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --background: oklch(0.13 0 0);
+    --foreground: oklch(0.97 0 0);
+    --card: oklch(0.13 0 0);
+    --card-foreground: oklch(0.97 0 0);
+    --popover: oklch(0.17 0 0);
+    --popover-foreground: oklch(0.97 0 0);
+    --primary: oklch(0.97 0 0);
+    --primary-foreground: oklch(0.145 0 0);
+    --secondary: oklch(0.21 0 0);
+    --secondary-foreground: oklch(0.97 0 0);
+    --muted: oklch(0.18 0 0);
+    --muted-foreground: oklch(0.7 0 0);
+    --accent: oklch(0.22 0 0);
+    --accent-foreground: oklch(0.97 0 0);
+    --border: oklch(1 0 0 / 11%);
+    --input: oklch(1 0 0 / 16%);
+    --ring: oklch(0.97 0 0 / 40%);
+    --sidebar: oklch(0.15 0 0);
+
+    --destructive: oklch(0.7 0.18 24);
+    --success: oklch(0.74 0.14 155);
+    --warning: oklch(0.8 0.14 75);
+    --info: oklch(0.72 0.13 250);
+
+    --chart-1: oklch(0.97 0 0);
+    --chart-2: oklch(0.7 0.15 250);
   }
 }
 
@@ -70,13 +95,31 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-xl: calc(var(--radius) * 1.5);
+}
+
+/* Inline text link: monochrome, underlined, darker underline on hover. */
+@utility link {
+  color: var(--foreground);
+  text-decoration-line: underline;
+  text-decoration-color: color-mix(in oklab, var(--foreground) 30%, transparent);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 150ms;
+  &:hover {
+    text-decoration-color: var(--foreground);
+  }
 }
 
 html,
@@ -90,5 +133,14 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv11";
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.015em;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--foreground) 15%, transparent);
   }
 }

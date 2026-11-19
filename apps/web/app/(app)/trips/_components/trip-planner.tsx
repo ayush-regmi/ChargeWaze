@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeftRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -358,7 +359,8 @@ export function TripPlanner({
           disabled={!trip.origin && !trip.destination}
           aria-label="Swap origin and destination"
         >
-          ⇄ Swap
+          <ArrowLeftRight aria-hidden />
+          Swap
         </Button>
         <PlaceSearch
           key={`to-${pointKey(trip.destination)}`}
@@ -375,7 +377,7 @@ export function TripPlanner({
       />
 
       {vehicle === null ? (
-        <p className="rounded-md bg-neutral-100 px-3 py-2 text-sm text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+        <p className="rounded-md bg-muted px-3 py-2 text-sm text-foreground">
           Chargers aren&apos;t checked for compatibility.{" "}
           <Link href="/garage" className="font-medium underline-offset-2 hover:underline">
             Connect a vehicle
@@ -383,7 +385,7 @@ export function TripPlanner({
           to filter by its connectors.
         </p>
       ) : vehicle.connectors.length === 0 ? (
-        <p className="rounded-md bg-neutral-100 px-3 py-2 text-sm text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+        <p className="rounded-md bg-muted px-3 py-2 text-sm text-foreground">
           Your {vehicle.title}&apos;s connectors aren&apos;t set, so compatibility can&apos;t be
           checked.{" "}
           <Link
@@ -427,7 +429,7 @@ export function TripPlanner({
                 aria-valuetext={formatDistanceText(corridorDraft, units) ?? undefined}
                 className="w-48"
               />
-              <span className="text-sm text-neutral-700 dark:text-neutral-300">
+              <span className="text-sm text-foreground">
                 {formatDistanceText(corridorDraft, units)}
               </span>
               {filtersChanged ? (
@@ -464,15 +466,15 @@ export function TripPlanner({
 
             <div className="space-y-4">
               {directionsResult === null ? (
-                <p role="status" className="text-sm text-neutral-500">
+                <p role="status" className="text-sm text-muted-foreground">
                   Finding routes…
                 </p>
               ) : "error" in directionsResult ? (
                 <div
                   role="alert"
-                  className="space-y-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm dark:border-red-900 dark:bg-red-950/40"
+                  className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm"
                 >
-                  <p className="text-red-700 dark:text-red-300">
+                  <p className="text-destructive">
                     {DIRECTIONS_ERROR_TEXT[directionsResult.error]}
                   </p>
                   {directionsResult.error === "UNAUTHENTICATED" ? (
@@ -539,12 +541,12 @@ export function TripPlanner({
                       Chargers along {routeLabel(selectedIndex)}
                     </h2>
                     {selectedResult === undefined ? (
-                      <p role="status" className="text-sm text-neutral-500">
+                      <p role="status" className="text-sm text-muted-foreground">
                         Loading chargers…
                       </p>
                     ) : "error" in selectedResult ? (
                       selectedResult.error === "UNAUTHENTICATED" ? (
-                        <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+                        <p role="alert" className="text-sm text-destructive">
                           Your session has ended. Sign in again to see chargers.
                         </p>
                       ) : (
@@ -571,7 +573,7 @@ export function TripPlanner({
                         <p
                           role="status"
                           data-testid="route-station-count"
-                          className="text-sm text-neutral-600 dark:text-neutral-400"
+                          className="text-sm text-muted-foreground"
                         >
                           {selectedResult.items.length}{" "}
                           {selectedResult.items.length === 1 ? "station" : "stations"} within{" "}
@@ -581,7 +583,7 @@ export function TripPlanner({
                             : null}
                         </p>
                         {selectedResult.truncated ? (
-                          <p className="text-xs text-neutral-500">
+                          <p className="text-xs text-muted-foreground">
                             The provider has more stations than shown, usually near the end of
                             the route. Narrow the filters to see them.
                           </p>

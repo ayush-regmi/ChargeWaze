@@ -6,6 +6,7 @@ import { LocalTime } from "@/components/garage/local-time";
 import { formatSoc } from "@/components/trips/plan-payload";
 import { Button } from "@/components/ui/button";
 import { parseSocPercent, socPromptDefault } from "@/lib/plan-format";
+import { fieldClass } from "@/components/ui/field";
 
 /**
  * Asked when the car's battery reading is missing or older than the stale
@@ -31,7 +32,7 @@ export function PlanSocPrompt({
     <form
       aria-label="Starting battery"
       data-testid="plan-soc-prompt"
-      className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+      className="space-y-2 rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-warning"
       onSubmit={(e) => {
         e.preventDefault();
         const parsed = parseSocPercent(value);
@@ -71,7 +72,7 @@ export function PlanSocPrompt({
             onChange={(e) => setValue(e.target.value)}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? `${id}-error` : undefined}
-            className="w-24 rounded-md border border-neutral-300 bg-white px-2 py-1 text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+            className={`${fieldClass} w-24`}
           />
         </div>
         <Button type="submit" size="sm" disabled={pending}>
@@ -79,7 +80,7 @@ export function PlanSocPrompt({
         </Button>
       </div>
       {error ? (
-        <p id={`${id}-error`} role="alert" className="text-red-700 dark:text-red-300">
+        <p id={`${id}-error`} role="alert" className="text-destructive">
           {error}
         </p>
       ) : null}
