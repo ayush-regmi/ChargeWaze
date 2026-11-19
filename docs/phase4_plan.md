@@ -229,6 +229,27 @@ Uses `POST /routes/plan` on the `/trips` page after a route is selected. Owns li
 
 `GET /trips` (saved by default) with pagination and empty state; detail from `GET /trips/{id}` rendering the stored plan (no recompute); delete via `DELETE /trips/{id}`. Shows infeasible saved trips with their reason.
 
+**As built:**
+- **Routes:** `/trips/saved` (list) and `/trips/[id]` (detail) are server components, built like `/charging/[id]`. Neither touches `trips/page.tsx` or `trips/_components/`. `/trips/saved` is a static segment, so it takes precedence over `[id]`. The detail page returns 404 for a non-UUID id or an API 404. It opens any of the caller's trips, saved or not, so P4-F6 can link to an unsaved plan as well.
+- **Pagination:** forward only, through `?cursor=` in the page URL, with an "Older trips →" link and a "← First page" link (`limit=20`).
+  - The cursor is passed to the API only if it looks like base64url (at most 512 characters).
+  - A 422 for a stale cursor shows "That page link has expired" with a link to the first page.
+  - The empty state ("No saved trips yet") links to `/trips`. An empty later page says "No more saved trips." instead.
+- **List row:** origin → destination (an unlabelled endpoint shows as "Unnamed start" or "Unnamed destination"), a feasible or infeasible badge, distance in the user's units, total time, stop count, and `saved_at` in the viewer's local time. A null distance or total shows "—".
+- **Reading the stored plan:** the API types `plan` as a free-form object, so `components/trips/plan-payload.ts` reads the §3.7 body defensively.
+  - A missing or wrong-typed field becomes `null` and shows as "—". It is never guessed and never throws.
+  - Stops are sorted by `sequence`.
+  - Nothing is recomputed: totals, arrival SoC and minutes are shown exactly as stored. SoC is shown as a whole percent.
+- **Detail page:**
+  - A map from `LazyMapView`: the stored route, the stops as markers and the origin as centre. There is no map when `route` is null (`NO_DRIVING_ROUTE`).
+  - A summary: distance, starting SoC and its source, then arrival SoC, drive, charging, detour (estimate), overhead and total. An infeasible plan shows only drive time.
+  - Stops: network, connector, kW, arrival → departure SoC, charging minutes, km along the route, and the detour estimate. Each stop links to `/charging/{station.id}`.
+  - A collapsible "How this was calculated" section built from `assumptions` and `candidates`. It includes "derived from published figures, not measured" for `catalog_derived` and the excluded-station counts.
+- **Infeasible trips:** a red `role="alert"` block with the reason title, `reason.message` and the limiting segment as "from X to Y along the route (needs N% charge, M% available)". The segment isn't drawn on the map, because `MapViewProps` has no prop for a partial route. P4-F6 needs one for its infeasible state, as a small follow-up in `components/map/`.
+- **Delete:** an AlertDialog confirm step, then the `deleteTrip` server action in `components/trips/actions.ts`. It redirects to `/trips/saved` on 204 or 404 (already gone); any other failure keeps the dialog open with an error.
+- **Tests:** `tests/trip-plan-payload.test.ts`, `trip-list.test.tsx`, `trip-detail.test.tsx` and `trip-actions.test.ts`, 21 tests in all, with fixtures in `tests/trip-fixture.ts` built from the §3.7 examples. No Playwright spec: nothing creates trips until P4-F4, and seeding rows would need E2E harness changes. P4-F9 or P4-F6 can add one once `/routes/plan` exists.
+- **Not checked live:** the pages weren't opened in a browser against real data, because there are no trips to show until P4-F4. `npm run build` compiles both routes.
+
 ### F8 — Per-vehicle consumption baseline (follow-up)
 
 Added after P4-F0 review (D1): every vehicle consumes differently, so the user should be able to set their own baseline, and vehicles without a catalog entry should become plannable. Files and lane: plan.md §4.2 P4-F8.
