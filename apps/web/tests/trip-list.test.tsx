@@ -22,6 +22,19 @@ describe("TripList", () => {
     expect(link).toHaveTextContent("Feasible");
     expect(link).toHaveTextContent("465 mi · 9 h 43 min · 3 stops");
     expect(link.querySelector("time")).toHaveAttribute("dateTime", "2026-11-06T18:02:00Z");
+    expect(link).not.toHaveTextContent("Completed");
+  });
+
+  it("marks a plan matched to a drive as Completed (phase5_plan F7)", () => {
+    render(
+      <TripList
+        items={[makeListItem({ status: "completed" })]}
+        units="imperial"
+        nextHref={null}
+        firstHref={null}
+      />,
+    );
+    expect(screen.getByRole("link", { name: /Frederick/ })).toHaveTextContent("Completed");
   });
 
   it("shows infeasible trips with missing values as —", () => {
