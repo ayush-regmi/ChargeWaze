@@ -209,7 +209,7 @@ A wave is a set of sessions that run together. Waves are a guide; the real rule 
 | **W4** | P3-F8 · P4-F4 ★ | migration (F8) | P4-F4 composes F5 + P4-F1 + P4-F3. |
 | **W5** | P3-F9 · P4-F6 ★ · P5-F1 | CI (F9), migration (P5-F1) | Phase 3 closes here. |
 | **W6** | P4-F9 · P5-F3 · P5-F5 · P6-F1 | dependency (P6-F1) | Phase 4 closes here. |
-| **W7** | P5-F4 · P5-F6 · P6-F3 · P4-F8 | CI (P6-F3), migration (P4-F8) | P5-F6 adds no dependency (phase5_plan D5), so it can start as soon as P5-F5 merges. P4-F8 is a Phase 4 follow-up (added by P4-F0); it can start any time after P4-F4 once the migration lane is free. |
+| **W7** | P5-F4 · P5-F6 · P6-F3 · P4-F8 | CI (P6-F3), migration (P4-F8) | P5-F6 adds no dependency (phase5_plan D5), so it can start as soon as P5-F5 merges. P4-F8 is a Phase 4 follow-up (added by P4-F0); it can start any time after P4-F4 once the migration lane is free. **As run:** P4-F8 ran in W6, and P5-F7 moved up from W8 into its slot. |
 | **W8** | P5-F7 · P6-F4 · P6-F5 | CI (P6-F4), migration (P6-F5) | |
 | **W9** | P5-F8 · then P6-F2 | — | Phase 5 closes here. P6-F2 seeds every table, so it waits for P5-F8. |
 | **W10** | P6-F6 | — | MVP done. |
@@ -430,17 +430,17 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 | P3-F9 | blocked (P3-R1: M-03) | — | Code dependencies are merged. To start, it needs M-03 (Places + directions with real keys). To finish, it also needs M-04, M-05 and M-06 (live cross-border stations, Charging page, Trip Planner), which phase3_plan §F9 requires. |
 | P4-F6 | merged 2026-11-19 | `feature/phase4-planner-ui` / #47 | ★ Planner on `/trips`, with the limiting-segment highlight. Codex fixes: map draws the plan's own geometry; plan settings kept per route. Real-key screenshot moves to P4-F9. |
 | P5-F1 | merged 2026-11-19 | `feature/phase5-observed-schema` / #48 | Migration `20261120_01`. Migration lane released. Coordinator fixed the ER diagram and §9 questions in `database-design.md`. |
-| P4-F9 | in progress (W6) | `feature/phase4-closeout` | ★ Phase 4 close-out. Needs your real-key run and screenshot, plus M-07. |
-| P4-F8 | in progress (W6, started early) | `feature/phase4-vehicle-baseline` | Holds the migration lane. Not a dependency of P4-F9. |
-| P5-F3 | in progress (W6) | `feature/phase5-trip-ingestion` | |
-| P5-F5 | in progress (W6) | `feature/phase5-analytics-api` | |
+| P4-F9 | merged 2026-11-19 | `feature/phase4-closeout` / #50 | ★ Phase 4 code complete. PRD §9 cases mapped to passing tests; ~465 mi plan 241–272 ms on fixtures. Phase 4 "complete" waits on your M-07 and M-10. |
+| P4-F8 | merged 2026-11-19 | `feature/phase4-vehicle-baseline` / #52 | Migration `20261121_01`; migration lane released. Adds `catalog_baseline_kwh_per_km` and `baseline_source` to specs. Coordinator fixed the contract §3.7 `*_source` wording to exclude `baseline_source`. |
+| P5-F3 | merged 2026-11-19 | `feature/phase5-trip-ingestion` / #53 | Webhooks now create legs via ADR 0009 hooks. Hooks take `(event, open_session)`. F4 replaces the placeholder `observed_service._match_and_score_vehicle`. |
+| P5-F5 | merged 2026-11-19 | `feature/phase5-analytics-api` / #51 | No migration. Analytics reads only via `trips/observed_queries.py`. Extra 422 reasons `UNKNOWN_TIME_ZONE`, `INVALID_RANGE`, `INVALID_CURSOR`. |
 | P6-F1 | merged 2026-11-19 | `feature/phase6-sentry` / #46 | Dependency lane released. Off without a DSN; scrubs IDs, coordinates and route geometry; frame locals off (Codex fixes). Sentry projects created and local DSNs set by you; hosted DSNs go in at P6-F3. |
-| P5-F4 | blocked (P5-F3, P4-F4) | — | |
-| P5-F6 | blocked (P5-F5) | — | |
-| P6-F3 | blocked (P4-F9) | — | |
-| P5-F7 | blocked (P5-F3) | — | |
+| P5-F4 | in progress (W7) | `feature/phase5-prediction-matching` | Approved Owns addition: `trips/schemas.py` (typed `TripObservation` / `TripObservationLeg`). |
+| P5-F6 | in progress (W7) | `feature/phase5-analytics-ui` | |
+| P6-F3 | in progress (W7) | `feature/phase6-deploy` | Holds the CI lane. Approved: a `docker-build` job in `ci.yml`; production only, with no preview/staging yet (architecture §7.1); web built in `deploy.yml` because the generated API types are gitignored. |
+| P5-F7 | in progress (W7, started early) | `feature/phase5-history-observations` | Ready since P5-F3 merged. The planned-vs-actual panel reads `observation`, which stays `null` until P5-F4 merges. Observed drives is a tab on `/trips/saved`. Approved Owns exception: the "Completed" badge in `components/trips/trip-list.tsx`. |
 | P6-F4 | blocked (P6-F3) | — | |
-| P6-F5 | blocked (migration lane, held by P4-F8) | — | Dependencies merged. |
+| P6-F5 | ready (waiting for a session slot) | — | Dependencies merged; migration lane free. Start when the first W7 session merges. |
 | P5-F8 | blocked (P5-F4, P5-F6, P5-F7) | — | |
 | P6-F2 | blocked (P5-F8) | — | |
 | P6-F6 | blocked (P6-F1, P6-F2, P6-F4, P6-F5) | — | |
@@ -448,4 +448,4 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 
 ## 7. Next step
 
-W5 is merged (#45–#48). W6 is running with four sessions (the §2.7 maximum): **P4-F9** (Phase 4 close-out, critical path), **P5-F3** (observed-trip ingestion), **P5-F5** (analytics API) and **P4-F8** (vehicle baseline, holds the migration lane; started early because its lane was free). When P4-F9 merges, start P6-F3. When P5-F3 merges, start P5-F4 and P5-F7. When P5-F5 merges, start P5-F6. When P4-F8 merges, start P6-F5 (migration lane). P3-F9 starts once you've passed M-03 (P3-R1). It can't close until M-04, M-05 and M-06 pass too. M-07 is unblocked now that plans exist. All of them are in [`manual-test-log.md`](manual-test-log.md).
+W6 is merged (#49–#53). Phase 4 is code complete; it becomes "complete" once you pass M-07 and M-10. W7 is running with four sessions (the §2.7 maximum): **P5-F4** (plan ↔ observation matching), **P5-F6** (analytics UI), **P5-F7** (history with observations; started early, since it was ready and is on the P5-F8 → P6-F2 → P6-F6 chain) and **P6-F3** (deployment, holds the CI lane). P6-F5 is ready too (migration lane free) and starts when the first W7 session merges. When P6-F3 merges, start P6-F4 (CI lane). When P5-F4, P5-F6 and P5-F7 have all merged, start P5-F8. P3-F9 starts once you've passed M-03 (P3-R1). It can't close until M-04, M-05 and M-06 pass too. Every open manual check is in [`manual-test-log.md`](manual-test-log.md).

@@ -458,7 +458,7 @@ The main planning call (Phase 4). The server gets the driving route itself, find
   - `considered` is the number of usable stations handed to the optimizer, after the three exclusions. Each excluded station is counted once, in the order incompatible → unknown power → detour.
   - `corridor_km` is `max_detour_minutes · detour_speed_kmh / 60 / (2 · detour_road_factor)`, clamped to 0.5–16 km and rounded to 3 decimals (20 min → `6.41`).
   - The search is also skipped for `STARTING_SOC_TOO_LOW`, since no charger can help.
-- `*_source` values equal to the catalog's are reported as `catalog` even when they are stored on the vehicle (a newly connected catalog vehicle gets the catalog copied into its specs), so derived figures are never shown as the user's own.
+- `*_source` values equal to the catalog's are reported as `catalog` even when they are stored on the vehicle (a newly connected catalog vehicle gets the catalog copied into its specs), so derived figures are never shown as the user's own This rule doesn't apply to `baseline_source`: connecting a car never copies the catalog baseline into its specs, so a stored baseline is always the user's own and is reported as `vehicle`.
 - `route.distance_km` is Mapbox's road distance (3 decimals). `distance_along_route_km` on stops and `from_km`/`to_km` on a limiting segment use that same axis.
 - `alternatives` is reserved for several plans and is always `[]` in v1.
 - Every plan, feasible or infeasible, is stored as an **unsaved** trip (§3.8). Saving is §3.9b; discarding is §3.9a.

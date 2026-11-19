@@ -246,7 +246,7 @@ Avoid, for the MVP: Kubernetes, distributed microservices, message queues. Add R
 ### 7.1 Environments
 
 - **local** — developer machine, tunneled webhooks, seeded fixtures.
-- **preview / staging** — deployed on push to a PR; uses a separate Supabase project and Smartcar dev credentials.
+- **preview / staging** — deployed on push to a PR; uses a separate Supabase project and Smartcar dev credentials. *Deferred (P6-F3, 2026-11-19): MVP deploys production only and Vercel PR previews are off, so previews never run against production API or Auth. Add this once a second Supabase project exists.*
 - **production** — main branch; real Smartcar credentials; monitored.
 
 ### 7.2 Public demo mode vs private live mode
