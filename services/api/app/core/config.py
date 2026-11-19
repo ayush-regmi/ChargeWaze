@@ -116,6 +116,10 @@ class Settings(BaseSettings):
     # ---- Trips (Phase 4 F1, Phase 5 F3/F4) ----
 
     # ---- Analytics (Phase 5 F5) ----
+    # phase5_plan.md D13: most buckets one /analytics/consumption call returns.
+    analytics_max_buckets: int = Field(default=366, ge=1)
+    # D6: most rows in one CSV export; more is a 422, never a truncated file.
+    analytics_export_max_rows: int = Field(default=10000, ge=1)
 
     # ---- Demo mode (Phase 6 F2) ----
 

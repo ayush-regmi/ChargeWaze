@@ -655,6 +655,7 @@ Query params: `?vehicle_id=&from=&to=&group_by=day|week|month&tz=&include_simula
 - `group_by` defaults to `week`. Weeks are ISO weeks (Monday start).
 - `tz`: an IANA time zone (default `UTC`); the client sends the browser's zone. A leg belongs to the bucket of its `end_time` in that zone.
 - More than 366 buckets → `VALIDATION_ERROR` with `details.reason = "RANGE_TOO_LARGE"`.
+- With only `from`, `to` is today (or `from`, if later); with only `to`, `from` is 29 days earlier. Other `details.reason` values: `UNKNOWN_TIME_ZONE`, `INVALID_RANGE` (`from > to`).
 
 **Response 200**
 ```json
@@ -757,7 +758,7 @@ The rows of §3.11a as CSV, for the same filters (no `limit`/`cursor`: every row
 
 - The header row is exactly the §3.11a field names, in the order shown; `quality_reasons` is joined with `;`. Timestamps are ISO-8601 UTC, numbers use `.` and no thousands separator, `null` is an empty cell, and booleans are `true`/`false`. Parsing the CSV gives the same values as the JSON pages.
 - Text cells starting with `=`, `+`, `-`, `@`, tab or carriage return are prefixed with `'` (CSV injection; labels are user text). Numeric cells are never changed.
-- At most 10,000 rows; more → `422 VALIDATION_ERROR` with `details.reason = "EXPORT_TOO_LARGE"` (narrow the range). A file is never silently truncated.
+- At most 10,000 rows; more → `422 VALIDATION_ERROR` with `details.reason = "EXPORT_TOO_LARGE"` and `details.rows` / `details.max_rows` (narrow the range). A file is never silently truncated.
 
 **Errors:** as §3.11a (sent as the JSON error envelope).
 
