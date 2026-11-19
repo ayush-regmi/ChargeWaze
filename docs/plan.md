@@ -435,10 +435,10 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 | P5-F3 | merged 2026-11-19 | `feature/phase5-trip-ingestion` / #53 | Webhooks now create legs via ADR 0009 hooks. Hooks take `(event, open_session)`. F4 replaces the placeholder `observed_service._match_and_score_vehicle`. |
 | P5-F5 | merged 2026-11-19 | `feature/phase5-analytics-api` / #51 | No migration. Analytics reads only via `trips/observed_queries.py`. Extra 422 reasons `UNKNOWN_TIME_ZONE`, `INVALID_RANGE`, `INVALID_CURSOR`. |
 | P6-F1 | merged 2026-11-19 | `feature/phase6-sentry` / #46 | Dependency lane released. Off without a DSN; scrubs IDs, coordinates and route geometry; frame locals off (Codex fixes). Sentry projects created and local DSNs set by you; hosted DSNs go in at P6-F3. |
-| P5-F4 | in progress (W7) | `feature/phase5-prediction-matching` | |
+| P5-F4 | in progress (W7) | `feature/phase5-prediction-matching` | Approved Owns addition: `trips/schemas.py` (typed `TripObservation` / `TripObservationLeg`). |
 | P5-F6 | in progress (W7) | `feature/phase5-analytics-ui` | |
-| P6-F3 | in progress (W7) | `feature/phase6-deploy` | Holds the CI lane. |
-| P5-F7 | in progress (W7, started early) | `feature/phase5-history-observations` | Ready since P5-F3 merged. The planned-vs-actual panel reads `observation`, which stays `null` until P5-F4 merges. |
+| P6-F3 | in progress (W7) | `feature/phase6-deploy` | Holds the CI lane. Approved: a `docker-build` job in `ci.yml`; production only, with no preview/staging yet (architecture §7.1); web built in `deploy.yml` because the generated API types are gitignored. |
+| P5-F7 | in progress (W7, started early) | `feature/phase5-history-observations` | Ready since P5-F3 merged. The planned-vs-actual panel reads `observation`, which stays `null` until P5-F4 merges. Observed drives is a tab on `/trips/saved`. Approved Owns exception: the "Completed" badge in `components/trips/trip-list.tsx`. |
 | P6-F4 | blocked (P6-F3) | — | |
 | P6-F5 | ready (waiting for a session slot) | — | Dependencies merged; migration lane free. Start when the first W7 session merges. |
 | P5-F8 | blocked (P5-F4, P5-F6, P5-F7) | — | |
