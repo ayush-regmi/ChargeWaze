@@ -15,12 +15,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
+from app.core.observability import init_sentry
 
 API_PREFIX = "/api/v1"
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    init_sentry(settings)
     _quiet_http_client_logs()
     _redact_access_log_queries()
 

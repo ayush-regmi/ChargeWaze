@@ -122,7 +122,12 @@ class Settings(BaseSettings):
     # ---- Privacy and retention (Phase 6 F5) ----
 
     # ---- Observability (Phase 6 F1, F4) ----
+    # Empty disables Sentry. It is also always off under APP_ENV=test / pytest.
     sentry_dsn_backend: str = ""
+    # Sentry "environment" tag; empty uses APP_ENV.
+    sentry_environment: str = ""
+    # Share of requests traced for performance. 0 sends errors only.
+    sentry_traces_sample_rate: float = Field(default=0.0, ge=0, le=1)
 
     @property
     def cors_origins(self) -> list[str]:
