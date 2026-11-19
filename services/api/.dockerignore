@@ -1,0 +1,16 @@
+# Keep secrets, local state and tests out of the API image (P6-F3).
+.env
+.env.*
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+tests/
+scripts/
+openapi.json
+Dockerfile
+.dockerignore
+node_modules/
+package.json
