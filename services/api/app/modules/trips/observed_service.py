@@ -43,6 +43,7 @@ from sqlalchemy.orm import Session, aliased
 
 from app.core.config import Settings, get_settings
 from app.core.errors import ApiError
+from app.modules.trips import matching
 from app.modules.trips.inference import (
     InferenceSettings,
     InferredLeg,
@@ -424,12 +425,11 @@ def _match_and_score_vehicle(
 ) -> int:
     """P5-F4 call site: plan matching and backtests (phase5_plan.md §3 F4).
 
-    Placeholder until F4 lands; it replaces this body with
-    ``matching.match_and_score_vehicle(db, vehicle_id=..., user_id=..., now=...)``
-    and returns the number of plans matched.
+    Re-checks matched plans, matches new ones and writes backtests; returns the
+    number of plans matched. The caller holds ``lock_vehicle``.
     """
 
-    return 0
+    return matching.match_and_score_vehicle(db, vehicle_id=vehicle_id, user_id=user_id, now=now)
 
 
 def _window_start(

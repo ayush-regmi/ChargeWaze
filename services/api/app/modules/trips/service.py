@@ -33,8 +33,15 @@ from sqlalchemy import ColumnElement, Row, and_, delete, func, or_, select, upda
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError
+from app.modules.trips.matching import MODEL_VERSION
 from app.modules.trips.models import PlannedStop, PlannedTrip
-from app.modules.trips.schemas import TripDetail, TripListItem
+from app.modules.trips.observed_models import ObservedTrip, PredictionResult
+from app.modules.trips.schemas import (
+    TripDetail,
+    TripListItem,
+    TripObservation,
+    TripObservationLeg,
+)
 from app.modules.vehicles.garage import get_vehicle_detail
 
 DEFAULT_LIMIT = 50
@@ -185,7 +192,54 @@ def get_trip(db: Session, *, user_id: uuid.UUID, trip_id: uuid.UUID) -> TripDeta
         created_at=trip.created_at,
         saved_at=trip.saved_at,
         plan=trip.plan_payload,
-        observation=None,
+        observation=_observation(db, trip.id),
+    )
+
+
+def _observation(db: Session, trip_id: uuid.UUID) -> TripObservation | None:
+    """The §3.18e object for a matched plan, else ``None`` (phase5_plan §3 F4)."""
+
+    row = db.scalar(
+        select(PredictionResult).where(
+            PredictionResult.kind == "plan",
+            PredictionResult.planned_trip_id == trip_id,
+            PredictionResult.model_version == MODEL_VERSION,
+        )
+    )
+    if row is None:
+        return None
+    legs = db.scalars(
+        select(ObservedTrip)
+        .where(ObservedTrip.planned_trip_id == trip_id)
+        .order_by(ObservedTrip.start_time, ObservedTrip.id)
+    ).all()
+    return TripObservation(
+        matched_at=row.created_at,
+        legs=[
+            TripObservationLeg(
+                id=leg.id,
+                plan_leg_index=index,
+                start_time=leg.start_time,
+                end_time=leg.end_time,
+                distance_km=float(leg.distance_km),
+                soc_start_percent=_dec(leg.soc_start_percent),
+                soc_end_percent=_dec(leg.soc_end_percent),
+                energy_kwh=_dec(leg.energy_kwh),
+                quality_flag=leg.quality_flag,  # type: ignore[arg-type]
+                review_status=leg.review_status,  # type: ignore[arg-type]
+            )
+            for index, leg in enumerate(legs, start=1)
+        ],
+        observed_distance_km=float(row.observed_distance_km),
+        planned_distance_km=float(row.distance_km),
+        predicted_energy_kwh=float(row.predicted_energy_kwh),
+        observed_energy_kwh=_dec(row.observed_energy_kwh),
+        error_kwh=_dec(row.error_kwh),
+        observed_start_soc=_dec(row.observed_start_soc),
+        predicted_arrival_soc=_dec(row.predicted_arrival_soc),
+        observed_arrival_soc=_dec(row.observed_arrival_soc),
+        arrival_soc_error_points=_dec(row.arrival_soc_error_points),
+        model_version=row.model_version,
     )
 
 
@@ -324,6 +378,10 @@ def _item(row: Row[Any]) -> TripListItem:
 def _label(endpoint: Any) -> str | None:
     label = endpoint.get("label") if isinstance(endpoint, dict) else None
     return label if isinstance(label, str) else None
+
+
+def _dec(value: Decimal | None) -> float | None:
+    return None if value is None else float(value)
 
 
 def _number(value: Any) -> float | None:

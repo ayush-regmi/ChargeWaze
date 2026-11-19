@@ -35,6 +35,39 @@ class TripList(BaseModel):
     next_cursor: str | None
 
 
+class TripObservationLeg(BaseModel):
+    """One observed leg of a matched plan (§3.18e), in drive order."""
+
+    id: uuid.UUID
+    plan_leg_index: int
+    start_time: datetime
+    end_time: datetime
+    distance_km: float
+    soc_start_percent: float | None
+    soc_end_percent: float | None
+    energy_kwh: float | None
+    quality_flag: Literal["high", "medium", "low"]
+    review_status: Literal["auto", "needs_review", "confirmed", "rejected"]
+
+
+class TripObservation(BaseModel):
+    """What happened when a plan was driven (§3.18e). SoC values are fractions."""
+
+    matched_at: datetime
+    legs: list[TripObservationLeg]
+    observed_distance_km: float
+    planned_distance_km: float
+    predicted_energy_kwh: float
+    # Null when any leg has no energy.
+    observed_energy_kwh: float | None
+    error_kwh: float | None
+    observed_start_soc: float | None
+    predicted_arrival_soc: float | None
+    observed_arrival_soc: float | None
+    arrival_soc_error_points: float | None
+    model_version: str
+
+
 class TripDetail(BaseModel):
     """``GET /trips/{id}`` (§3.9). ``plan`` is the stored ``/routes/plan`` body, unchanged."""
 
@@ -45,8 +78,16 @@ class TripDetail(BaseModel):
     created_at: datetime
     saved_at: datetime | None
     plan: dict[str, Any]
-    # The matched observed trip, from Phase 5. Always null until then.
-    observation: dict[str, Any] | None = None
+    # The legs that carried the plan out (Phase 5, §3.18e); null until matched.
+    observation: TripObservation | None = None
 
 
-__all__ = ["PlanStatus", "TripDetail", "TripList", "TripListItem", "TripStatus"]
+__all__ = [
+    "PlanStatus",
+    "TripDetail",
+    "TripList",
+    "TripListItem",
+    "TripObservation",
+    "TripObservationLeg",
+    "TripStatus",
+]
