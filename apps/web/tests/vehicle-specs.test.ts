@@ -100,32 +100,19 @@ describe("validateSpecsForm", () => {
   });
 
   it("rejects duplicate connectors", () => {
-    const result = validateSpecsForm(
-      { ...valid, connectors: ["NACS", "NACS"] },
-      "imperial",
-    );
+    const result = validateSpecsForm({ ...valid, connectors: ["NACS", "NACS"] }, "imperial");
     expect(result.ok).toBe(false);
-    if (!result.ok)
-      expect(result.errors.connectors).toMatch(/only be listed once/);
+    if (!result.ok) expect(result.errors.connectors).toMatch(/only be listed once/);
   });
 
   it.each([
     [{ socPercent: "", powerKw: "50" }, "Fill in both values."],
     [{ socPercent: "x", powerKw: "50" }, "Enter numbers."],
     [{ socPercent: "101", powerKw: "50" }, "Battery level must be 0–100%."],
-    [
-      { socPercent: "50", powerKw: "0" },
-      "Power must be more than 0 and at most 1000 kW.",
-    ],
-    [
-      { socPercent: "50", powerKw: "1001" },
-      "Power must be more than 0 and at most 1000 kW.",
-    ],
+    [{ socPercent: "50", powerKw: "0" }, "Power must be more than 0 and at most 1000 kW."],
+    [{ socPercent: "50", powerKw: "1001" }, "Power must be more than 0 and at most 1000 kW."],
   ])("flags a bad curve row %o", (row, message) => {
-    const result = validateSpecsForm(
-      { ...valid, curve: [valid.curve[0], row] },
-      "imperial",
-    );
+    const result = validateSpecsForm({ ...valid, curve: [valid.curve[0], row] }, "imperial");
     expect(result).toEqual({
       ok: false,
       errors: { curveRows: [undefined, message] },
@@ -133,10 +120,7 @@ describe("validateSpecsForm", () => {
   });
 
   it("requires battery levels to increase", () => {
-    const result = validateSpecsForm(
-      { ...valid, curve: [...valid.curve].reverse() },
-      "imperial",
-    );
+    const result = validateSpecsForm({ ...valid, curve: [...valid.curve].reverse() }, "imperial");
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors.curve).toMatch(/must go up/);
   });
@@ -173,9 +157,7 @@ describe("consumption units (phase4_plan F8)", () => {
     "round-trips %s kWh/km through both unit systems",
     (kwhPerKm) => {
       for (const units of ["imperial", "metric"] as const) {
-        expect(
-          displayToKwhPerKm(kwhPerKmToDisplay(kwhPerKm, units), units),
-        ).toBe(kwhPerKm);
+        expect(displayToKwhPerKm(kwhPerKmToDisplay(kwhPerKm, units), units)).toBe(kwhPerKm);
       }
     },
   );
@@ -194,18 +176,12 @@ describe("consumption units (phase4_plan F8)", () => {
   });
 
   it("sends imperial input as kWh/km", () => {
-    const result = validateSpecsForm(
-      { ...valid, consumption: "300" },
-      "imperial",
-    );
+    const result = validateSpecsForm({ ...valid, consumption: "300" }, "imperial");
     expect(result.ok && result.body.baseline_kwh_per_km).toBe(0.186);
   });
 
   it("sends metric input as kWh/km", () => {
-    const result = validateSpecsForm(
-      { ...valid, consumption: "18.5" },
-      "metric",
-    );
+    const result = validateSpecsForm({ ...valid, consumption: "18.5" }, "metric");
     expect(result.ok && result.body.baseline_kwh_per_km).toBe(0.185);
   });
 

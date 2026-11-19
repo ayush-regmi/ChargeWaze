@@ -408,6 +408,12 @@ Added after P4-F0 review (D1): every vehicle consumes differently, so the user s
 
 **Later (not F8):** suggest a personal baseline from observed trips once Phase 5 has data (ML Stage C).
 
+**As built (P4-F8, 2026-11-19):**
+- Migration `20261121_01` adds `vehicle_specs.baseline_kwh_per_km numeric(5,3)` with `CHECK vehicle_specs_baseline_range (> 0 AND <= 1)`, down-revision `20261120_01`. No backfill; the connect flow (`service.py`) does not copy the catalog baseline into the row, so a stored value is always the user's.
+- Contract addition (coordinator-approved): `specs.catalog_baseline_kwh_per_km` (read-only, number or null) so the Garage can show the catalog value as the placeholder. The `specs` object therefore has `baseline_kwh_per_km`, `catalog_baseline_kwh_per_km` and `baseline_source` in both `GET /vehicles/{id}` and the `PATCH …/specs` response. The two read-only keys are rejected in a PATCH body (unknown keys).
+- Source rule: `baseline_source` is `vehicle` whenever the row has a value, even if it equals the catalog's. Unlike capacity and curve, the baseline is never copied from the catalog, so the "row equal to catalog → `catalog`" rule from P4-F4 isn't needed. The same rule is used in `GET` (`garage._specs_out`) and the planner (`planner_service.resolve_specs`).
+- Web: the field is in `specs-editor.tsx` (the form); `specs-panel.tsx` shows the effective value with "Your value" or "Catalog highway estimate", or a prompt to add one. The Garage vehicle page now also reads `/me` for the unit preference (falls back to imperial). Imperial shows whole Wh/mi and metric 0.1 kWh/100 km; both round-trip to the same 3-decimal kWh/km, so re-saving an untouched form doesn't change the stored value. An empty field sends `null` (back to the catalog value).
+
 ### F9 — Close-out
 
 Fills §6 with test names, records the ~500 mi latency in the roadmap, runs the real-key Frederick → Toronto plan with a screenshot, and checks the §5 numbers still pass.

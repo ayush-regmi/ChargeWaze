@@ -145,9 +145,13 @@ def test_observed_models_match_migrated_schema(db_connection: Connection) -> Non
     assert diff == [], f"Schema drift between models and migrations: {diff}"
 
 
-def test_migration_chain_has_one_head_and_it_is_this_revision() -> None:
+def test_migration_chain_has_one_head_and_contains_this_revision() -> None:
+    # Later migrations (P4-F8, P6-F5, ...) build on this one, so it needn't be head.
     script = ScriptDirectory.from_config(_alembic_config())
-    assert script.get_heads() == [THIS_REVISION]
+    heads = script.get_heads()
+    assert len(heads) == 1
+    chain = {rev.revision for rev in script.walk_revisions("base", heads[0])}
+    assert THIS_REVISION in chain
     revision = script.get_revision(THIS_REVISION)
     assert revision is not None
     assert revision.down_revision == PREVIOUS_REVISION
@@ -167,7 +171,7 @@ def test_migration_downgrades_and_upgrades_cleanly(db_connection: Connection) ->
     command.upgrade(cfg, "head")
     assert _public_tables(db_connection).issuperset(TABLES)
     version = db_connection.execute(text("SELECT version_num FROM alembic_version")).scalar()
-    assert version == THIS_REVISION
+    assert version == ScriptDirectory.from_config(cfg).get_current_head()
 
 
 # ---- observed_trips ---------------------------------------------------------

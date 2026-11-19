@@ -95,7 +95,11 @@ describe("SpecsPanel", () => {
           usable_capacity_kwh: 71.4,
           connectors: ["NACS", "J1772"],
           charging_curve: [{ soc: 0.1, power_kw: 150 }],
+          baseline_kwh_per_km: null,
+          catalog_baseline_kwh_per_km: null,
+          baseline_source: null,
         }}
+        units="imperial"
       />,
     );
     expect(screen.getByText("71.4 kWh")).toBeInTheDocument();
@@ -105,14 +109,27 @@ describe("SpecsPanel", () => {
   });
 
   it("says 'Not set' when capacity is unknown", () => {
-    render(<SpecsPanel specs={{ usable_capacity_kwh: null, connectors: [], charging_curve: [] }} />);
-    expect(screen.getAllByText("Not set")).toHaveLength(3);
+    render(
+      <SpecsPanel
+        specs={{
+          usable_capacity_kwh: null,
+          connectors: [],
+          charging_curve: [],
+          baseline_kwh_per_km: null,
+          catalog_baseline_kwh_per_km: null,
+          baseline_source: null,
+        }}
+        units="imperial"
+      />,
+    );
+    // Capacity, connectors, consumption and charging curve.
+    expect(screen.getAllByText("Not set")).toHaveLength(4);
     expect(screen.getByText(/doesn.t report battery capacity/i)).toBeInTheDocument();
   });
 
   it("handles missing specs", () => {
-    render(<SpecsPanel specs={null} />);
-    expect(screen.getAllByText("Not set")).toHaveLength(3);
+    render(<SpecsPanel specs={null} units="imperial" />);
+    expect(screen.getAllByText("Not set")).toHaveLength(4);
   });
 });
 

@@ -12,14 +12,9 @@ import { requireSessionApi } from "@/lib/session-api";
 import type { UnitSystem } from "@/lib/units";
 import { vehicleTitle } from "@/lib/vehicles";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default function VehiclePage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function VehiclePage({ params }: { params: Promise<{ id: string }> }) {
   return (
     <section className="mx-auto max-w-3xl space-y-6">
       <Link
@@ -28,9 +23,7 @@ export default function VehiclePage({
       >
         ← Back to Garage
       </Link>
-      <Suspense
-        fallback={<p className="text-sm text-neutral-500">Loading vehicle…</p>}
-      >
+      <Suspense fallback={<p className="text-sm text-neutral-500">Loading vehicle…</p>}>
         <VehicleDetails params={params} />
       </Suspense>
     </section>
@@ -74,8 +67,7 @@ async function VehicleDetails({ params }: { params: Promise<{ id: string }> }) {
                 since <LocalTime iso={data.connected_at} />
               </span>
             ) : null}
-            {data.connection_status === "disconnected" &&
-            data.disconnected_at ? (
+            {data.connection_status === "disconnected" && data.disconnected_at ? (
               <span className="normal-case">
                 {" "}
                 on <LocalTime iso={data.disconnected_at} />

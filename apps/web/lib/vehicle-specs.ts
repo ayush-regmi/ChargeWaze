@@ -7,12 +7,7 @@ export type VehicleSpecsUpdate = components["schemas"]["VehicleSpecsUpdate"];
 export type Connector = NonNullable<VehicleSpecsUpdate["connectors"]>[number];
 
 /** Same rules as `PATCH /api/v1/vehicles/{id}/specs` (api-contracts §3.4a). */
-export const CONNECTORS: readonly Connector[] = [
-  "NACS",
-  "CCS1",
-  "J1772",
-  "CHAdeMO",
-];
+export const CONNECTORS: readonly Connector[] = ["NACS", "CCS1", "J1772", "CHAdeMO"];
 export const MAX_CAPACITY_KWH = 300;
 export const MAX_POWER_KW = 1000;
 export const MAX_CURVE_POINTS = 20;
@@ -37,8 +32,7 @@ export function kwhPerKmToDisplay(kwhPerKm: number, units: UnitSystem): number {
 
 /** The user's unit → kWh/km, rounded to the 3 decimals the API stores. */
 export function displayToKwhPerKm(value: number, units: UnitSystem): number {
-  const kwhPerKm =
-    units === "imperial" ? value / 1000 / KM_PER_MILE : value / 100;
+  const kwhPerKm = units === "imperial" ? value / 1000 / KM_PER_MILE : value / 100;
   const scale = 10 ** BASELINE_DECIMALS;
   return Math.round(kwhPerKm * scale) / scale;
 }
@@ -81,10 +75,7 @@ export function specsToFormValues(
   units: UnitSystem,
 ): SpecsFormValues {
   return {
-    capacityKwh:
-      specs?.usable_capacity_kwh != null
-        ? String(specs.usable_capacity_kwh)
-        : "",
+    capacityKwh: specs?.usable_capacity_kwh != null ? String(specs.usable_capacity_kwh) : "",
     consumption:
       specs?.baseline_kwh_per_km != null
         ? String(kwhPerKmToDisplay(specs.baseline_kwh_per_km, units))
@@ -112,10 +103,7 @@ function parseNumber(raw: string): number | null {
  * so most mistakes are caught before a round trip; the server stays the
  * authority.
  */
-export function validateSpecsForm(
-  values: SpecsFormValues,
-  units: UnitSystem,
-): SpecsValidation {
+export function validateSpecsForm(values: SpecsFormValues, units: UnitSystem): SpecsValidation {
   const errors: SpecsFormErrors = {};
 
   const capacity = parseNumber(values.capacityKwh);
@@ -136,11 +124,7 @@ export function validateSpecsForm(
       errors.consumption = "Enter a number.";
     } else {
       baseline = displayToKwhPerKm(consumption, units);
-      if (
-        consumption <= 0 ||
-        baseline <= 0 ||
-        baseline > MAX_BASELINE_KWH_PER_KM
-      ) {
+      if (consumption <= 0 || baseline <= 0 || baseline > MAX_BASELINE_KWH_PER_KM) {
         const max = kwhPerKmToDisplay(MAX_BASELINE_KWH_PER_KM, units);
         errors.consumption = `Must be more than 0 and at most ${max} ${consumptionUnit(units)}.`;
       }

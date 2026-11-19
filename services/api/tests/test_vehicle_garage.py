@@ -570,3 +570,22 @@ def test_disconnect_logs_no_smartcar_ids(
     assert SC_CONNECTION_ID not in text
     assert vehicle.smartcar_vehicle_id is not None
     assert vehicle.smartcar_vehicle_id not in text
+
+
+def test_baseline_migration_is_in_the_single_head_chain() -> None:
+    """P4-F8 migration. Later revisions build on it, so don't assert it's head."""
+
+    from pathlib import Path
+
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    cfg = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    script = ScriptDirectory.from_config(cfg)
+    heads = script.get_heads()
+    assert len(heads) == 1
+    chain = {rev.revision for rev in script.walk_revisions("base", heads[0])}
+    assert "20261121_01" in chain
+    revision = script.get_revision("20261121_01")
+    assert revision is not None
+    assert revision.down_revision == "20261120_01"

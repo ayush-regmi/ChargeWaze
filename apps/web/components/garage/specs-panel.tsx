@@ -41,9 +41,7 @@ export function SpecsPanel({
           <dt className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
             Usable battery capacity
           </dt>
-          <dd className="mt-1 text-sm">
-            {capacity != null ? `${capacity} kWh` : "Not set"}
-          </dd>
+          <dd className="mt-1 text-sm">{capacity != null ? `${capacity} kWh` : "Not set"}</dd>
         </div>
         <div>
           <dt className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
@@ -94,14 +92,14 @@ export function SpecsPanel({
       </div>
       {capacity == null ? (
         <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          Smartcar doesn&apos;t report battery capacity for this vehicle. Add it
-          with Edit specs so trip planning can estimate range.
+          Smartcar doesn&apos;t report battery capacity for this vehicle. Add it with
+          Edit specs so trip planning can estimate range.
         </p>
       ) : null}
       {consumption == null ? (
         <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          There&apos;s no consumption estimate for this vehicle. Add one with
-          Edit specs so trips can be planned.
+          There&apos;s no consumption estimate for this vehicle. Add one with Edit specs so trips
+          can be planned.
         </p>
       ) : null}
     </div>
