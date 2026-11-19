@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
-import { formatClock, formatDay, formatStartWindow } from "./observation-format";
+import { dayKey, formatClock, formatDay, formatStartWindow } from "./observation-format";
 
 type Times = {
   start_time: string;
@@ -13,10 +13,40 @@ type Times = {
 
 const subscribe = () => () => {};
 
-/** Text for the viewer's time zone (`undefined`) or UTC on the server render. */
-export function driveTimesText(leg: Times, timeZone?: string): string {
-  const day = formatDay(leg.end_time, timeZone);
-  return `${day} · started ${formatStartWindow(leg, timeZone)} · ended ${formatClock(leg.end_time, timeZone)}`;
+/**
+ * Text for the viewer's time zone (`undefined`) or UTC on the server render.
+ *
+ * Usually "Nov 10 · started 07:12 · ended 08:41". The leading date is the
+ * day the start falls on, so a drive that crosses midnight never puts its
+ * start on the end's day: "Nov 9 · started between 22:00 and 23:30 · ended
+ * Nov 10, 00:30". When the start bounds themselves span days, the window
+ * already dates both ends.
+ */
+export function driveTimesText(leg: Times, timeZone?: string, now: Date = new Date()): string {
+  const start = new Date(leg.start_time);
+  const latest = new Date(leg.start_time_latest);
+  const end = new Date(leg.end_time);
+  const window = formatStartWindow(leg, timeZone, now);
+  const endClock = formatClock(leg.end_time, timeZone);
+  if ([start, latest, end].some((d) => Number.isNaN(d.getTime()))) {
+    return `${formatDay(leg.end_time, timeZone, now)} · started ${window} · ended ${endClock}`;
+  }
+  const startDay = dayKey(start, timeZone);
+  const latestDay = dayKey(latest, timeZone);
+  const endDay = dayKey(end, timeZone);
+  if (startDay !== latestDay) {
+    // The window carries both dates; the end shares the latest bound's day or gets its own.
+    const endText =
+      latestDay === endDay ? endClock : `${formatDay(leg.end_time, timeZone, now)}, ${endClock}`;
+    return `${formatDay(leg.end_time, timeZone, now)} · started ${window} · ended ${endText}`;
+  }
+  if (startDay === endDay) {
+    return `${formatDay(leg.end_time, timeZone, now)} · started ${window} · ended ${endClock}`;
+  }
+  return (
+    `${formatDay(leg.start_time, timeZone, now)} · started ${window}` +
+    ` · ended ${formatDay(leg.end_time, timeZone, now)}, ${endClock}`
+  );
 }
 
 export function driveEndText(endTime: string, timeZone?: string): string {

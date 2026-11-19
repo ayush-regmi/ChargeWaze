@@ -134,7 +134,8 @@ function clock(d: Date, timeZone?: string): string {
   }).format(d);
 }
 
-function dayKey(d: Date, timeZone?: string): string {
+/** YYYY-MM-DD of `d` in `timeZone` (the runtime's zone when undefined). */
+export function dayKey(d: Date, timeZone?: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
