@@ -381,6 +381,14 @@ PRD §4.3 asks for favorites; the roadmap's Phase 3 scope doesn't list them. The
   - `GET /favorites` returns `{items: [station + favorited_at]}`, newest first, with optional `vehicle_id` for `compatible`. It reads the cache only, with no provider call. `is_stale` means `fetched_at` is older than the TTL, and opening the station refreshes it.
   - Restricted, closed and private stations stay in the list.
 - **Cap (decided 2026-11-19).** A user can have at most 500 favorites. Past that, `PUT` returns `FAVORITES_LIMIT` (409, `details.limit`). This keeps the list unpaged. Re-favoriting an existing favorite is still a no-op at the cap.
+- **Cap under concurrency (review fix, 2026-11-19).**
+  - The problem: under READ COMMITTED, two parallel `PUT`s for different stations at 499 favorites could both count 499 and both insert.
+  - The fix: `add_favorite` now takes `SELECT … FROM profiles WHERE id = :user FOR UPDATE` before re-checking for an existing favorite and counting. The lock holds until commit.
+  - The test: `test_concurrent_puts_cannot_pass_the_cap` runs two real connections with committed data. It checks that the second `PUT` waits, then gets 409. It was confirmed to fail without the lock.
+- **Favorites tab kept across the station page (review fix, 2026-11-19).**
+  - Links from the Favorites list carry `view=favorites`.
+  - The station page builds "Back to Charging" and its sign-in return path with `stationPageLinks()` in `charging-tab.ts`. That function re-parses the filters and keeps only `view=favorites`, so Back returns to the Favorites tab instead of an empty Nearby screen.
+  - The E2E spec covers it: open a station from Favorites, click Back, and the Favorites tab is still open.
 - **Web.**
   - `components/stations/favorite-toggle.tsx` is a star button with `aria-pressed` and the label "Add/Remove {name} to/from favorites". It flips at once, then saves; if the save fails it flips back and shows an alert. It doesn't propagate the click to the card.
   - The server action is `components/stations/favorite-actions.ts`. It deliberately doesn't call `revalidatePath`: that would re-run `/charging`'s provider search on every star.

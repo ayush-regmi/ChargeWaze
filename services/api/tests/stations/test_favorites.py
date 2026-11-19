@@ -6,6 +6,7 @@ on account and station deletion, ordering, compatibility and the 500 cap.
 
 from __future__ import annotations
 
+import threading
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -13,13 +14,14 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import Engine, delete, func, select, update
 from sqlalchemy.orm import Session
 
+from app.core.errors import ApiError
 from app.modules.stations import favorites
 from app.modules.stations.favorites_models import FavoriteStation
 from app.modules.stations.models import ChargingStation
-from app.modules.users.models import Profile
+from app.modules.users.models import Profile, UserPreferences
 from tests.conftest import TEST_USER_ID
 from tests.stations.conftest import OTHER_USER_ID, FakeAfdc
 
@@ -265,3 +267,86 @@ def test_limit(
 def test_favorites_route_is_not_parsed_as_a_station_id(api: TestClient, auth: Auth) -> None:
     # ``/stations/favorites`` must not reach ``GET /stations/{station_id}`` (422).
     assert api.get(FAVORITES, headers=auth()).status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Concurrency: the cap holds across two real transactions
+# ---------------------------------------------------------------------------
+
+
+def _committed_station(conn: Any, external_id: str) -> uuid.UUID:
+    station = ChargingStation(
+        provider="simulated",
+        external_id=external_id,
+        name=f"Race test {external_id}",
+        lat=39.4,
+        lon=-77.4,
+        raw_payload={},
+        is_simulated=True,
+    )
+    with Session(bind=conn) as s:
+        s.add(station)
+        s.commit()
+        return station.id
+
+
+def test_concurrent_puts_cannot_pass_the_cap(
+    db_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two PUTs for different stations at cap - 1: the second waits, then gets 409.
+
+    Uses two real connections with committed data (not the rolled-back test
+    transaction), so READ COMMITTED behaves as in production.
+    """
+
+    monkeypatch.setattr(favorites, "MAX_FAVORITES_PER_USER", 1)
+    user_id = uuid.uuid4()
+    tag = uuid.uuid4().hex[:8]
+    with db_engine.connect() as setup:
+        with Session(bind=setup) as s:
+            # As after the user's first ``/me``: profile and preferences exist.
+            s.add(Profile(id=user_id))
+            s.add(UserPreferences(user_id=user_id))
+            s.commit()
+        first = _committed_station(setup, f"race-a-{tag}")
+        second = _committed_station(setup, f"race-b-{tag}")
+
+    a = Session(bind=db_engine)
+    b = Session(bind=db_engine)
+    outcome: dict[str, Any] = {}
+
+    def put_second() -> None:
+        try:
+            favorites.add_favorite(b, user_id=user_id, station_id=second)
+            b.commit()
+            outcome["b"] = "added"
+        except ApiError as exc:
+            b.rollback()
+            outcome["b"] = exc.code
+
+    try:
+        # A favorites the first station and holds its transaction open.
+        favorites.add_favorite(a, user_id=user_id, station_id=first)
+        worker = threading.Thread(target=put_second)
+        worker.start()
+        # B must wait on A's lock rather than count 0 and insert.
+        worker.join(timeout=0.5)
+        assert worker.is_alive(), "second PUT didn't wait for the first"
+        a.commit()
+        worker.join(timeout=10)
+        assert not worker.is_alive()
+        assert outcome["b"] == "FAVORITES_LIMIT"
+        with Session(bind=db_engine) as check:
+            count = check.scalar(
+                select(func.count())
+                .select_from(FavoriteStation)
+                .where(FavoriteStation.user_id == user_id)
+            )
+        assert count == 1
+    finally:
+        a.rollback()
+        a.close()
+        b.close()
+        with db_engine.begin() as cleanup:
+            cleanup.execute(delete(Profile).where(Profile.id == user_id))
+            cleanup.execute(delete(ChargingStation).where(ChargingStation.id.in_([first, second])))

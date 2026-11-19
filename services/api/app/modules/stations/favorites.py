@@ -25,6 +25,7 @@ from app.modules.stations.favorites_models import FavoriteStation
 from app.modules.stations.models import ChargingStation
 from app.modules.stations.schemas import StationOut
 from app.modules.stations.service import _compatible, _from_row
+from app.modules.users.models import Profile
 from app.modules.users.service import get_or_create_profile
 
 # Bounds the list response without a cursor (api-contracts §3.19a).
@@ -73,10 +74,16 @@ def add_favorite(db: Session, *, user_id: uuid.UUID, station_id: uuid.UUID) -> N
     """Favorite a station. A no-op if it's already a favorite."""
 
     _require_station(db, station_id)
-    if db.get(FavoriteStation, (user_id, station_id)) is not None:
+    if _is_favorite(db, user_id, station_id):
         return
     # The FK needs a profile; it's created lazily on a user's first request.
     get_or_create_profile(db, user_id=user_id)
+    # Serialize this user's PUTs until commit: without the lock, two PUTs for
+    # different stations at 499 favorites both count 499 and both insert.
+    _lock_user(db, user_id)
+    # Re-check under the lock: a concurrent PUT may have added this station.
+    if _is_favorite(db, user_id, station_id):
+        return
     count = db.scalar(
         select(func.count()).select_from(FavoriteStation).where(FavoriteStation.user_id == user_id)
     )
@@ -104,6 +111,22 @@ def remove_favorite(db: Session, *, user_id: uuid.UUID, station_id: uuid.UUID) -
             FavoriteStation.user_id == user_id, FavoriteStation.station_id == station_id
         )
     )
+
+
+def _lock_user(db: Session, user_id: uuid.UUID) -> None:
+    """Row-lock the caller's profile; held until the transaction ends."""
+
+    db.execute(select(Profile.id).where(Profile.id == user_id).with_for_update())
+
+
+def _is_favorite(db: Session, user_id: uuid.UUID, station_id: uuid.UUID) -> bool:
+    # A query, not ``db.get``: the identity map could hold a pre-lock answer.
+    found = db.scalar(
+        select(FavoriteStation.station_id).where(
+            FavoriteStation.user_id == user_id, FavoriteStation.station_id == station_id
+        )
+    )
+    return found is not None
 
 
 def _require_station(db: Session, station_id: uuid.UUID) -> None:

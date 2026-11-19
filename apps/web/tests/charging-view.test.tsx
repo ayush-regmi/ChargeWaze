@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   parseChargingView,
+  stationPageLinks,
   withView,
   type FavoriteStation,
 } from "@/app/(app)/charging/_components/charging-tab";
@@ -302,6 +303,17 @@ describe("ChargingView Favorites tab", () => {
     expect(router.refresh).toHaveBeenCalled();
   });
 
+  it("links each favorite's page with the tab, so Back returns here", () => {
+    renderView({ view: "favorites", favorites: [favorite(makeStation({ id: "s1", name: "Fav" }))] });
+    const link = screen.getByRole("link", { name: "Fav" });
+    expect(link.getAttribute("href")).toMatch(/^\/charging\/s1\?lat=.*&view=favorites$/);
+  });
+
+  it("links Nearby station pages without the tab", () => {
+    renderView({ result: { items: [makeStation({ id: "s1", name: "Near" })], more: false, unknownPowerCount: 0 } });
+    expect(screen.getByRole("link", { name: "Near" }).getAttribute("href")).not.toMatch(/view=/);
+  });
+
   it("has an empty state", () => {
     renderView({ view: "favorites", favorites: [] });
     expect(screen.getByText(/No favorite stations yet/)).toBeInTheDocument();
@@ -326,5 +338,31 @@ describe("Charging view URL helpers", () => {
     expect(withView("/charging", "nearby")).toBe("/charging");
     expect(withView("/charging", "favorites")).toBe("/charging?view=favorites");
     expect(withView("/charging?lat=1", "favorites")).toBe("/charging?lat=1&view=favorites");
+  });
+});
+
+describe("stationPageLinks", () => {
+  it("returns to the Favorites tab with the same filters", () => {
+    const { back, self } = stationPageLinks("s1", {
+      lat: "39.4143",
+      lon: "-77.4105",
+      place: "Frederick",
+      view: "favorites",
+    });
+    expect(back).toMatch(/^\/charging\?lat=39\.4143&lon=-77\.4105&place=Frederick.*&view=favorites$/);
+    expect(self).toMatch(/^\/charging\/s1\?lat=39\.4143.*&view=favorites$/);
+  });
+
+  it("returns to Nearby by default and drops anything unknown", () => {
+    expect(stationPageLinks("s1", {})).toEqual({ back: "/charging", self: "/charging/s1" });
+    const { back } = stationPageLinks("s1", { view: "https://evil.test", next: "//evil.test" });
+    expect(back).toBe("/charging");
+  });
+
+  it("keeps the tab without filters", () => {
+    expect(stationPageLinks("s1", { view: "favorites" })).toEqual({
+      back: "/charging?view=favorites",
+      self: "/charging/s1?view=favorites",
+    });
   });
 });

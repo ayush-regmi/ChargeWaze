@@ -6,8 +6,9 @@ import { Suspense } from "react";
 import { FavoriteToggle } from "@/components/stations/favorite-toggle";
 import { StationDetail } from "@/components/stations/station-detail";
 import { requireSessionApi } from "@/lib/session-api";
-import { parseFilters, serializeFilters } from "@/lib/stations";
 import { pickDashboardVehicle } from "@/lib/vehicles";
+
+import { stationPageLinks } from "../_components/charging-tab";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -31,12 +32,11 @@ async function Station({ params, searchParams }: Props) {
   const { id } = await params;
   if (!UUID_RE.test(id)) notFound();
 
-  // The list passes its filters along so "Back" returns to the same search.
+  // The list passes its filters (and tab) along so "Back" returns to the same search.
   // They are re-parsed, never echoed raw.
-  const qs = serializeFilters(parseFilters(await searchParams));
-  const back = qs ? `/charging?${qs}` : "/charging";
+  const { back, self } = stationPageLinks(id, await searchParams);
 
-  const api = await requireSessionApi(`/charging/${id}${qs ? `?${qs}` : ""}`);
+  const api = await requireSessionApi(self);
   const [{ data: me }, { data: vehicles }] = await Promise.all([
     api.GET("/api/v1/me"),
     api.GET("/api/v1/vehicles"),

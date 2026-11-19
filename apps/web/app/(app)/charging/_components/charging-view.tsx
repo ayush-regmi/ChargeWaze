@@ -381,7 +381,11 @@ function FavoritesPanel({
             <li key={station.id}>
               <StationCard
                 station={station}
-                href={`/charging/${station.id}${detailQuery ? `?${detailQuery}` : ""}`}
+                // Carry the tab so "Back" on the station page returns here.
+                href={withView(
+                  `/charging/${station.id}${detailQuery ? `?${detailQuery}` : ""}`,
+                  "favorites",
+                )}
                 distanceText={distanceKm === null ? null : formatDistanceText(distanceKm, units)}
                 selected={station.id === selectedId}
                 onSelect={setSelectedId}

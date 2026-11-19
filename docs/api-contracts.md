@@ -968,6 +968,8 @@ The caller's favorite stations ([`phase3_plan.md`](phase3_plan.md) F8, PRD §4.3
 
 Adds the station (`id` from §3.10 / §3.16 / §3.17) to the caller's favorites. No body. Idempotent: favoriting a favorite changes nothing and keeps its first `favorited_at`.
 
+The cap holds under concurrency: a caller's `PUT`s are serialized (a row lock on the caller's profile, held until commit), so two parallel `PUT`s at 499 favorites add one and the other gets `FAVORITES_LIMIT`.
+
 **Response 204** — no body.
 
 **Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (`id` is not a UUID); `NOT_FOUND` (unknown station); `FAVORITES_LIMIT` (409, the caller already has 500 favorites and this station isn't one of them).

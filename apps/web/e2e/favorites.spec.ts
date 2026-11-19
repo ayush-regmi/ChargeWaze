@@ -84,6 +84,16 @@ test("star a station, keep it across sign-out, then unstar it", async ({
   await expect(favorites.getByRole("article", { name })).toBeVisible();
   await expect(favorites.getByRole("status")).toHaveText("1 favorite station");
 
+  // Open it from the list; "Back" returns to the Favorites tab, not Nearby.
+  await favorites.getByRole("link", { name }).click();
+  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
+  await page.getByRole("link", { name: "← Back to Charging" }).click();
+  await expect(page).toHaveURL(/\/charging\?view=favorites$/);
+  await expect(
+    page.getByRole("navigation", { name: "Charging views" }).getByRole("link", { name: "Favorites" }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(favorites.getByRole("article", { name })).toBeVisible();
+
   // Sign out: the page needs a session again.
   await context.clearCookies();
   await page.goto("/charging?view=favorites");
