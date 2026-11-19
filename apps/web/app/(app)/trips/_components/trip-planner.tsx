@@ -37,6 +37,7 @@ import {
   type AlongRouteResult,
   type DirectionsErrorCode,
   type DirectionsResult,
+  type DirectionsRoute,
   type NoRouteReason,
 } from "./actions";
 import { RouteList, routeLabel, type RouteStationsSummary } from "./route-list";
@@ -65,9 +66,29 @@ const DIRECTIONS_ERROR_TEXT: Record<DirectionsErrorCode, string> = {
 
 const CORRIDOR_COMMIT_MS = 300;
 
-/** Cache key for one route's stations under one set of filters. */
-function stationsKey(endpoints: string, routeIndex: number, filtersKey: string): string {
-  return `${endpoints}#${routeIndex}|${filtersKey}`;
+/** A short, stable FNV-1a hash of a route's geometry. */
+function geometryHash(polyline: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < polyline.length; i++) {
+    h ^= polyline.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+}
+
+/**
+ * Cache key for one route's stations under one set of filters. It includes
+ * the route's geometry: a fresh Directions response for the same endpoints
+ * (after swapping back, say) may reorder the alternatives or change their
+ * shape, and stations found along the old line must not be shown for the new
+ * one. An unchanged geometry keeps its cache entry.
+ */
+function stationsKey(
+  endpoints: string,
+  route: Pick<DirectionsRoute, "index" | "geometry_polyline6">,
+  filtersKey: string,
+): string {
+  return `${endpoints}#${route.index}:${geometryHash(route.geometry_polyline6)}|${filtersKey}`;
 }
 
 function summarize(result: AlongRouteResult | undefined, hasVehicle: boolean): RouteStationsSummary {
@@ -164,7 +185,7 @@ export function TripPlanner({
     const fetchFor = async (index: number) => {
       const route = routes.find((r) => r.index === index);
       if (!route) return;
-      const key = stationsKey(endpoints, index, filtersKey);
+      const key = stationsKey(endpoints, route, filtersKey);
       if (requested.current.has(key)) return;
       requested.current.add(key);
       const result = await getStationsAlongRoute({
@@ -187,8 +208,11 @@ export function TripPlanner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routes, endpoints, filtersKey, selectedIndex, stationsAttempt]);
 
-  const resultFor = (index: number): AlongRouteResult | undefined =>
-    endpoints ? stations[stationsKey(endpoints, index, filtersKey)] : undefined;
+  const routeAt = (index: number) => routes?.find((r) => r.index === index);
+  const resultFor = (index: number): AlongRouteResult | undefined => {
+    const route = routeAt(index);
+    return endpoints && route ? stations[stationsKey(endpoints, route, filtersKey)] : undefined;
+  };
   const selectedResult = routes ? resultFor(selectedIndex) : undefined;
   const hasVehicle = vehicle !== null && vehicle.connectors.length > 0;
 
@@ -460,9 +484,9 @@ export function TripPlanner({
                         <StationsError
                           code={selectedResult.error}
                           onRetry={() => {
-                            const key = endpoints
-                              ? stationsKey(endpoints, selectedIndex, filtersKey)
-                              : null;
+                            const route = routeAt(selectedIndex);
+                            const key =
+                              endpoints && route ? stationsKey(endpoints, route, filtersKey) : null;
                             if (key) {
                               setStations((s) => {
                                 const next = { ...s };

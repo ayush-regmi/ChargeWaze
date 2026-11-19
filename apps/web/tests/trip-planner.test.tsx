@@ -209,6 +209,53 @@ describe("TripPlanner", () => {
     expect(currentUrlState()).toMatchObject({ origin: TORONTO, destination: FREDERICK });
   });
 
+  describe("swapping back to a trip already planned", () => {
+    const g = (geometry: string): DirectionsRoute => ({ ...route(0, 748), geometry_polyline6: geometry });
+    const stationsFor = async ({ geometry }: { geometry: string }) =>
+      ok([station(`${geometry}-station`)]);
+
+    async function swapTwice() {
+      renderPlanner();
+      await screen.findByRole("article", { name: "Station G1-station" });
+      fireEvent.click(screen.getByRole("button", { name: "Swap origin and destination" }));
+      await screen.findByRole("article", { name: "Station reverse-station" });
+      fireEvent.click(screen.getByRole("button", { name: "Swap origin and destination" }));
+      await waitFor(() => expect(actions.getDirections).toHaveBeenCalledTimes(3));
+    }
+
+    it("refetches stations when the fresh route 0 has a different geometry", async () => {
+      actions.getDirections
+        .mockResolvedValueOnce({ routes: [g("G1")], noRouteReason: null })
+        .mockResolvedValueOnce({ routes: [g("reverse")], noRouteReason: null })
+        .mockResolvedValueOnce({ routes: [g("G2")], noRouteReason: null });
+      actions.getStationsAlongRoute.mockImplementation(stationsFor);
+
+      await swapTwice();
+
+      const list = await screen.findByRole("region", { name: "Chargers along the route" });
+      expect(await within(list).findByRole("article", { name: "Station G2-station" })).toBeInTheDocument();
+      expect(within(list).queryByRole("article", { name: "Station G1-station" })).toBeNull();
+      expect(actions.getStationsAlongRoute.mock.calls.map((c) => c[0].geometry)).toEqual([
+        "G1",
+        "reverse",
+        "G2",
+      ]);
+    });
+
+    it("reuses the cached stations when route 0's geometry is unchanged", async () => {
+      actions.getDirections
+        .mockResolvedValueOnce({ routes: [g("G1")], noRouteReason: null })
+        .mockResolvedValueOnce({ routes: [g("reverse")], noRouteReason: null })
+        .mockResolvedValueOnce({ routes: [g("G1")], noRouteReason: null });
+      actions.getStationsAlongRoute.mockImplementation(stationsFor);
+
+      await swapTwice();
+
+      expect(await screen.findByRole("article", { name: "Station G1-station" })).toBeInTheDocument();
+      expect(actions.getStationsAlongRoute).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it.each([
     ["no_route", "No drivable route connects these places."],
     ["no_road_near_point", "One of these places isn't near a road."],
