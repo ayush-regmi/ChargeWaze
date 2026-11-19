@@ -104,6 +104,17 @@ def run(
 
 
 def add_backtest(db: Session, leg: ObservedTrip) -> uuid.UUID:
+    """The leg's deterministic-v1 backtest: the one P5-F4 wrote, else a new one."""
+
+    existing = db.scalar(
+        select(PredictionResult.id).where(
+            PredictionResult.kind == "leg",
+            PredictionResult.observed_trip_id == leg.id,
+            PredictionResult.model_version == "deterministic-v1",
+        )
+    )
+    if existing is not None:
+        return existing
     row = PredictionResult(
         user_id=leg.user_id,
         vehicle_id=leg.vehicle_id,
@@ -320,8 +331,9 @@ def test_leg_that_disappears_is_deleted(db: Session, add_vehicle: Callable[..., 
     vehicle = add_vehicle()
     add_readings(db, vehicle, TWO_LEGS)
     run(db, vehicle)
-    _, b = legs(db, vehicle)
-    add_backtest(db, b)
+    a, b = legs(db, vehicle)
+    a_backtest = add_backtest(db, a)
+    b_backtest = add_backtest(db, b)
     db.execute(
         delete(VehicleTelemetry).where(
             VehicleTelemetry.vehicle_id == vehicle.id,
@@ -334,7 +346,16 @@ def test_leg_that_disappears_is_deleted(db: Session, add_vehicle: Callable[..., 
 
     assert summary.legs_deleted == 1
     assert [leg.odometer_start_km for leg in legs(db, vehicle)] == [Decimal("1000.00")]
-    assert db.scalar(select(PredictionResult.id)) is None  # cascaded with its leg
+    remaining = {
+        row.id: row.observed_trip_id
+        for row in db.scalars(
+            select(PredictionResult).where(PredictionResult.vehicle_id == vehicle.id)
+        )
+    }
+    assert b_backtest not in remaining  # cascaded with its leg
+    # The delete is targeted: A keeps its deterministic-v1 backtest.
+    (a_leg,) = legs(db, vehicle)
+    assert remaining == {a_backtest: a_leg.id}
 
 
 def test_simulated_vehicle_gets_simulated_legs_and_drops_real_rows(
