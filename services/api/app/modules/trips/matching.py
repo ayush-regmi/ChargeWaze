@@ -28,7 +28,7 @@ from datetime import datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Literal
 
-from sqlalchemy import and_, exists, select
+from sqlalchemy import and_, delete, exists, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -577,8 +577,9 @@ def _write_backtests(
     """A ``kind = 'leg'`` row for every finished leg with energy (D9).
 
     Missing rows are written; a row whose leg numbers or baseline changed is
-    updated. Rows of legs that lost their energy are removed by inference
-    (F3), and deleted legs lose theirs through the cascade.
+    updated. With no baseline, the vehicle's leg rows are deleted. Rows of
+    legs that lost their energy are removed by inference (F3), and deleted
+    legs lose theirs through the cascade.
     """
 
     legs = db.scalars(
@@ -587,11 +588,22 @@ def _write_backtests(
         )
     ).all()
     finished = [leg for leg in legs if not _in_progress(leg, now=now, split=split)]
-    if not finished:
-        return
     baseline, source = _resolve_baseline(db, vehicle)
     if baseline is None or source is None:
+        # No baseline, no estimate (contract §3.11a): drop rows written while
+        # the vehicle had one, e.g. a user baseline that was later cleared.
+        db.execute(
+            delete(PredictionResult)
+            .where(
+                PredictionResult.kind == "leg",
+                PredictionResult.vehicle_id == vehicle.id,
+                PredictionResult.model_version == MODEL_VERSION,
+            )
+            .execution_options(synchronize_session=False)
+        )
         summary.backtests_skipped_no_baseline += len(finished)
+        return
+    if not finished:
         return
     existing = {
         row.observed_trip_id: row

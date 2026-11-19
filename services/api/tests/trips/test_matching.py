@@ -705,3 +705,58 @@ def test_someone_elses_vehicle_is_a_no_op(db: Session, add_vehicle: Callable[...
     add_plan(db, vehicle)
     summary = run_matching(db, vehicle_id=vehicle.id, user_id=uuid.uuid4(), now=EX3_NOW)
     assert summary.plans_matched == 0
+
+
+def test_clearing_the_only_baseline_removes_leg_backtests(
+    api: TestClient,
+    auth: Callable[..., dict[str, str]],
+    db: Session,
+    add_vehicle: Callable[..., Vehicle],
+) -> None:
+    """No catalog baseline: a user baseline that is later cleared leaves no stale estimates."""
+
+    vehicle = add_vehicle()
+    vehicle.make, vehicle.model = "Unknown", "Car"
+    specs = VehicleSpecs(
+        vehicle_id=vehicle.id,
+        usable_capacity_kwh=Decimal("60.00"),
+        baseline_kwh_per_km=Decimal("0.250"),
+    )
+    db.add(specs)
+    db.commit()
+    add_readings(db, vehicle, TWO_LEGS)
+    now = datetime(2026, 11, 10, 12, 0, tzinfo=UTC)
+    infer(db, vehicle, now=now)
+    assert len(predictions(db, vehicle, "leg")) == 2
+
+    params = {"vehicle_id": str(vehicle.id), "from": "2026-11-09", "to": "2026-11-09"}
+    items = api.get("/api/v1/analytics/trips", params=params, headers=auth()).json()["items"]
+    assert [i["estimated_energy_kwh"] for i in items] == [2.5, 2.5]
+
+    specs.baseline_kwh_per_km = None
+    db.commit()
+    summary = run_matching(db, vehicle_id=vehicle.id, user_id=vehicle.user_id, now=now)
+    db.commit()
+    db.expire_all()
+
+    assert summary.backtests_skipped_no_baseline == 2
+    assert predictions(db, vehicle, "leg") == []
+    items = api.get("/api/v1/analytics/trips", params=params, headers=auth()).json()["items"]
+    assert len(items) == 2
+    assert {(i["estimated_energy_kwh"], i["error_kwh"]) for i in items} == {(None, None)}
+    assert {i["observed_energy_kwh"] for i in items} == {3.0}
+
+
+def test_clearing_the_baseline_keeps_plan_rows(
+    db: Session, ex3: tuple[Vehicle, uuid.UUID, observed_service.InferRunSummary]
+) -> None:
+    vehicle, plan_id, _ = ex3
+    vehicle.make, vehicle.model = "Unknown", "Car"
+    db.add(VehicleSpecs(vehicle_id=vehicle.id, usable_capacity_kwh=Decimal("71.00")))
+    db.commit()
+    run_matching(db, vehicle_id=vehicle.id, user_id=vehicle.user_id, now=EX3_NOW)
+    db.commit()
+    db.expire_all()
+    assert predictions(db, vehicle, "leg") == []
+    (row,) = predictions(db, vehicle, "plan")
+    assert row.planned_trip_id == plan_id
