@@ -317,6 +317,32 @@ Replaces the placeholder `app/(app)/analytics/page.tsx`. No chart library (D5): 
 
 **Tests:** Vitest for scales/ticks and unit conversion; components render the table data; Playwright: open Analytics on seeded legs, switch to weekly, download the CSV and compare its rows with the table.
 
+**As built (P5-F6, 2026-11-19):** no new dependency, no API change. Files:
+- `app/(app)/analytics/page.tsx`: a server component that calls `/me`, `/vehicles`, `/analytics/consumption` and `/analytics/trips` (`limit=200`). All state lives in the URL (`components/analytics/params.ts`): `vehicle`, `from`, `to`, `group_by` (default week), `simulated=1`, `tz` and `cursor`. Invalid values are dropped, never echoed to the API.
+  - The default vehicle is the Dashboard's (primary if connected, else the newest connected), then any vehicle, since a disconnected car keeps its history.
+  - Filters are a plain GET form. The range the API resolved is pinned into the CSV and paging links, so they match the view on screen.
+  - 422s show inline: `RANGE_TOO_LARGE`, `INVALID_RANGE` and `UNKNOWN_TIME_ZONE` (with a "last 30 days" reset), and an expired cursor.
+- **`tz`:** `components/analytics/tz-sync.tsx` writes the browser's IANA zone into the URL with `router.replace` when it is missing. The first server render uses UTC.
+- **CSV:** `app/(app)/analytics/trips.csv/route.ts` forwards to `GET /analytics/trips.csv` with the session token and passes `Content-Disposition` through. On `EXPORT_TOO_LARGE` or any failure it redirects back with `export_error`, and the page shows a message instead of a raw JSON error. The link has no `download` attribute so that redirect works.
+- **Charts:** `components/analytics/charts/` holds `scale.ts` (linear scale, 1/2/2.5/5 × 10ⁿ ticks), `frame.tsx` (480×220 viewBox and axes), `bar-chart.tsx`, `line-chart.tsx` (null buckets break the line) and `scatter-chart.tsx` (shared domain, so y = x is a true diagonal; low quality is hollow).
+  - Each chart has `role="img"`, an `aria-label`, a `<title>` per mark, and `data-table.tsx`: a table that is always in the DOM, `sr-only` until "Show data".
+  - Colours are Tailwind palette classes with `dark:` variants. `globals.css` has no chart tokens and is not F6's file.
+  - The consumption chart and the scatter show a sentence instead of empty axes when nothing has both observed and estimated energy.
+- **Units:** `components/analytics/format.ts` converts kWh/km to Wh/mi (× 1609.344) or kWh/100 km (× 100). It also holds the distance conversion, signed errors, human labels for the D8 reason codes and the review statuses.
+- **Table:** `trips-table.tsx`. The quality badge is focusable, and its reasons are a tooltip on hover or focus that is also its `aria-describedby`.
+  - Bounded starts read "Started between X and Y".
+  - Every time in the table (end, start and both start bounds) is shown in the analytics `tz` (`tripTimeLabel` in `format.ts`, the same helper as the scatter), not the browser's zone, and the Drive header names the zone. A shared `tz=UTC` link opened elsewhere then lists the same days the API filtered on (Codex review on #58).
+  - Status tags: Needs review, In progress, Simulated, Not in totals.
+  - "Needs review" links to `/trips/{planned_trip_id}` when the leg is matched, else to `/trips/saved`, where F7 adds Observed drives.
+  - The table scrolls inside its box (`contain: inline-size`), because the app layout's `<main>` has no `min-w-0`.
+- **Paging and simulated data:** the scatter plots the current table page, and says so when there are more pages. `simulated-notice.tsx` shows "N simulated trips … left out" with a link to include them, or a persistent "Includes simulated data" banner.
+- **Tests:**
+  - `tests/analytics-lib.test.ts` (21): scale and ticks, segments, units, labels, URL params and error reasons.
+  - `tests/analytics-components.test.tsx` (13): each chart's marks and data table, the table's badges, reasons and links, the simulated notices and the summary.
+  - `e2e/analytics.spec.ts` (2): the spec signs `VEHICLE_STATE` webhooks for two past drives, so legs come from the real ingest and inference, with no direct writes and no harness change. It then checks the badges and tooltip, day → week, and that the downloaded CSV's ids and quality match the table rows. A second test covers the empty state.
+- **Found while testing (P5-F3 follow-up, not fixed here):** when a drive's readings arrive late, one webhook each and each already older than `stop_split_minutes`, the per-webhook inference closes the leg after its second reading. The rest of the drive is then never added. Example: a 39 km, 10-point drive was stored as 13 km on 2 points, low quality. `infer_trips.py --full` (or `POST /observed-trips/recompute` with `full`) rebuilds it correctly as high. The E2E spec runs that documented catch-up before opening the page.
+- **Until P5-F4 merges** there are no `kind='leg'` backtests. `estimated_energy_kwh` is then null, consumption ratios are null (contract: they need `energy_trips`), and the line chart and scatter show their "nothing to compare" sentences. The spec accepts either state.
+
 ### F7 — History with observations
 
 - Trip detail (`trips/[id]`): when `observation` is present, a "Planned vs actual" panel: each planned leg next to the observed leg (distance, SoC used, arrival SoC), total energy predicted vs observed with the error, and quality badges.
