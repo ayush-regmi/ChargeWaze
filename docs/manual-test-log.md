@@ -6,7 +6,7 @@ Checks that automated tests can't cover: they need the real Toyota bZ, real Mapb
 - **Where results go:** a check's result row here, plus wherever its "Record in" says (PR, roadmap, phase plan). Screenshots go in the named PR or close-out PR, not in the repo.
 - **Status values:** `open`, `blocked (<what>)`, `pass`, `fail (<issue/PR>)`.
 
-Last updated 2026-11-18 (after W3: #38, #39, #40, #41; Codex review fixes on #42).
+Last updated 2026-11-19 (P4-F9 close-out: M-07 unblocked, M-10 added).
 
 ---
 
@@ -20,9 +20,10 @@ Last updated 2026-11-18 (after W3: #38, #39, #40, #41; Codex review fixes on #42
 | M-04 | Along-route Frederick → Toronto returns US and CA stations (E2 live) | Mapbox + AFDC keys | P3-F9 | open |
 | M-05 | Charging page near Frederick, MD (P3-F6) | Mapbox public + secret, AFDC | P3-F9 | open |
 | M-06 | Trip Planner Frederick → Toronto, both sides of the border (P3-F7, E1/E2) | Mapbox public + secret, AFDC | P3-F9 | open |
-| M-07 | Saved-trips list and detail pages look right (P4-F7) | A planned trip | P4-F9 | open |
+| M-07 | Saved-trips list and detail pages look right (P4-F7) | Mapbox public + secret, AFDC, connected vehicle | P4-F9 | open |
 | M-08 | Real DC charging session logged for the bZ curve | Real car, DC charger | phase4_plan §7 item 2 (not blocking) | open |
 | M-09 | Clean up local per-session databases | Docker | Nothing | open |
+| M-10 | Real-key Frederick → Toronto **plan** with charging stops, latency and screenshot (P4-F9) | Mapbox public + secret, AFDC, connected vehicle | Phase 4 "complete" (roadmap) | open |
 
 Upcoming checks that close-out features will add (listed so they aren't a surprise): see [Upcoming](#upcoming).
 
@@ -238,24 +239,73 @@ Record in: screenshot on the P3-F9 close-out PR; result row here.
 |---|---|---|---|---|---|
 | | | | | | |
 
+### M-10 · Real-key Frederick → Toronto plan (P4-F9)
+
+Source: phase4_plan X1 and F9; roadmap Phase 4 completion criteria. Blocks the Phase 4 roadmap status moving from "awaiting manual checks" to complete.
+
+Before you start: Setup steps 1–3 (keys, `alembic upgrade head`, both servers) and a connected vehicle in the Garage. Never paste keys or the access token into a file, a PR or a chat.
+
+**Part A · In the browser**
+
+1. Open http://localhost:3000/trips.
+2. In **From**, type `Frederick, MD` and pick the first suggestion. In **To**, type `Toronto, ON` and pick the first suggestion.
+3. Route A is selected. In the panel "Charging plan for Route A", click **Plan charging stops**.
+4. If the panel asks for the starting charge ("too old to plan with" or no reading), type `90` in **Starting battery (%)** and click **Plan with this charge**.
+5. Check: the result is feasible, with one or more stops. Each stop shows `NN% → NN%`, a charge time and "detour N min (estimate)". Every arrival is at or above your reserve (15 % by default). The totals show **Total time**. The stop markers on the map sit on the route.
+6. Click **Save trip**. Take a screenshot of the map and the plan panel together.
+
+**Part B · Latency with `curl`** (Setup step 4 first, for `CW_AUTH`). Run from the repo root; responses go to the gitignored `spike_out/`.
+
+```bash
+mkdir -p services/api/scripts/spike_out
+```
+
+```bash
+export CW_VEHICLE=$(curl -s -H "Authorization: $CW_AUTH" http://localhost:8000/api/v1/vehicles | jq -r '.items[0].id') && echo "$CW_VEHICLE"
+```
+
+```bash
+jq -n --arg vid "$CW_VEHICLE" '{vehicle_id: $vid, origin: {lat: 39.4143, lon: -77.4105, label: "Frederick, MD"}, destination: {lat: 43.6532, lon: -79.3832, label: "Toronto, ON"}, starting_soc_override: 0.9}' > services/api/scripts/spike_out/plan-request.json
+```
+
+```bash
+curl -s -w 'plan: HTTP %{http_code} in %{time_total}s\n' -o services/api/scripts/spike_out/plan-response.json -X POST -H "Authorization: $CW_AUTH" -H "Content-Type: application/json" --data-binary @services/api/scripts/spike_out/plan-request.json http://localhost:8000/api/v1/routes/plan
+```
+
+```bash
+jq '{status, distance_km: .route.distance_km, countries: .route.countries, stops: [.stops[] | {name: .station.name, network: .station.network, km: .distance_along_route_km, arrival_soc, departure_soc, charging_minutes}], arrival_soc, total_minutes: .totals.total_minutes, candidates, reason}' services/api/scripts/spike_out/plan-response.json
+```
+
+Run the `curl` line three times and note each time (the first one fills the station cache, so it is usually the slowest).
+
+Expected: `HTTP 200`, `status: "feasible"`, `distance_km` near 748, `countries` `["US","CA"]`, two or more stops (the §5 math says three at 0.90 if stops were spaced ideally; real stations may need more), every `arrival_soc` ≥ 0.15 and the final `arrival_soc` ≥ 0.15, `reason: null`. On fixtures the same request takes about 0.25 s (roadmap Phase 4); the real one adds Mapbox and AFDC network time.
+
+Record in: this row; the screenshot and the three latencies on the P4-F9 PR (or a comment on it); the real-provider latency in the roadmap Phase 4 latency table.
+
+| Date | Feasible + stops | Arrivals ≥ reserve | US + CA | Latency (3 runs) | Screenshot |
+|---|---|---|---|---|---|
+| | | | | | |
+
 ---
 
 ## Visual checks after later merges
 
 ### M-07 · Saved-trips pages (P4-F7)
 
-Source: #38 "Left manual". Blocked until P4-F4 (`POST /routes/plan`) merges, because nothing can create a trip before that.
+Source: #38 "Left manual". Unblocked by P4-F4 (#43) and P4-F6 (#47). Do it straight after M-10, which saves a trip.
 
-Steps:
-1. Plan a trip (via P4-F6's UI once it exists, or `POST /api/v1/routes/plan` directly), then save it (`POST /api/v1/trips/{id}/save`).
-2. Open `/trips/saved`: the trip is listed; with no trips you see the empty state.
-3. Open the trip: static map, stops with SoC, totals; for an infeasible plan, the limiting segment is described in text.
-4. Delete it: it leaves the list.
-5. Screenshot list and detail.
+1. Open http://localhost:3000/trips/saved. The Frederick, MD → Toronto, ON trip saved in M-10 is listed, with its distance and total time.
+2. Click it. The detail page (`/trips/<id>`) shows the static map with the route and stop markers, each stop with its arrival → departure charge and charge time, and the totals. Take a screenshot.
+3. Make an infeasible plan to check its detail page: back on http://localhost:3000/trips with the same From/To, open **Re-plan with different preferences**, set **Reserve (%)** to `50` and **Charge to (%)** to `55`, click **Re-plan**. The panel shows a red "Not feasible" alert with no stops or totals. Click **Save trip**.
+4. Open http://localhost:3000/trips/saved and click the infeasible trip. The detail page says it isn't feasible and describes the limiting segment in text. Take a screenshot.
+5. On each trip's detail page click **Delete**, then **Delete** again in the "Delete this trip?" dialog. You land back on the list without that trip.
+6. With no saved trips left, http://localhost:3000/trips/saved shows "No saved trips yet". (Delete any older saved trips first if you have them.) Take a screenshot.
 
-| Date | List | Empty state | Detail | Delete | Screenshot |
-|---|---|---|---|---|---|
-| | | | | | |
+Record in: this row; screenshots on the P4-F9 PR (or a comment on it).
+
+| Date | List | Empty state | Detail (feasible) | Detail (infeasible, segment text) | Delete | Screenshot |
+|---|---|---|---|---|---|---|
+| | | | | | | |
 
 ### M-09 · Clean up local per-session databases
 
@@ -280,7 +330,6 @@ Checks that later close-outs will need; they'll move into the summary when their
 | Feature | Check |
 |---|---|
 | P3-F8 favorites | Favorite a station, sign out and back in: still favorited (Playwright covers it; a quick real-data look is enough). |
-| P4-F9 close-out | Real-key Frederick → Toronto **plan** with charging stops, screenshot; ~500 mi latency recorded in the roadmap; §5 numbers still pass. |
 | P4-F8 | Set a per-vehicle baseline on the real bZ and re-plan; numbers change as expected. |
 | P5-F8 close-out | A few real drives and one charge produce observed-trip legs with no manual step; record the high/medium/low quality mix (needs M-02 first). |
 | P6-F3 / F4 | Deployed app smoke test: sign in, Garage, Charging, Trip Planner on the production URL; alerts fire. |

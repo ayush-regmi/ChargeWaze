@@ -76,6 +76,20 @@ Status: code complete (F0–F7 merged; F8 adds the Playwright Garage → Dashboa
 
 ### Phase 4 — Charging-aware trip planner (Weeks 7–9)
 
+Status: **code complete; awaiting manual checks (M-07, M-10)**. F1–F7 merged (#27, #28, #32, #33, #38, #40, #43, #47); close-out evidence is in [`phase4_plan.md`](phase4_plan.md) §6 and F9. Three of the four completion criteria have automated evidence: hand-checked trips (§5 numbers asserted by the F2/F3/F4 tests, re-derived by hand on 2026-11-19), the starting-SoC prompt (F4 endpoint tests, F6 Vitest and Playwright), and every PRD §9 case mapped to a passing test. The first criterion's "real long-distance routes" half still needs the real-key Frederick → Toronto plan ([M-10](manual-test-log.md#m-10--real-key-frederick--toronto-plan-p4-f9)); the saved-trips pages need a visual check ([M-07](manual-test-log.md#m-07--saved-trips-pages-p4-f7)). P4-F8 (per-vehicle baseline) is a follow-up and not part of this phase's criteria.
+
+**Latency (~500 mi trip, fixtures, 2026-11-19).** Frederick, MD → Toronto, ON: 748.1 km (465 mi), Mapbox and AFDC served from the committed fixtures, local Postgres, Apple M3 Pro. Measured with `uv run pytest "tests/routing/test_plan_endpoint.py::test_frederick_toronto_plans_stores_and_matches_get_trip" -s` (five runs) and the optimizer alone on the same 121 candidates (20 runs per starting SoC):
+
+| Measure | Result |
+|---|---|
+| Whole `POST /api/v1/routes/plan` request (3 stops) | 241–272 ms (median 243 ms) |
+| Stations stage (along-route search + ~120 upserts) | 139–164 ms |
+| Optimizer stage | 22–25 ms |
+| Directions stage (fixture) / persist stage | ~1 ms / 6–9 ms |
+| Optimizer alone, start 0.30 / 0.50 / 0.90 / 1.00 | median 26.7 / 24.8 / 21.5 / 21.9 ms (max 71 ms) |
+
+With real providers, Mapbox Directions and the paged AFDC along-route search add network time on top; the real-key run (M-10) records that number.
+
 **Scope**
 
 - `energy` module: deterministic baseline energy model using `vehicle_specs.usable_capacity_kwh`, a configurable kWh/mi baseline, and the piecewise `charging_curve`.
