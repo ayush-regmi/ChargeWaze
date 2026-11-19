@@ -1,6 +1,6 @@
-"""HTTP routes for the stations module (``docs/api-contracts.md`` §3.10, §3.16, §3.17).
+"""HTTP routes for the stations module (``docs/api-contracts.md`` §3.10, §3.16, §3.17, §3.19).
 
-All three endpoints require sign-in. Coordinates, routes and search filters are
+All endpoints require sign-in. Coordinates, routes and search filters are
 never logged (phase3_plan.md D13); the service logs counts only.
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
@@ -19,7 +19,8 @@ from app.db.session import get_db
 from app.integrations.stations import StationFilters, StationProvider, get_station_provider
 from app.integrations.stations.base import ChargingLevel, ConnectorType
 from app.modules.auth.dependencies import AuthenticatedUser, get_current_user
-from app.modules.stations import service
+from app.modules.stations import favorites, service
+from app.modules.stations.favorites import FavoriteStationListResponse
 from app.modules.stations.schemas import (
     MAX_RADIUS_KM,
     AlongRouteRequest,
@@ -129,6 +130,60 @@ def stations_along_route(
     )
     db.commit()
     return result
+
+
+@router.get("/favorites", response_model=FavoriteStationListResponse)
+def list_favorite_stations(
+    vehicle_id: uuid.UUID | None = None,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> FavoriteStationListResponse:
+    """The caller's favorite stations, newest first (cache only, no provider call)."""
+
+    # Declared before ``/{station_id}`` so "favorites" isn't parsed as an ID.
+    vehicle = _vehicle_connectors(db, user, vehicle_id)
+    items = favorites.list_favorites(
+        db,
+        user_id=user.user_id,
+        ttl=timedelta(hours=settings.stations_cache_ttl_hours),
+        vehicle_connectors=vehicle,
+    )
+    return FavoriteStationListResponse(items=items)
+
+
+@router.put(
+    "/{station_id}/favorite",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+def favorite_station(
+    station_id: uuid.UUID,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Add a station to the caller's favorites. Idempotent."""
+
+    favorites.add_favorite(db, user_id=user.user_id, station_id=station_id)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete(
+    "/{station_id}/favorite",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+def unfavorite_station(
+    station_id: uuid.UUID,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Remove a station from the caller's favorites. Idempotent."""
+
+    favorites.remove_favorite(db, user_id=user.user_id, station_id=station_id)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{station_id}", response_model=StationOut)

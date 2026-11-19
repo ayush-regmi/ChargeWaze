@@ -16,6 +16,7 @@ import {
 import type { UnitSystem } from "@/lib/units";
 import { pickDashboardVehicle, vehicleTitle } from "@/lib/vehicles";
 
+import { parseChargingView, withView, type FavoriteStation } from "./_components/charging-tab";
 import { ChargingView, type ChargingResult, type ChargingVehicle } from "./_components/charging-view";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -57,9 +58,11 @@ async function loadVehicle(
 
 async function Charging({ searchParams }: { searchParams: SearchParams }) {
   await connection();
-  const filters = parseFilters(await searchParams);
+  const params = await searchParams;
+  const filters = parseFilters(params);
+  const view = parseChargingView(params);
   const qs = serializeFilters(filters);
-  const api = await requireSessionApi(qs ? `/charging?${qs}` : "/charging");
+  const api = await requireSessionApi(withView(qs ? `/charging?${qs}` : "/charging", view));
 
   const { data: me } = await api.GET("/api/v1/me");
   const units: UnitSystem = me?.preferences.units ?? "imperial";
@@ -71,9 +74,13 @@ async function Charging({ searchParams }: { searchParams: SearchParams }) {
     units,
   });
 
+  // Favorites load alongside the search: the Nearby cards need them for
+  // their stars, the Favorites tab lists them. Null when they failed to load.
+  const favoritesRequest = loadFavorites(api, vehicle?.id ?? null);
+
   let result: ChargingResult | null = null;
   let error: StationsErrorCode | null = null;
-  if (query) {
+  if (query && view === "nearby") {
     try {
       const { data, error: body } = await api.GET("/api/v1/stations", {
         params: { query },
@@ -92,6 +99,8 @@ async function Charging({ searchParams }: { searchParams: SearchParams }) {
     }
   }
 
+  const favorites = await favoritesRequest;
+
   const networkOptions = [
     ...new Set([
       ...(me?.preferences.preferred_networks ?? []),
@@ -107,6 +116,22 @@ async function Charging({ searchParams }: { searchParams: SearchParams }) {
       result={result}
       error={error}
       networkOptions={networkOptions}
+      view={view}
+      favorites={favorites}
     />
   );
+}
+
+async function loadFavorites(
+  api: ApiClient,
+  vehicleId: string | null,
+): Promise<FavoriteStation[] | null> {
+  try {
+    const { data } = await api.GET("/api/v1/stations/favorites", {
+      params: { query: vehicleId ? { vehicle_id: vehicleId } : {} },
+    });
+    return data?.items ?? null;
+  } catch {
+    return null;
+  }
 }

@@ -5,7 +5,34 @@ import { StationCard } from "@/components/stations/station-card";
 
 import { makeStation } from "./station-fixture";
 
+vi.mock("@/components/stations/favorite-actions", () => ({
+  setStationFavorite: vi.fn().mockResolvedValue(undefined),
+}));
+
 describe("StationCard", () => {
+  it("shows no star unless told whether the station is a favorite", () => {
+    render(<StationCard station={makeStation()} href="/x" />);
+    expect(screen.queryByRole("button", { name: /favorites/ })).not.toBeInTheDocument();
+  });
+
+  it("shows the star in its state", () => {
+    const { rerender } = render(<StationCard station={makeStation()} href="/x" favorite={false} />);
+    expect(
+      screen.getByRole("button", { name: "Add POTOMAC EDISON MAX KEHNE DC1 to favorites" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    rerender(<StationCard station={makeStation()} href="/x" favorite />);
+    expect(
+      screen.getByRole("button", { name: "Remove POTOMAC EDISON MAX KEHNE DC1 from favorites" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("starring doesn't select the card", async () => {
+    const onSelect = vi.fn();
+    render(<StationCard station={makeStation()} href="/x" favorite={false} onSelect={onSelect} />);
+    fireEvent.click(screen.getByRole("button", { name: /to favorites/ }));
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it("shows name, network, connectors with count and power, and distance", () => {
     render(<StationCard station={makeStation()} href="/charging/x" distanceText="1.2 mi" />);
     const card = screen.getByRole("article", { name: "POTOMAC EDISON MAX KEHNE DC1" });

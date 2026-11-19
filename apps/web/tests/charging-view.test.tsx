@@ -1,6 +1,11 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  parseChargingView,
+  withView,
+  type FavoriteStation,
+} from "@/app/(app)/charging/_components/charging-tab";
 import { ChargingView } from "@/app/(app)/charging/_components/charging-view";
 import type { MapViewProps } from "@/components/map/types";
 import { EMPTY_FILTERS, parseFilters, type ChargingFilters } from "@/lib/stations";
@@ -16,6 +21,9 @@ vi.mock("@/components/map/lazy-map-view", () => ({
     mapProps(props);
     return <div data-testid="map-stub" />;
   },
+}));
+vi.mock("@/components/stations/favorite-actions", () => ({
+  setStationFavorite: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/components/places/actions", () => ({
   suggestPlaces: vi.fn(),
@@ -205,5 +213,118 @@ describe("ChargingView", () => {
   it("says when only the nearest stations are shown", () => {
     renderView({ result: { items: [makeStation()], more: true, unknownPowerCount: 0 } });
     expect(screen.getByText(/Showing the nearest 1/)).toBeInTheDocument();
+  });
+
+  it("stars the nearby stations that are favorites", () => {
+    const fav = makeStation({ id: "fav", name: "Fav" });
+    const other = makeStation({ id: "other", name: "Other" });
+    renderView({
+      result: { items: [fav, other], more: false, unknownPowerCount: 0 },
+      favorites: [favorite(fav)],
+    });
+    expect(screen.getByRole("button", { name: "Remove Fav from favorites" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Other to favorites" })).toBeInTheDocument();
+  });
+
+  it("shows no stars when the favorites couldn't be loaded", () => {
+    renderView({
+      result: { items: [makeStation()], more: false, unknownPowerCount: 0 },
+      favorites: null,
+    });
+    expect(screen.queryByRole("button", { name: /favorites/ })).not.toBeInTheDocument();
+  });
+});
+
+function favorite(station = makeStation(), favorited_at = "2026-11-19T12:00:00Z"): FavoriteStation {
+  return { ...station, favorited_at };
+}
+
+describe("ChargingView Favorites tab", () => {
+  it("links both tabs and keeps the filters", () => {
+    renderView();
+    const tabs = screen.getByRole("navigation", { name: "Charging views" });
+    const nearby = within(tabs).getByRole("link", { name: "Nearby" });
+    const favs = within(tabs).getByRole("link", { name: "Favorites" });
+    expect(nearby).toHaveAttribute("aria-current", "page");
+    expect(favs).not.toHaveAttribute("aria-current");
+    expect(favs.getAttribute("href")).toMatch(/^\/charging\?lat=.*&view=favorites$/);
+    expect(parseFilters(new URL(favs.getAttribute("href")!, "http://x").searchParams).location)
+      .toMatchObject({ label: "Frederick, MD" });
+  });
+
+  it("lists favorites newest first without a place, with no search or filters", () => {
+    renderView({
+      view: "favorites",
+      filters: EMPTY_FILTERS,
+      result: null,
+      favorites: [
+        favorite(makeStation({ id: "b", name: "Newer" })),
+        favorite(makeStation({ id: "a", name: "Older" })),
+      ],
+    });
+    expect(
+      within(screen.getByRole("navigation", { name: "Charging views" })).getByRole("link", {
+        name: "Favorites",
+      }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("combobox", { name: "Search near" })).not.toBeInTheDocument();
+    const list = screen.getByRole("region", { name: "Favorite stations" });
+    expect(within(list).getAllByRole("article").map((a) => a.getAttribute("aria-label"))).toEqual([
+      "Newer",
+      "Older",
+    ]);
+    expect(within(list).getByRole("status")).toHaveTextContent("2 favorite stations");
+    expect(within(list).getAllByRole("button", { name: /Remove .* from favorites/ })).toHaveLength(2);
+    expect(mapProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ stations: expect.arrayContaining([expect.objectContaining({ id: "a" })]) }),
+    );
+  });
+
+  it("sorts favorites by distance when a place is set", () => {
+    renderView({
+      view: "favorites",
+      favorites: [
+        favorite(makeStation({ id: "far", name: "Far", location: { lat: 39.6, lon: -77.41 } })),
+        favorite(makeStation({ id: "near", name: "Near", location: { lat: 39.415, lon: -77.41 } })),
+      ],
+    });
+    const list = screen.getByRole("region", { name: "Favorite stations" });
+    const cards = within(list).getAllByRole("article");
+    expect(cards.map((a) => a.getAttribute("aria-label"))).toEqual(["Near", "Far"]);
+    expect(cards[0]).toHaveTextContent(/mi/);
+  });
+
+  it("refreshes after unstarring so the station drops out", async () => {
+    renderView({ view: "favorites", favorites: [favorite(makeStation({ name: "Fav" }))] });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Remove Fav from favorites" }));
+    });
+    expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it("has an empty state", () => {
+    renderView({ view: "favorites", favorites: [] });
+    expect(screen.getByText(/No favorite stations yet/)).toBeInTheDocument();
+    expect(screen.queryByTestId("map-stub")).not.toBeInTheDocument();
+  });
+
+  it("says when the favorites couldn't be loaded", () => {
+    renderView({ view: "favorites", favorites: null });
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load your favorite stations");
+  });
+});
+
+describe("Charging view URL helpers", () => {
+  it("parses only `view=favorites` as the Favorites tab", () => {
+    expect(parseChargingView({ view: "favorites" })).toBe("favorites");
+    expect(parseChargingView({ view: "nope" })).toBe("nearby");
+    expect(parseChargingView({ view: ["favorites", "x"] })).toBe("nearby");
+    expect(parseChargingView({})).toBe("nearby");
+  });
+
+  it("writes the tab only when it isn't the default", () => {
+    expect(withView("/charging", "nearby")).toBe("/charging");
+    expect(withView("/charging", "favorites")).toBe("/charging?view=favorites");
+    expect(withView("/charging?lat=1", "favorites")).toBe("/charging?lat=1&view=favorites");
   });
 });

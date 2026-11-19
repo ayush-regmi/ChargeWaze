@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
+import { FavoriteToggle } from "@/components/stations/favorite-toggle";
 import { StationDetail } from "@/components/stations/station-detail";
 import { requireSessionApi } from "@/lib/session-api";
 import { parseFilters, serializeFilters } from "@/lib/stations";
@@ -44,22 +45,35 @@ async function Station({ params, searchParams }: Props) {
     ? pickDashboardVehicle(vehicles.items, me?.preferences.primary_vehicle_id)
     : null;
 
-  const { data, response } = await api.GET("/api/v1/stations/{station_id}", {
-    params: {
-      path: { station_id: id },
-      query: vehicle ? { vehicle_id: vehicle.id } : {},
-    },
-  });
+  const [{ data, response }, { data: favorites }] = await Promise.all([
+    api.GET("/api/v1/stations/{station_id}", {
+      params: {
+        path: { station_id: id },
+        query: vehicle ? { vehicle_id: vehicle.id } : {},
+      },
+    }),
+    api.GET("/api/v1/stations/favorites"),
+  ]);
   if (response.status === 404) notFound();
 
   return (
     <>
-      <Link
-        href={back}
-        className="text-sm text-neutral-600 hover:underline dark:text-neutral-400"
-      >
-        ← Back to Charging
-      </Link>
+      <div className="flex items-start justify-between gap-3">
+        <Link
+          href={back}
+          className="text-sm text-neutral-600 hover:underline dark:text-neutral-400"
+        >
+          ← Back to Charging
+        </Link>
+        {/* Without the favorites list we can't say whether it's starred, so no star. */}
+        {data && favorites ? (
+          <FavoriteToggle
+            stationId={data.id}
+            stationName={data.name}
+            favorite={favorites.items.some((f) => f.id === data.id)}
+          />
+        ) : null}
+      </div>
       {data ? (
         <StationDetail station={data} />
       ) : (
