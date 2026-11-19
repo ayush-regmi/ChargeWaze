@@ -32,6 +32,7 @@ describe("sentryDsn", () => {
     const options = sharedSentryOptions();
     expect(options.dsn).toBeUndefined();
     expect(options.sendDefaultPii).toBe(false);
+    expect(options.includeLocalVariables).toBe(false);
   });
 });
 
@@ -45,6 +46,30 @@ describe("scrubString", () => {
       expect(out).not.toContain(secret);
     }
     expect(out).toContain("radius=5");
+  });
+});
+
+describe("route geometry", () => {
+  const POLYLINE6 = "_p~iF~ps|U_ulLnnqC";
+
+  it("filters any key containing polyline or geometry", () => {
+    const out = scrubEvent({
+      extra: { geometry_polyline6: POLYLINE6, routeGeometry: { type: "LineString" }, distance_m: 1000 },
+    });
+    expect(out.extra).toEqual({
+      geometry_polyline6: FILTERED,
+      routeGeometry: FILTERED,
+      distance_m: 1000,
+    });
+  });
+
+  it("scrubs geometry assignments inside serialized text and URLs", () => {
+    const out = scrubString(
+      `{"geometry_polyline6":"${POLYLINE6}","distance_m":1000} ` +
+        `geometry_polyline6='${POLYLINE6}' /plan?geometry_polyline6=${POLYLINE6}`,
+    );
+    expect(out).not.toContain(POLYLINE6);
+    expect(out).toContain('"distance_m":1000');
   });
 });
 

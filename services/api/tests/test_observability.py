@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from collections.abc import Iterator
 from typing import Any
 
@@ -28,6 +29,9 @@ USER_ID = "3f2b9c1e-7a4d-4e8b-9c3a-2d1f0e6b5a49"
 VEHICLE_ID = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"
 LAT, LON = 37.774929, -122.419416
 FAKE_DSN = "https://publickey@sentry.example.invalid/1"
+# Built at runtime so the value never appears in captured source-context lines.
+SECRET = "sk-" + uuid.uuid4().hex
+POLYLINE6 = "".join(["_p~iF", "~ps|U", "_ulLnnqC"])
 
 
 def _settings(**overrides: Any) -> Settings:
@@ -139,6 +143,21 @@ def test_scrub_event_removes_personal_data() -> None:
     assert event["user"]["id"] == USER_ID
 
 
+def test_route_geometry_keys_and_assignments_are_scrubbed() -> None:
+    out = scrub_event(
+        {
+            "extra": {"geometry_polyline6": POLYLINE6, "routeGeometry": {"type": "LineString"}},
+            "message": (
+                f"PlanRouteOut(geometry_polyline6='{POLYLINE6}', distance_m=1000) "
+                f'{{"geometry_polyline6": "{POLYLINE6}"}} /stations?geometry_polyline6={POLYLINE6}'
+            ),
+        }
+    )
+    assert out["extra"] == {"geometry_polyline6": FILTERED, "routeGeometry": FILTERED}
+    assert POLYLINE6 not in json.dumps(out)
+    assert "distance_m=1000" in out["message"]
+
+
 # ---- end to end through the SDK ----
 
 
@@ -178,8 +197,10 @@ def test_unhandled_route_error_is_scrubbed_before_sending(captured: _CaptureTran
     def boom(vehicle_id: str, lat: float, lon: float) -> None:
         user_id = USER_ID
         point = (lat, lon)
+        settings = _settings(mapbox_secret_token=SECRET, smartcar_client_secret=SECRET)
+        route = {"geometry_polyline6": POLYLINE6}
         logging.getLogger("chargewise.test").info("planning for %s at %s", user_id, point)
-        raise RuntimeError(f"no route for {user_id} near {point}")
+        raise RuntimeError(f"no route for {user_id} near {point}: {route!r} ({settings.app_env})")
 
     sentry_sdk.set_user({"id": USER_ID})
     client = TestClient(app, raise_server_exceptions=False)
@@ -189,5 +210,7 @@ def test_unhandled_route_error_is_scrubbed_before_sending(captured: _CaptureTran
 
     sent = captured.payloads()
     assert "RuntimeError" in sent, "the event should still be reported"
-    for secret in (USER_ID, VEHICLE_ID, str(LAT), str(LON)):
+    # Frame locals are never attached, so objects like Settings can't leak secrets.
+    assert '"vars"' not in sent
+    for secret in (USER_ID, VEHICLE_ID, str(LAT), str(LON), SECRET, POLYLINE6):
         assert secret not in sent, sent[max(0, sent.find(secret) - 300) : sent.find(secret) + 60]

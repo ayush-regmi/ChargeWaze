@@ -58,11 +58,14 @@ const COORD_PARAM = /\b(lat|lon|lng|latitude|longitude|near|origin|destination)=
 const COORD_ASSIGN = /(^|[^A-Za-z])((?:lat|lon|lng)\w*['"]?\s*[:=]\s*)-?\d+(?:\.\d+)?/gi;
 // "originLat": 37.7 (camelCase keys inside serialized JSON)
 const CAMEL_COORD_ASSIGN = /([a-z])((?:Lat|Lon|Lng)\w*['"]?\s*[:=]\s*)-?\d+(?:\.\d+)?/g;
+// "geometry_polyline6='_p~iF~ps|U'", "routePolyline": "..." inside reprs, JSON and URLs
+const ROUTE_ASSIGN = /(\w*(?:polyline|geometry)\w*['"]?\s*[:=]\s*)(?:'[^']*'|"[^"]*"|[^\s,&]+)/gi;
 const COORD_NUMBER = /^-?\d{1,3}\.\d{2,}$/;
 
 function isSensitiveKey(key: string): boolean {
   return (
     SENSITIVE_KEYS.has(key.toLowerCase()) ||
+    /polyline|geometry/i.test(key) ||
     ID_KEY.test(key) ||
     CAMEL_ID_KEY.test(key) ||
     COORD_KEY.test(key) ||
@@ -84,6 +87,7 @@ export function scrubString(value: string): string {
     .replace(COORD_PARAM, (_m, key: string) => `${key}=${FILTERED}`)
     .replace(COORD_ASSIGN, (_m, lead: string, prefix: string) => `${lead}${prefix}${FILTERED}`)
     .replace(CAMEL_COORD_ASSIGN, (_m, lead: string, prefix: string) => `${lead}${prefix}${FILTERED}`)
+    .replace(ROUTE_ASSIGN, (_m, prefix: string) => `${prefix}${FILTERED}`)
     .replace(COORD_PAIR, "[coords]");
 }
 
@@ -149,6 +153,9 @@ export function sharedSentryOptions() {
       process.env.NEXT_PUBLIC_VERCEL_ENV ||
       process.env.NODE_ENV,
     sendDefaultPii: false,
+    // Server runtime: never attach stack-frame locals (they can hold secrets).
+    // Already the Node SDK default; pinned so it can't be switched on by accident.
+    includeLocalVariables: false,
     // Errors only by default; tracing would also send page URLs as spans.
     tracesSampleRate: 0,
     beforeSend: <E extends object>(event: E) => scrubEvent(event),

@@ -77,6 +77,11 @@ _COORD_ASSIGN = re.compile(
 )
 # "originLat": 37.7 (camelCase keys inside serialized JSON)
 _CAMEL_COORD_ASSIGN = re.compile(r"(?<=[a-z])((?:Lat|Lon|Lng)\w*['\"]?\s*[:=]\s*)-?\d+(?:\.\d+)?")
+# "geometry_polyline6='_p~iF~ps|U'", "polyline": "..." inside reprs, JSON and URLs
+_ROUTE_ASSIGN = re.compile(
+    r"""(\w*(?:polyline|geometry)\w*['"]?\s*[:=]\s*)(?:'[^']*'|"[^"]*"|[^\s,&]+)""",
+    re.IGNORECASE,
+)
 
 
 _COORD_NUMBER = re.compile(r"-?\d{1,3}\.\d{2,}")
@@ -96,7 +101,12 @@ def _is_coordinate_pair(value: list[Any] | tuple[Any, ...]) -> bool:
 
 def _is_sensitive_key(key: str) -> bool:
     lowered = key.lower()
-    return lowered in _SENSITIVE_KEYS or bool(_ID_KEY.search(key) or _COORD_KEY.search(key))
+    return (
+        lowered in _SENSITIVE_KEYS
+        or "polyline" in lowered
+        or "geometry" in lowered
+        or bool(_ID_KEY.search(key) or _COORD_KEY.search(key))
+    )
 
 
 def scrub_string(value: str) -> str:
@@ -106,6 +116,7 @@ def scrub_string(value: str) -> str:
     value = _COORD_PARAM.sub(lambda m: f"{m.group(1)}={FILTERED}", value)
     value = _COORD_ASSIGN.sub(lambda m: f"{m.group(1)}{FILTERED}", value)
     value = _CAMEL_COORD_ASSIGN.sub(lambda m: f"{m.group(1)}{FILTERED}", value)
+    value = _ROUTE_ASSIGN.sub(lambda m: f"{m.group(1)}{FILTERED}", value)
     return _COORD_PAIR.sub("[coords]", value)
 
 
@@ -178,6 +189,9 @@ def start_sentry(
         # collects no user identity, cookies or IPs and keeps its own
         # EventScrubber on as a second layer under ours.
         max_request_body_size="never",
+        # Frame locals are serialized with repr(), which would send secrets held
+        # in objects such as Settings (JWT/Smartcar/Mapbox keys, DB password).
+        include_local_variables=False,
         traces_sample_rate=traces_sample_rate,
         before_send=_before_send,
         before_send_transaction=_before_send,
