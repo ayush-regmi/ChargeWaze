@@ -103,6 +103,15 @@ class Settings(BaseSettings):
     # ---- Energy model (Phase 4 F2) ----
 
     # ---- Trip planner (Phase 4 F4) ----
+    # phase4_plan.md D11: minutes added per stop (parking, plugging in, ramp-up).
+    planner_stop_overhead_minutes: float = Field(default=5.0, ge=0, le=60)
+    # D4: detour = 2 * off-route km * road factor, driven at the detour speed.
+    planner_detour_road_factor: float = Field(default=1.3, ge=1, le=3)
+    planner_detour_speed_kmh: float = Field(default=50.0, gt=0, le=130)
+    # D16: departure SoC grid (1 %).
+    planner_soc_grid_step: float = Field(default=0.01, gt=0, le=0.1)
+    # Upper bound of the along-route station corridor (phase3_plan.md D6 range).
+    planner_max_corridor_km: float = Field(default=16.0, ge=0.5, le=16)
 
     # ---- Trips (Phase 4 F1, Phase 5 F3/F4) ----
 

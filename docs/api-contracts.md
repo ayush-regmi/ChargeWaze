@@ -425,7 +425,7 @@ The main planning call (Phase 4). The server gets the driving route itself, find
   },
   "candidates": {
     "searched": true,
-    "corridor_km": 6.4,
+    "corridor_km": 6.41,
     "considered": 41,
     "excluded_incompatible": 12,
     "excluded_unknown_power": 3,
@@ -441,6 +441,11 @@ The main planning call (Phase 4). The server gets the driving route itself, find
 - `stops` is in route order; `[]` when no charging is needed. Each `station.id` is the stable Chargewise station ID (§3.16), and `station.power_kw` is the known power of the connector type used. `detour_minutes` is always an estimate (`2 × distance_from_route_km × detour_road_factor` at `detour_speed_kmh`).
 - `assumptions` says where each vehicle number came from: `*_source` is `vehicle` (the user's specs, §3.4a) or `catalog`. `charging_curve_source` is `vehicle`, `catalog` or `catalog_derived` (derived from published figures, not measured; the UI says so). `adjustments_applied` lists energy adjustments (speed, temperature, …) and is always `[]` in v1. `preferred_networks_relaxed` is `true` when no plan existed using only preferred networks, so all networks were used.
 - `candidates` explains which stations were used. Stations with no known power for a compatible connector are **never** used and are counted in `excluded_unknown_power`. When no charging was needed, the stations search isn't run: `searched: false` and the counts are `0`.
+  - `considered` is the number of usable stations handed to the optimizer, after the three exclusions. Each excluded station is counted once, in the order incompatible → unknown power → detour.
+  - `corridor_km` is `max_detour_minutes · detour_speed_kmh / 60 / (2 · detour_road_factor)`, clamped to 0.5–16 km and rounded to 3 decimals (20 min → `6.41`).
+  - The search is also skipped for `STARTING_SOC_TOO_LOW`, since no charger can help.
+- `*_source` values equal to the catalog's are reported as `catalog` even when they are stored on the vehicle (a newly connected catalog vehicle gets the catalog copied into its specs), so derived figures are never shown as the user's own.
+- `route.distance_km` is Mapbox's road distance (3 decimals). `distance_along_route_km` on stops and `from_km`/`to_km` on a limiting segment use that same axis.
 - `alternatives` is reserved for several plans and is always `[]` in v1.
 - Every plan, feasible or infeasible, is stored as an **unsaved** trip (§3.8). Saving is §3.9b; discarding is §3.9a.
 
@@ -489,7 +494,8 @@ Infeasibility codes ([`architecture.md`](architecture.md#66-infeasibility) §6.6
 - `VALIDATION_ERROR` (422), for body rule violations and for these `details.reason` values:
   - `STARTING_SOC_REQUIRED`: no `starting_soc_override`, and the SoC reading is missing or stale. `details` also has `last_soc` (fraction or `null`) and `last_recorded_at` (or `null`) so the UI can prefill a prompt.
   - `VEHICLE_SPECS_INCOMPLETE`: the vehicle lacks a value the model needs, from its specs and from the catalog. `details.missing` lists any of `usable_capacity_kwh`, `connectors`, `charging_curve`, `baseline_kwh_per_km`.
-  - `ROUTE_INDEX_UNAVAILABLE`: `route_index` is beyond the routes Mapbox returned.
+  - `ROUTE_INDEX_UNAVAILABLE`: `route_index` is beyond the routes Mapbox returned. `details.route_count` says how many there were.
+  - No `details.reason`, `details.fields` set: `reserve_soc` isn't below `preferred_charge_to` after merging, or isn't below the vehicle's highest chargeable SoC (the last point of its charging curve; `details.max_charge_soc`).
 - `MAPBOX_NOT_CONFIGURED`, `MAPBOX_UNREACHABLE`, `MAPBOX_ERROR`; `STATIONS_NOT_CONFIGURED`, `STATIONS_UNREACHABLE`.
 - Nothing is stored when the request fails.
 
