@@ -1,0 +1,63 @@
+# Render Blueprint for the Chargewise API (P6-F3). Setup steps: docs/deployment.md.
+#
+# Values marked `sync: false` are typed into the Render dashboard when the
+# Blueprint is first created; none are committed. Deploys are not automatic:
+# .github/workflows/deploy.yml runs migrations first, then asks Render to
+# deploy the exact commit that passed CI.
+services:
+  - type: web
+    name: chargewise-api
+    runtime: docker
+    dockerfilePath: ./services/api/Dockerfile
+    dockerContext: ./services/api
+    plan: free
+    region: oregon
+    branch: main
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    envVars:
+      # ---- App ----
+      - key: APP_ENV
+        value: production
+      - key: APP_PUBLIC_DEMO_MODE
+        value: "false"
+      - key: ALLOWED_ORIGINS # the Vercel production URL, e.g. https://chargewise.vercel.app
+        sync: false
+      # ---- Database (Supabase session pooler, postgresql+psycopg://...) ----
+      - key: DATABASE_URL
+        sync: false
+      # ---- Supabase Auth ----
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWKS_URL
+        sync: false
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
+      # ---- Smartcar V3 ----
+      - key: SMARTCAR_CLIENT_ID
+        sync: false
+      - key: SMARTCAR_CLIENT_SECRET
+        sync: false
+      - key: SMARTCAR_APPLICATION_ID
+        sync: false
+      - key: SMARTCAR_REDIRECT_URI # https://<web>/garage/connect/callback
+        sync: false
+      - key: SMARTCAR_WEBHOOK_ID
+        sync: false
+      - key: SMARTCAR_MANAGEMENT_TOKEN
+        sync: false
+      - key: SMARTCAR_MODE
+        value: live
+      - key: SMARTCAR_STATE_SECRET
+        generateValue: true
+      # ---- Mapbox (server-side secret token) ----
+      - key: MAPBOX_SECRET_TOKEN
+        sync: false
+      # ---- Charging stations ----
+      - key: AFDC_API_KEY
+        sync: false
+      - key: STATIONS_CURSOR_SECRET
+        generateValue: true
+      # ---- Observability (P6-F1) ----
+      - key: SENTRY_DSN_BACKEND
+        sync: false
