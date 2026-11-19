@@ -1,0 +1,169 @@
+{
+  "description": "Example 4: gap, out-of-order delivery, duplicate, odometer regression, short leg.",
+  "source": "docs/phase5_plan.md §5 (synthetic)",
+  "inputs": {
+    "vehicle_is_simulated": false,
+    "usable_capacity_kwh": 71.0,
+    "now": "2026-11-09T14:15:00Z"
+  },
+  "readings": [
+    {
+      "recorded_at": "2026-11-09T11:20:00Z",
+      "signal": "odometer_km",
+      "value": 24800.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T11:20:00Z",
+      "signal": "soc_percent",
+      "value": 76,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T12:45:00Z",
+      "signal": "odometer_km",
+      "value": 24850.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T12:45:00Z",
+      "signal": "soc_percent",
+      "value": 66,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T12:00:00Z",
+      "signal": "odometer_km",
+      "value": 24800.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T12:00:00Z",
+      "signal": "soc_percent",
+      "value": 75,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T12:10:00Z",
+      "signal": "odometer_km",
+      "value": 24812.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T12:10:00Z",
+      "signal": "soc_percent",
+      "value": 73,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T12:55:00Z",
+      "signal": "odometer_km",
+      "value": 24862.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T12:55:00Z",
+      "signal": "soc_percent",
+      "value": 64,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T12:50:00Z",
+      "signal": "odometer_km",
+      "value": 24849.2,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T13:30:00Z",
+      "signal": "odometer_km",
+      "value": 24862.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T13:30:00Z",
+      "signal": "soc_percent",
+      "value": 64,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T13:31:00Z",
+      "signal": "odometer_km",
+      "value": 24862.3,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T13:31:00Z",
+      "signal": "soc_percent",
+      "value": 64,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T12:10:00Z",
+      "signal": "odometer_km",
+      "value": 24812.0,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T14:10:00Z",
+      "signal": "odometer_km",
+      "value": 24862.3,
+      "is_simulated": false
+    },
+    {
+      "recorded_at": "2026-11-09T14:10:00Z",
+      "signal": "soc_percent",
+      "value": 64,
+      "is_simulated": false
+    }
+  ],
+  "expected": {
+    "legs": [
+      {
+        "start_time": "2026-11-09T12:00:00Z",
+        "start_time_latest": "2026-11-09T12:00:00Z",
+        "end_time": "2026-11-09T12:10:00Z",
+        "odometer_start_km": 24800.0,
+        "odometer_end_km": 24812.0,
+        "distance_km": 12.0,
+        "soc_start_percent": 75,
+        "soc_start_recorded_at": "2026-11-09T12:00:00Z",
+        "soc_end_percent": 73,
+        "soc_end_recorded_at": "2026-11-09T12:10:00Z",
+        "energy_kwh": 1.42,
+        "energy_kwh_uncertainty": 0.71,
+        "quality_flag": "low",
+        "quality_reasons": [
+          "soc_delta_small"
+        ],
+        "closed": true
+      },
+      {
+        "start_time": "2026-11-09T12:10:00Z",
+        "start_time_latest": "2026-11-09T12:45:00Z",
+        "end_time": "2026-11-09T12:55:00Z",
+        "odometer_start_km": 24812.0,
+        "odometer_end_km": 24862.0,
+        "distance_km": 50.0,
+        "soc_start_percent": 73,
+        "soc_start_recorded_at": "2026-11-09T12:10:00Z",
+        "soc_end_percent": 64,
+        "soc_end_recorded_at": "2026-11-09T12:55:00Z",
+        "energy_kwh": 6.39,
+        "energy_kwh_uncertainty": 0.71,
+        "quality_flag": "medium",
+        "quality_reasons": [
+          "soc_delta_small",
+          "soc_reading_stale",
+          "start_time_bounded",
+          "odometer_regression"
+        ],
+        "closed": true
+      }
+    ],
+    "charging_sessions": [],
+    "dropped_simulated": 0,
+    "dropped_duplicates": 1,
+    "dropped_odometer_regressions": 1,
+    "dropped_short_legs": 1
+  }
+}
