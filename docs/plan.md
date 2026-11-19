@@ -419,16 +419,16 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 | P4-F3 | merged 2026-11-18 | `feature/phase4-optimizer` / #40 | Route-ordered DP; ~35 ms median on the Frederick → Toronto fixture. Notes for P4-F4 in the PR (pre-filtered candidates; `ValueError` on bad input). |
 | P4-F7 | merged 2026-11-18 | `feature/phase4-trip-history` / #38 | No Playwright spec or screenshot yet (no trips exist before P4-F4). Limiting-segment highlight needs a `components/map/` follow-up, picked up by P4-F6. |
 | P5-F2 | merged 2026-11-18 | `feature/phase5-trip-inference` / #39 | Pure engine. Codex fix: each leg's SoC endpoints bounded to its own window. |
-| P3-F8 | in progress (W4) | `feature/phase3-favorites` | Holds the migration lane. |
-| P4-F4 | in progress (W4) | `feature/phase4-plan-endpoint` | ★ critical path. |
-| P3-F9 | blocked (P3-F8, P3-R1) | — | |
-| P4-F6 | blocked (P4-F4) | — | Also adds the limiting-segment map highlight left by P4-F7. |
-| P5-F1 | blocked (P3-F8, migration lane) | — | |
+| P3-F8 | merged 2026-11-19 | `feature/phase3-favorites` / #44 | Migration lane released (head `20261119_01`). New `FAVORITES_LIMIT` (409) at 500 favorites. Codex fixes: cap race (profile row lock), Favorites tab kept through the station page. Nothing manual left. |
+| P4-F4 | merged 2026-11-19 | `feature/phase4-plan-endpoint` / #43 | ★ `POST /routes/plan`. Unblocks P4-F6 and P4-F8. |
+| P3-F9 | blocked (P3-R1) | — | Only the manual real-key check M-03 is left. |
+| P4-F6 | in progress (W5) | `feature/phase4-planner-ui` | ★ critical path. Also adds the limiting-segment map highlight left by P4-F7. |
+| P5-F1 | in progress (W5) | `feature/phase5-observed-schema` | Holds the migration lane. |
 | P4-F9 | blocked (P4-F6) | — | |
-| P4-F8 | blocked (P4-F4) | — | Added by P4-F0 (#28). Migration lane; W7. Not a dependency of P4-F9. |
+| P4-F8 | blocked (migration lane, held by P5-F1) | — | Added by P4-F0 (#28). Dependencies merged; W7. Not a dependency of P4-F9. |
 | P5-F3 | blocked (P5-F1) | — | |
 | P5-F5 | blocked (P5-F1) | — | |
-| P6-F1 | scheduled W6 | — | |
+| P6-F1 | in progress (W5, started early) | `feature/phase6-sentry` | Holds the dependency lane. No dependencies, and no other ready feature needs that lane, so §3.1 lets it start now. |
 | P5-F4 | blocked (P5-F3, P4-F4) | — | |
 | P5-F6 | blocked (P5-F5) | — | |
 | P6-F3 | blocked (P4-F9) | — | |
@@ -442,4 +442,4 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 
 ## 7. Next step
 
-W3 is merged (#38, #39, #40, #41). W4 is running: **P3-F8** (favorites, holds the migration lane) and **P4-F4** (`POST /routes/plan`, critical path). When P4-F4 merges, start P4-F6; when P3-F8 merges, start P3-F9 (needs P3-R1 first) and P5-F1. Manual checks waiting on you are in [`manual-test-log.md`](manual-test-log.md).
+W4 is merged (#43, #44). W5 is running: **P4-F6** (Planner UI, critical path), **P5-F1** (observed-trips schema, holds the migration lane) and **P6-F1** (Sentry, holds the dependency lane; started early because it was ready). When P5-F1 merges, start P5-F3, P5-F5 and P4-F8 (migration lane). When P4-F6 merges, start P4-F9. P3-F9 starts once you've passed M-03 (P3-R1) in [`manual-test-log.md`](manual-test-log.md), which also lists the other manual checks waiting on you.
