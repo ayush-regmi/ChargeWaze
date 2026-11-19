@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from app.core.geo import EARTH_RADIUS_KM, LatLon, haversine_km
+from app.core.geo import EARTH_RADIUS_KM, LatLon, encode_polyline, haversine_km
 from app.integrations.stations.afdc import normalize_station
 from app.modules.energy import EnergyVehicle
 from app.modules.routing.plan_types import CandidateStation, PlannerSettings, RouteProfile
@@ -149,3 +149,40 @@ def bz() -> EnergyVehicle:
 @pytest.fixture
 def settings() -> PlannerSettings:
     return default_settings()
+
+
+# ---------------------------------------------------------------------------
+# POST /routes/plan (Phase 4 F4): synthetic straight routes and stations.
+# ---------------------------------------------------------------------------
+
+# A route due north from here: a meridian is a great circle, so the simplified
+# line (its two endpoints) has exactly the haversine length, and a station's
+# distance along the route is its latitude offset.
+SYNTHETIC_ORIGIN: LatLon = (39.0, -77.0)
+
+
+def north_of(along_km: float, off_km: float = 0.0) -> LatLon:
+    """The point ``along_km`` north of ``SYNTHETIC_ORIGIN`` and ``off_km`` east."""
+
+    km_per_deg = math.pi / 180 * EARTH_RADIUS_KM
+    lat = SYNTHETIC_ORIGIN[0] + along_km / km_per_deg
+    lon = SYNTHETIC_ORIGIN[1] + off_km / (km_per_deg * math.cos(math.radians(lat)))
+    return (lat, lon)
+
+
+def synthetic_directions(distance_km: float, duration_minutes: float) -> dict[str, object]:
+    """A Mapbox Directions body for one straight route north of the origin."""
+
+    steps = max(2, int(distance_km))
+    points = [north_of(distance_km * i / steps) for i in range(steps + 1)]
+    return {
+        "code": "Ok",
+        "routes": [
+            {
+                "geometry": encode_polyline(points),
+                "distance": haversine_km(points[0], points[-1]) * 1000.0,
+                "duration": duration_minutes * 60.0,
+                "legs": [{"summary": "Synthetic Rd", "admins": [{"iso_3166_1": "US"}]}],
+            }
+        ],
+    }

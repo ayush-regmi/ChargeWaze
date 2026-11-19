@@ -248,6 +248,69 @@ Corridor for the along-route search: `max_detour_minutes · speed / 60 / (2 · r
 - `trip_id` returned; `GET /trips/{id}` returns the same body.
 - Latency logged per stage (directions, stations, optimizer, persist) without coordinates.
 
+**As built (P4-F4, 2026-11-18):**
+- **Files:**
+  - `app/modules/routing/planner_service.py` follows §4.5 step by step. Its `plan_trip` signature is unchanged.
+  - `routing/schemas.py` adds the §3.7 request and response models.
+  - The `POST /routes/plan` route is in `routing/router.py`. It commits once, after the trip is stored.
+  - The five `planner_*` settings are in the "Trip planner" config block, with commented defaults in `.env.example`.
+  - No migration and no new dependency.
+- **Specs (D14):**
+  - Row value, then catalog value, then missing, as specified. Connector strings the planner doesn't know are ignored.
+  - A curve that `EnergyVehicle` rejects (fewer than 2 points, unsorted, zero power) is reported as missing `charging_curve`.
+  - The baseline comes from the catalog only; F8 changes the baseline lines.
+  - **A row value equal to the catalog's is reported as `catalog`.** P4-F2 copies the catalog into newly connected bZs' rows, so otherwise derived figures would show as `vehicle`. The curve source is `vehicle`, `catalog_derived` (the catalog curve is `derived`), or `catalog`.
+- **Preferences:**
+  - Request keys, then the stored row, then the seeded defaults. `reserve_soc ≥ preferred_charge_to` after merging → 422 with `details.fields`, the same as `PATCH /me/preferences`.
+  - `charge_to = min(preferred_charge_to, last curve point)`. If the reserve isn't below that → 422 (`details.max_charge_soc`). The optimizer's `ValueError` paths are never reached from user input.
+  - Request `preferences` follow the §3.1a field rules: explicit `null`, more than 3 decimals, duplicate networks, an unknown key (`units`, `primary_vehicle_id`) → 422.
+- **Starting SoC (D7):**
+  - The override always wins.
+  - Otherwise `soc_percent / 100` from `get_vehicle_state`, if `signal_recorded_at["soc_percent"]` is no older than `telemetry_stale_after_minutes`.
+  - A reading outside 0–100 counts as missing. `last_recorded_at` is null whenever `last_soc` is null.
+- **Order of checks:** specs, then preferences, then SoC, then Mapbox. So 404, specs, preference and SoC errors never call a provider.
+- **Short trips:** `optimize` with no candidates runs first. If that plan is feasible, or the result is `STARTING_SOC_TOO_LOW`, no stations call is made (`searched: false`).
+- **Along-route km axis (approved deviation):** P3-F5 measures `distance_along_route_km` on the Douglas–Peucker simplified line (0.1 km, `stations_route_max_points`). The optimizer uses Mapbox's road distance.
+  - The planner simplifies the decoded route the same way and scales station positions by `distance_km / simplified_length`, clamped to `[0, distance_km]`.
+  - Limiting-segment km are converted back with the same scale and interpolated on that line. The response's `from`/`to` are on the route, within 0.1 km.
+- **Candidates:**
+  - The stations call uses `dc_fast`, the vehicle's connectors as the provider filter, and `max_results` = 1,000 (the §3.17 maximum).
+  - The filters run in order: incompatible, unknown power (D12), detour over `max_detour_minutes` (D4). Each station is counted once.
+  - The highest-power compatible connector is used, ties by connector name.
+  - `considered` = stations handed to the optimizer.
+- **Preferred networks:**
+  - Matching is case- and whitespace-insensitive containment in either direction, on `network` or `operator`.
+  - If every candidate matches, the optimizer runs once and `relaxed = false`.
+  - If the preferred-only plan is infeasible, the planner runs again on all candidates and sets `relaxed = true`, even when that plan is infeasible too.
+- **Response:**
+  - SoC is rounded to 3 decimals and minutes to whole numbers, both half-up through `Decimal`. `energy_kwh_estimated` has 2 decimals; `route.distance_km` and km fields have 3.
+  - `stops[].station.location` is the cached station point.
+  - `plan_payload` is the response dumped with `mode="json", by_alias=True`, so `GET /trips/{id}` returns the identical body (tested).
+- **`is_simulated`:** set when the vehicle's cached state says `source = "simulated"`. A simulated vehicle with no state yet is stored as not simulated. P6-F2 (demo mode) should check this.
+- **Errors:** Mapbox and AFDC failures come from the adapters as the existing envelopes. Nothing is committed, so the trip and any station upserts from that request are rolled back.
+- **Logging:** one `route_plan` line per stored plan, with status, reason code, stop count, candidate counts, `preferred_networks_relaxed` and `{directions,stations,optimizer,persist}_ms`. Coordinates, geometry and station names are never logged (tested).
+- **Latency on fixtures:** Frederick → Toronto route A, the real Mapbox and AFDC fixtures over `MockTransport` (119 stations after the adapter drops restricted ones; 118 considered, 1 excluded for unknown power, corridor 6.41 km), local Postgres, Apple M3 Pro, 5 runs.
+
+  | Stage | Time |
+  |---|---|
+  | Whole request (TestClient) | 298–302 ms |
+  | Stations (decode, simplify, upsert, project) | 153–158 ms |
+  | Optimizer (two runs: no-candidate check, then full) | 31 ms |
+  | Persist | 10–12 ms |
+  | Directions (fixture, no network) | 1.5 ms |
+
+  The test asserts the whole request takes < 3 s. Real provider latency (Mapbox and AFDC paging over the network) is left to F9's real-key run.
+- **Tests:** `tests/routing/test_plan_endpoint.py`, 57 tests, covering every F4 test bullet plus:
+  - §5 trips 1 and 2 end to end on synthetic straight routes (B at 0.173 → 0.66, 17 min, total 295; trip 1 arrives at 0.495 with no stations call);
+  - a vehicle-capped charge-to, a user curve overriding the catalog, and a row copy of the catalog;
+  - Mapbox 401/422/500/timeout and an AFDC 503;
+  - `route_index` choosing the alternative route;
+  - a limiting segment located on the map;
+  - body validation (no client geometry accepted);
+  - the rounding and corridor helpers.
+
+  `tests/routing/conftest.py` gains `north_of` and `synthetic_directions`; the optimizer helpers are unchanged.
+
 ### F5 — Preferences editor
 
 Done (PR #27). No change, except one note for F4: `preferred_networks` is free text, matched as described in F4.
