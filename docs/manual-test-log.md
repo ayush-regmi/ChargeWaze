@@ -6,7 +6,7 @@ Checks that automated tests can't cover: they need the real Toyota bZ, real Mapb
 - **Where results go:** a check's result row here, plus wherever its "Record in" says (PR, roadmap, phase plan). Screenshots go in the named PR or close-out PR, not in the repo.
 - **Status values:** `open`, `blocked (<what>)`, `pass`, `fail (<issue/PR>)`.
 
-Last updated 2026-11-18 (after W3: #38, #39, #40, #41).
+Last updated 2026-11-18 (after W3: #38, #39, #40, #41; Codex review fixes on #42).
 
 ---
 
@@ -49,11 +49,31 @@ cd services/api && uv run fastapi dev app/main.py
 npm run dev --workspace=apps/web
 ```
 
-4. **A JWT for `curl`** (M-03, M-04): sign in at http://localhost:3000, open DevTools → Network, pick any `/api/v1/` request, and copy the `Authorization` header value. Then:
+4. **An access token for `curl`** (M-03, M-04). The browser never calls `/api/v1/` itself (Server Components and server actions attach the token server-side), so DevTools → Network won't show it. Read it from the Supabase session cookie instead: `@supabase/ssr` stores it, not `httpOnly`, as `sb-<project>-auth-token` (split into `.0`, `.1`, … chunks when long, value prefixed `base64-`). Sign in at http://localhost:3000, open the DevTools **Console** on that tab, and paste:
+
+```js
+(() => {
+  const parts = document.cookie.split("; ")
+    .filter((c) => /^sb-.+-auth-token(\.\d+)?=/.test(c))
+    .map((c) => [c.slice(0, c.indexOf("=")), c.slice(c.indexOf("=") + 1)])
+    .sort(([a], [b]) => Number(a.split(".")[1] ?? 0) - Number(b.split(".")[1] ?? 0));
+  let v = decodeURIComponent(parts.map(([, val]) => val).join(""));
+  if (v.startsWith("base64-")) {
+    const bin = atob(v.slice(7).replace(/-/g, "+").replace(/_/g, "/"));
+    v = new TextDecoder().decode(Uint8Array.from(bin, (ch) => ch.charCodeAt(0)));
+  }
+  copy(JSON.parse(v).access_token);
+  return "access token copied";
+})();
+```
+
+   It copies the token to the clipboard (`copy` is a DevTools console helper). Then, in the terminal you'll run `curl` from (macOS):
 
 ```bash
-export CW_AUTH="Bearer <paste token>"
+export CW_AUTH="Bearer $(pbpaste)"
 ```
+
+   The token expires after about an hour; repeat both steps if the API starts returning `UNAUTHENTICATED`. Don't paste it anywhere else.
 
 5. **Real car only** (M-01, M-02, M-08): Smartcar app in `live` mode, and the webhook reachable through the ngrok tunnel as in the 2026-11-16 run ([`phase2_plan.md`](phase2_plan.md) F8).
 
@@ -129,8 +149,18 @@ Source: [`phase3_plan.md`](phase3_plan.md) F4 acceptance. Blocks P3-F9.
 curl -s -H "Authorization: $CW_AUTH" "http://localhost:8000/api/v1/places/suggest?q=Toronto&session_token=$(uuidgen)&lat=39.4143&lon=-77.4105" | jq '.items[] | {name, kind, country_code}'
 ```
 
+Run these from the repo root. Save the directions response to a file; M-04 reuses it. `services/api/scripts/spike_out/` is gitignored, so real responses stay out of commits.
+
 ```bash
-curl -s -X POST -H "Authorization: $CW_AUTH" -H "Content-Type: application/json" -d '{"origin":{"lat":39.4143,"lon":-77.4105},"destination":{"lat":43.6532,"lon":-79.3832}}' http://localhost:8000/api/v1/routes/directions | jq '.routes[] | {distance_m, duration_s, countries}'
+mkdir -p services/api/scripts/spike_out
+```
+
+```bash
+curl -s -w 'directions: %{time_total}s\n' -o services/api/scripts/spike_out/directions.json -X POST -H "Authorization: $CW_AUTH" -H "Content-Type: application/json" -d '{"origin":{"lat":39.4143,"lon":-77.4105},"destination":{"lat":43.6532,"lon":-79.3832}}' http://localhost:8000/api/v1/routes/directions
+```
+
+```bash
+jq '.routes[] | {index, distance_m, duration_s, countries}' services/api/scripts/spike_out/directions.json
 ```
 
 Expected: suggestions include Toronto, ON; directions return 1–3 routes, each with `countries` containing `US` and `CA`. Also check the API log shows `/places/suggest` **without** its query string (the D13 log-redaction fix).
@@ -145,13 +175,23 @@ Record in: this row and phase3_plan F4 "As built" (replace "still to run").
 
 Source: phase3_plan E2, F5 "Still manual" (#29). Blocks P3-F9.
 
-Steps: take the first route's `geometry_polyline6` from M-03's directions call and post it:
+Steps: build the request body from M-03's saved directions response with `jq`. Don't paste the polyline into a shell command: the real Frederick → Toronto geometry contains hundreds of backticks and backslashes, which the shell would run or mangle.
 
 ```bash
-curl -s -X POST -H "Authorization: $CW_AUTH" -H "Content-Type: application/json" -d "{\"geometry_polyline6\":\"<paste>\",\"corridor_km\":3,\"charging_level\":\"dc_fast\"}" http://localhost:8000/api/v1/stations/along-route | jq '[.items[].country] | group_by(.) | map({(.[0]): length}) | add'
+jq '{geometry_polyline6: .routes[0].geometry_polyline6, corridor_km: 3, charging_level: "dc_fast"}' services/api/scripts/spike_out/directions.json > services/api/scripts/spike_out/along-route.json
 ```
 
-Expected: counts for both `US` and `CA`. Time the directions and along-route calls (`curl -w '%{time_total}\n'`); P3-F9 records these latencies in the roadmap as input for P4.
+```bash
+curl -s -w 'along-route: %{time_total}s\n' -o services/api/scripts/spike_out/along-route-response.json -X POST -H "Authorization: $CW_AUTH" -H "Content-Type: application/json" --data-binary @services/api/scripts/spike_out/along-route.json http://localhost:8000/api/v1/stations/along-route
+```
+
+```bash
+jq '{total_results, truncated, by_country: ([.items[].country] | group_by(.) | map({(.[0]): length}) | add)}' services/api/scripts/spike_out/along-route-response.json
+```
+
+For the other routes, change `.routes[0]` to `.routes[1]` or `.routes[2]` and repeat.
+
+Expected: counts for both `US` and `CA`. The `-w` output prints the directions and along-route latencies; P3-F9 records them in the roadmap as input for P4.
 
 Record in: this row; P3-F9 puts the counts and latencies in the roadmap.
 
