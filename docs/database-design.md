@@ -29,7 +29,8 @@ erDiagram
     profiles ||--o{ favorite_stations : stars
     charging_stations ||--o{ favorite_stations : starred_in
     planned_trips ||--o| prediction_results : scored_by
-    observed_trips ||--o| prediction_results : compared_in
+    observed_trips ||--o| prediction_results : backtested_in
+    planned_trips ||--o{ observed_trips : matched_to
 
     profiles {
         uuid id PK
@@ -128,23 +129,31 @@ erDiagram
         uuid id PK
         uuid user_id FK
         uuid vehicle_id FK
+        uuid planned_trip_id FK
         timestamptz start_time
         timestamptz end_time
+        numeric odometer_start_km
         numeric distance_km
-        numeric energy_kwh_estimated
+        numeric energy_kwh
         text energy_source
         text quality_flag
+        text review_status
+        boolean closed
         boolean is_simulated
     }
     prediction_results {
         uuid id PK
+        uuid user_id FK
+        uuid vehicle_id FK
+        text kind
         uuid planned_trip_id FK
         uuid observed_trip_id FK
         text model_version
         numeric predicted_energy_kwh
         numeric observed_energy_kwh
+        numeric error_kwh
         numeric arrival_soc_error_points
-        timestamptz created_at
+        boolean is_simulated
     }
 ```
 
@@ -430,7 +439,7 @@ The public demo depends on being able to seed convincing plans without touching 
 
 ## 6. Location and privacy
 
-- Location columns (`vehicles.latest_state.location`, `observed_trips` paths, `charging_stations.lat/lon`) are classified sensitive.
+- Location columns (`vehicles.latest_state.location`, `charging_stations.lat/lon`; `observed_trips` has no location columns, phase5_plan D7) are classified sensitive.
 - Account deletion removes `profiles` and cascades to `user_preferences`, `vehicles` (and through them `vehicle_specs`, `vehicle_telemetry`, `planned_trips`, `planned_stops`, `observed_trips`, `prediction_results`).
 - `charging_stations` is global cache data and is not removed on account deletion.
 - Telemetry retention policy: keep 24 months by default; user-configurable in Phase 6. Rows older than retention are deleted by a nightly job (not yet scheduled).
@@ -450,5 +459,5 @@ Not in the MVP. Adopt PostGIS when the first query that actually benefits from i
 ## 9. Open database questions
 
 - Partition `vehicle_telemetry` by month once row count makes `(vehicle_id, recorded_at DESC)` queries slow. Reassess after Phase 2 ships.
-- Whether `observed_trips` needs a `path` column (LineString) or should stay with aggregate distance only until mobile tracking exists.
-- Where to store weather observations tied to trips — a separate `trip_weather` table vs embedding in `observed_trips`. Decide in Phase 5.
+- ~~Whether `observed_trips` needs a `path` column~~ **Answered (phase5_plan D7):** no. Legs keep odometer distance only; no `path` until mobile tracking exists.
+- ~~Where to store weather observations tied to trips~~ **Deferred (phase5_plan "Not in Phase 5" and §7 item 5):** no weather integration in Phase 5; the `trip_weather` question moves to the ML plan.
