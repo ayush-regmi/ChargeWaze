@@ -70,7 +70,7 @@ These files are touched by many features. Each has one rule so parallel branches
 | `services/api/app/main.py` (router list) | **Pre-wired by W0** (§3.2): every planned router module is listed now. `_register_v1_routers` skips modules that don't exist yet (`except ImportError`), so later features don't edit this file. |
 | `services/api/app/core/config.py`, `services/api/.env.example`, `apps/web/.env.example` | **Pre-sectioned by W0**: one commented block per upcoming feature group (`# ---- energy (Phase 4) ----`, …). A feature adds settings only inside its own block, so hunks never touch. |
 | `services/api/alembic/versions/*`, `services/api/alembic/env.py`, `docs/database-design.md` | **Migration lane** (one at a time). The chain is linear; two parallel migrations both pointing at the current head make two heads and break `alembic upgrade head`. Before opening the PR, `uv run alembic heads` must print exactly one head. |
-| `apps/web/package.json`, `package-lock.json`, `services/api/pyproject.toml`, `services/api/uv.lock` | **Dependency lane** (one at a time). Lockfiles can't be merged by hand. Dependency-adding features: P3-F6 (`mapbox-gl`), P5-F6 (chart library), P6-F1 (Sentry). If a lockfile conflicts anyway: take `main`'s lockfile and re-run `npm install` / `uv lock`. |
+| `apps/web/package.json`, `package-lock.json`, `services/api/pyproject.toml`, `services/api/uv.lock` | **Dependency lane** (one at a time). Lockfiles can't be merged by hand. Dependency-adding features: P3-F6 (`mapbox-gl`), P6-F1 (Sentry). P5-F6 needs none (phase5_plan D5: plain SVG charts). If a lockfile conflicts anyway: take `main`'s lockfile and re-run `npm install` / `uv lock`. |
 | `.github/workflows/*` | **CI lane** (one at a time): P3-F9, P6-F3, P6-F4. |
 | `apps/web/e2e/support/*`, `apps/web/playwright.config.ts` | **E2E-harness lane**: P3-F7 builds the provider stub; W0 makes ports configurable. Later features only *add* `e2e/*.spec.ts` files. |
 | `docs/api-contracts.md` | Each feature edits only its own `§3.x` sections. The endpoint index table (§2) and the error-code table (§1.1): add rows next to your module's rows. If two PRs add rows at the same spot, keep both rows (the only acceptable "conflict"). |
@@ -209,7 +209,7 @@ A wave is a set of sessions that run together. Waves are a guide; the real rule 
 | **W4** | P3-F8 · P4-F4 ★ | migration (F8) | P4-F4 composes F5 + P4-F1 + P4-F3. |
 | **W5** | P3-F9 · P4-F6 ★ · P5-F1 | CI (F9), migration (P5-F1) | Phase 3 closes here. |
 | **W6** | P4-F9 · P5-F3 · P5-F5 · P6-F1 | dependency (P6-F1) | Phase 4 closes here. |
-| **W7** | P5-F4 · P5-F6 · P6-F3 · P4-F8 | dependency (P5-F6, after P6-F1 merges), CI (P6-F3), migration (P4-F8) | P5-F6 waits for P6-F1 to release the dependency lane. P4-F8 is a Phase 4 follow-up (added by P4-F0); it can start any time after P4-F4 once the migration lane is free. |
+| **W7** | P5-F4 · P5-F6 · P6-F3 · P4-F8 | CI (P6-F3), migration (P4-F8) | P5-F6 adds no dependency (phase5_plan D5), so it can start as soon as P5-F5 merges. P4-F8 is a Phase 4 follow-up (added by P4-F0); it can start any time after P4-F4 once the migration lane is free. |
 | **W8** | P5-F7 · P6-F4 · P6-F5 | CI (P6-F4), migration (P6-F5) | |
 | **W9** | P5-F8 · then P6-F2 | — | Phase 5 closes here. P6-F2 seeds every table, so it waits for P5-F8. |
 | **W10** | P6-F6 | — | MVP done. |
@@ -415,31 +415,31 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 | P4-F1 | merged 2026-11-18 | `feature/phase4-trips-schema` / #33 | Migration lane released. Codex fix: wrong-typed cursor fields → 422. |
 | P4-F2 | merged 2026-11-18 | `feature/phase4-energy-model` / #32 | Also edited `tests/test_vehicle_connect.py` (coordinator-approved). |
 | P5-F0 | merged 2026-11-18 | `feature/phase5-design` / #34 | Settles P5-D1…D14 in `phase5_plan.md` §2; ADR 0009. |
-| P3-F7 | in progress (W3) | `feature/phase3-trip-planner-map` | Holds the E2E-harness lane. |
-| P4-F3 | in progress (W3) | `feature/phase4-optimizer` | |
-| P4-F7 | in progress (W3) | `feature/phase4-trip-history` | |
-| P5-F2 | in progress (W3) | `feature/phase5-trip-inference` | |
-| P3-F8 | blocked (P3-F7) | — | |
-| P4-F4 | blocked (P3-F5, P4-F1, P4-F3) | — | |
-| P3-F9 | blocked (P3-F7, P3-F8, P3-R1) | — | |
-| P4-F6 | blocked (P3-F7, P4-F4) | — | |
-| P5-F1 | blocked (P5-F0, P4-F1, P3-F8) | — | |
-| P4-F9 | blocked (P4-F6, P4-F7) | — | |
-| P4-F8 | blocked (P4-F2, P4-F4) | — | Added by P4-F0 (#28). Migration lane; W7. Not a dependency of P4-F9. |
-| P5-F3 | blocked (P5-F1, P5-F2) | — | |
+| P3-F7 | merged 2026-11-18 | `feature/phase3-trip-planner-map` / #41 | E2E-harness lane released. Adds the provider stub; Playwright now `workers: 1`. Codex fix: along-route cache keyed by route geometry. Real-key Frederick → Toronto screenshot still manual. |
+| P4-F3 | merged 2026-11-18 | `feature/phase4-optimizer` / #40 | Route-ordered DP; ~35 ms median on the Frederick → Toronto fixture. Notes for P4-F4 in the PR (pre-filtered candidates; `ValueError` on bad input). |
+| P4-F7 | merged 2026-11-18 | `feature/phase4-trip-history` / #38 | No Playwright spec or screenshot yet (no trips exist before P4-F4). Limiting-segment highlight needs a `components/map/` follow-up, picked up by P4-F6. |
+| P5-F2 | merged 2026-11-18 | `feature/phase5-trip-inference` / #39 | Pure engine. Codex fix: each leg's SoC endpoints bounded to its own window. |
+| P3-F8 | in progress (W4) | `feature/phase3-favorites` | Holds the migration lane. |
+| P4-F4 | in progress (W4) | `feature/phase4-plan-endpoint` | ★ critical path. |
+| P3-F9 | blocked (P3-F8, P3-R1) | — | |
+| P4-F6 | blocked (P4-F4) | — | Also adds the limiting-segment map highlight left by P4-F7. |
+| P5-F1 | blocked (P3-F8, migration lane) | — | |
+| P4-F9 | blocked (P4-F6) | — | |
+| P4-F8 | blocked (P4-F4) | — | Added by P4-F0 (#28). Migration lane; W7. Not a dependency of P4-F9. |
+| P5-F3 | blocked (P5-F1) | — | |
 | P5-F5 | blocked (P5-F1) | — | |
 | P6-F1 | scheduled W6 | — | |
 | P5-F4 | blocked (P5-F3, P4-F4) | — | |
 | P5-F6 | blocked (P5-F5) | — | |
 | P6-F3 | blocked (P4-F9) | — | |
-| P5-F7 | blocked (P5-F3, P4-F7) | — | |
+| P5-F7 | blocked (P5-F3) | — | |
 | P6-F4 | blocked (P6-F3) | — | |
 | P6-F5 | blocked (P5-F1) | — | |
 | P5-F8 | blocked (P5-F4, P5-F6, P5-F7) | — | |
 | P6-F2 | blocked (P5-F8) | — | |
 | P6-F6 | blocked (P6-F1, P6-F2, P6-F4, P6-F5) | — | |
-| P2-R1, P2-R2, P3-R1 | manual (you) | — | |
+| P2-R1, P2-R2, P3-R1 | manual (you) | — | Every open manual check is listed in [`manual-test-log.md`](manual-test-log.md). |
 
 ## 7. Next step
 
-Approve or change: the parallel rules (§1–§2), the W0 contents (§3.2), and the P4/P5 recommendations in §4.2–4.3 (they are recommendations only; P4-F0 and P5-F0 settle them for real). Then merge this plan with W0, and start W1: **P3-F5**, **P4-F0** and **P4-F5**.
+W3 is merged (#38, #39, #40, #41). W4 is running: **P3-F8** (favorites, holds the migration lane) and **P4-F4** (`POST /routes/plan`, critical path). When P4-F4 merges, start P4-F6; when P3-F8 merges, start P3-F9 (needs P3-R1 first) and P5-F1. Manual checks waiting on you are in [`manual-test-log.md`](manual-test-log.md).
