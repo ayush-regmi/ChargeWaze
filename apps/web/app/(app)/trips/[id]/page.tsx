@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
+import { parseObservation } from "@/components/trips/observation-format";
+import { ObservationPanel } from "@/components/trips/observation-panel";
+import { parseStoredPlan } from "@/components/trips/plan-payload";
 import { TripDetail } from "@/components/trips/trip-detail";
 import { requireSessionApi } from "@/lib/session-api";
 import type { UnitSystem } from "@/lib/units";
@@ -35,6 +38,8 @@ async function Trip({ params }: Props) {
   ]);
   if (trip?.response.status === 404) notFound();
   const units: UnitSystem = me?.preferences.units ?? "imperial";
+  // `null` (or anything unreadable) means no drive has been matched yet (§3.18e).
+  const observation = trip?.data ? parseObservation(trip.data.observation) : null;
 
   return (
     <>
@@ -45,7 +50,16 @@ async function Trip({ params }: Props) {
         ← Saved trips
       </Link>
       {trip?.data ? (
-        <TripDetail trip={trip.data} units={units} />
+        <>
+          <TripDetail trip={trip.data} units={units} />
+          {observation ? (
+            <ObservationPanel
+              observation={observation}
+              plan={parseStoredPlan(trip.data.plan)}
+              units={units}
+            />
+          ) : null}
+        </>
       ) : (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">
           Couldn&apos;t load this trip. Please refresh to try again.

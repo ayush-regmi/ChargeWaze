@@ -84,6 +84,11 @@ export function TripList({
                     {tripTitle(trip.origin_label, trip.destination_label)}
                   </span>
                   <PlanStatusBadge planStatus={trip.plan_status} />
+                  {trip.status === "completed" ? (
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                      Completed
+                    </span>
+                  ) : null}
                 </div>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">
                   {formatDistanceText(trip.distance_km, units) ?? MISSING}
