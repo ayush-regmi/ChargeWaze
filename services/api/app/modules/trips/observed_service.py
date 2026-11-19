@@ -305,8 +305,9 @@ def infer_for_vehicle(
         raise _vehicle_not_found()
 
     window_start = _window_start(db, vehicle_id=vehicle_id, since=since, full=full)
+    context_start = _context_start(db, vehicle_id=vehicle_id, window_start=window_start)
     readings = [
-        _engine_reading(r) for r in list_readings(db, vehicle_id=vehicle_id, since=window_start)
+        _engine_reading(r) for r in list_readings(db, vehicle_id=vehicle_id, since=context_start)
     ]
     capacity, capacity_source = _resolve_capacity(db, vehicle)
     result = infer_legs(
@@ -317,8 +318,8 @@ def infer_for_vehicle(
         settings=engine_settings,
     )
 
-    # A leg that starts before the window is only a partial view of a leg the
-    # window doesn't cover (the engine saw just its tail); never write it.
+    # Legs that start before the window are context (the previous leg, or the
+    # tail of one); they are outside the window and never written.
     produced = [
         leg for leg in result.legs if window_start is None or leg.start_time >= window_start
     ]
@@ -454,13 +455,40 @@ def _window_start(
     anchor: datetime = max(closed_ends)
     if since is None or since >= anchor:
         return anchor
-    # Late telemetry: rebuild from the earliest non-frozen leg it can touch.
+    # Late telemetry: rebuild from the earliest non-frozen leg it can touch,
+    # and never start after ``since`` itself: readings older than every leg
+    # (a delayed earlier drive) must be inside the window to become a leg.
     reaching = [
         leg.start_time
         for leg in legs
         if leg.review_status not in FROZEN_REVIEW_STATUSES and leg.end_time >= since
     ]
-    return min(reaching, default=since)
+    start: datetime = min([*reaching, since])
+    return start
+
+
+def _context_start(
+    db: Session, *, vehicle_id: uuid.UUID, window_start: datetime | None
+) -> datetime | None:
+    """Where the engine's readings start: the previous leg's start, before the window.
+
+    The engine bounds a leg's SoC readings by its neighbouring legs (F2 As
+    built). Fed only the window plus the last reading of each signal before
+    it, the engine can't see the leg before the window, and would take a SoC
+    reading from before that leg as the first window leg's start SoC. Reading
+    from the previous leg's start (any review status) lets it see that leg's
+    boundary; legs starting before ``window_start`` are still never written.
+    ``None`` (all history) when there is no window or no leg before it.
+    """
+
+    if window_start is None:
+        return None
+    previous: datetime | None = db.scalar(
+        select(func.max(ObservedTrip.start_time)).where(
+            ObservedTrip.vehicle_id == vehicle_id, ObservedTrip.start_time < window_start
+        )
+    )
+    return previous
 
 
 def _engine_reading(reading: TelemetryReading) -> Reading:

@@ -333,3 +333,33 @@ def test_late_charging_delivery_nulls_a_closed_legs_energy(
     assert a.energy_kwh is None
     assert "soc_increased" in a.quality_reasons
     assert b.energy_kwh == Decimal("3.550")
+
+
+def test_late_drive_before_every_leg_is_created_by_the_hook(
+    api: TestClient, db: Session, vehicle: Vehicle
+) -> None:
+    post(api, delivery(0, odometer=1000.0, soc=80, charging=False))
+    post(api, delivery(10, odometer=1010.0, soc=75))
+    post(api, delivery(50, odometer=1010.0, soc=75))
+    (later,) = legs(db, vehicle)
+    assert later.closed
+    db.expunge(later)
+
+    # A delayed 07:00 → 07:10 drive arrives after the 08:00 leg is stored.
+    post(api, delivery(-60, odometer=990.0, soc=88))
+    post(api, delivery(-50, odometer=1000.0, soc=84))
+
+    earlier, later_again = legs(db, vehicle)
+    assert earlier.start_time == T0 - timedelta(minutes=60)
+    assert (earlier.odometer_start_km, earlier.odometer_end_km) == (
+        Decimal("990.00"),
+        Decimal("1000.00"),
+    )
+    # The first late reading alone (07:00, 990 km) briefly joins both drives
+    # into one bounded leg; the 07:10 reading splits them again, so the 08:00
+    # leg is back on its own odometer key (not necessarily its old row).
+    assert (later_again.odometer_start_km, later_again.odometer_end_km) == (
+        Decimal("1000.00"),
+        Decimal("1010.00"),
+    )
+    assert later_again.start_time == T0

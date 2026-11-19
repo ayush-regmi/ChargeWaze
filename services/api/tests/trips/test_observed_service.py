@@ -429,3 +429,83 @@ def test_run_for_someone_elses_vehicle_is_not_found(
     with pytest.raises(ApiError) as exc:
         observed_service.run_for_vehicle(db, vehicle_id=vehicle.id, user_id=uuid.uuid4(), now=NOW)
     assert exc.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# PR #53 review fixes (Codex)
+# ---------------------------------------------------------------------------
+
+# Drive 1 08:00 → 08:10, at rest until 08:50, drive 2 08:50 → 09:00, then at
+# rest. SoC only at 08:00 (80) and 09:00 (70): neither leg has its own pair of
+# SoC readings, so both must have energy None (F2's SoC bounds).
+SOC_STEAL: list[Row] = [
+    (0, 1000.0, 80, False),
+    (10, 1010.0, None, None),
+    (50, 1010.0, None, None),
+    (60, 1020.0, 70, None),
+    (100, 1020.0, None, None),
+]
+
+
+def _numbers(db: Session, vehicle: Vehicle) -> list[tuple[object, ...]]:
+    return [
+        (
+            leg.odometer_start_km,
+            leg.odometer_end_km,
+            leg.soc_start_percent,
+            leg.soc_end_percent,
+            leg.energy_kwh,
+            tuple(leg.quality_reasons),
+        )
+        for leg in legs(db, vehicle)
+    ]
+
+
+def test_windowed_run_doesnt_take_soc_from_before_the_previous_leg(
+    db: Session, add_vehicle: Callable[..., Vehicle]
+) -> None:
+    vehicle = add_vehicle()
+    add_readings(db, vehicle, SOC_STEAL)
+    run(db, vehicle, full=True)
+    full = _numbers(db, vehicle)
+    assert [n[4] for n in full] == [None, None]
+
+    # A late odometer reading inside drive 2 moves the window back to drive 2's
+    # start (08:50); drive 1 is outside the window.
+    add_readings(db, vehicle, [(55, 1015.0, None, None)])
+    summary = run(db, vehicle, since=T0 + timedelta(minutes=55))
+
+    assert summary.window_start == T0 + timedelta(minutes=50)
+    assert _numbers(db, vehicle) == full  # windowed == full: energy stays None
+    assert run(db, vehicle, full=True).legs_updated == 0
+
+
+def test_late_drive_before_every_leg_is_created(
+    db: Session, add_vehicle: Callable[..., Vehicle]
+) -> None:
+    vehicle = add_vehicle()
+    # An 08:00 drive, stored and closed.
+    add_readings(
+        db, vehicle, [(0, 1000.0, 80, False), (10, 1010.0, 75, None), (50, 1010.0, 75, None)]
+    )
+    run(db, vehicle, since=T0)
+    (later,) = legs(db, vehicle)
+    observed_service.confirm(db, user_id=vehicle.user_id, trip_id=later.id, now=NOW)
+    db.commit()
+
+    # A delayed 07:00 → 07:10 drive (990 → 1000 km), then at rest until 08:00.
+    add_readings(db, vehicle, [(-60, 990.0, 88, False), (-50, 1000.0, 84, None)])
+    summary = run(db, vehicle, since=T0 - timedelta(minutes=60))
+
+    assert summary.window_start == T0 - timedelta(minutes=60)
+    assert summary.legs_created == 1
+    earlier, later_again = legs(db, vehicle)
+    assert (earlier.odometer_start_km, earlier.odometer_end_km) == (
+        Decimal("990.00"),
+        Decimal("1000.00"),
+    )
+    assert earlier.start_time == T0 - timedelta(minutes=60)
+    # The confirmed 08:00 leg is still frozen.
+    assert later_again.id == later.id
+    assert later_again.review_status == "confirmed"
+    assert later_again.energy_kwh == later.energy_kwh
