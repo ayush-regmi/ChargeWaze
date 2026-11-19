@@ -347,39 +347,72 @@ RLS enabled.
 
 ### 3.9 `observed_trips`
 
-A real-world trip, either inferred from telemetry or manually confirmed.
+One **driving leg** inferred from telemetry ([phase5_plan.md](phase5_plan.md) D1): a stretch of odometer increase with no charging inside it. A road trip with two charging stops is three legs. Written and upserted by trip inference (P5-F3); migration `20261120_01`.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `uuid` PK | |
+| `id` | `uuid` PK | `gen_random_uuid()`. |
 | `user_id` | `uuid` FK → `profiles.id` ON DELETE CASCADE | |
 | `vehicle_id` | `uuid` FK → `vehicles.id` ON DELETE CASCADE | |
-| `start_time` | `timestamptz` | |
-| `end_time` | `timestamptz` | |
-| `distance_km` | `numeric(8,2)` | |
-| `energy_kwh_estimated` | `numeric(8,3)` | |
-| `energy_source` | `text` | `'soc_inferred'`, `'odometer_inferred'`, `'manual'`. |
-| `quality_flag` | `text` | `'high'`, `'medium'`, `'low'`. |
-| `is_simulated` | `boolean` | Default `false`. |
+| `start_time` | `timestamptz` NOT NULL | Earliest possible start: the last at-rest reading before motion. |
+| `start_time_latest` | `timestamptz` NOT NULL | First reading showing motion when the start is bounded; equals `start_time` when exact. CHECK `>= start_time`. |
+| `end_time` | `timestamptz` NOT NULL | Last reading with an odometer increase. CHECK `>= start_time_latest`. |
+| `odometer_start_km` | `numeric(10,2)` NOT NULL | |
+| `odometer_end_km` | `numeric(10,2)` NOT NULL | CHECK `> odometer_start_km`. |
+| `distance_km` | `numeric(8,2)` NOT NULL | CHECK `> 0` and `= odometer_end_km − odometer_start_km`. |
+| `soc_start_percent` | `numeric(5,2)` NULL | CHECK 0..100. |
+| `soc_start_recorded_at` | `timestamptz` NULL | |
+| `soc_end_percent` | `numeric(5,2)` NULL | CHECK 0..100. |
+| `soc_end_recorded_at` | `timestamptz` NULL | |
+| `usable_capacity_kwh` | `numeric(6,2)` NULL | Capacity the energy was computed with (D10). |
+| `capacity_source` | `text` NULL | `'vehicle'`, `'catalog'`. CHECK: `NULL` iff `usable_capacity_kwh` is `NULL`. |
+| `energy_kwh` | `numeric(8,3)` NULL | Observed driving energy, `(soc_start − soc_end) × capacity`. `NULL` when SoC can't give it. No `>= 0` check: a SoC rise within tolerance can make it slightly negative (phase5_plan F2 notes); such legs are `low` and out of aggregates. |
+| `energy_kwh_uncertainty` | `numeric(6,3)` NULL | D8. |
+| `energy_source` | `text` NULL | `'soc_inferred'`, `'manual'` (reserved). CHECK: `NULL` iff `energy_kwh` is `NULL`. There is no `'odometer_inferred'`: distance × baseline is a prediction, not an observation. |
+| `quality_flag` | `text` NOT NULL | `'high'`, `'medium'`, `'low'`. |
+| `quality_reasons` | `jsonb` NOT NULL | Array of D8 reason codes. Default `[]`. |
+| `review_status` | `text` NOT NULL | `'auto'`, `'needs_review'`, `'confirmed'`, `'rejected'`. Confirmed and rejected legs are frozen: inference never changes or deletes them (D3). |
+| `reviewed_at` | `timestamptz` NULL | Set by confirm/reject. |
+| `closed` | `boolean` NOT NULL | Default `false`. `false` while the leg may still grow (D14). |
+| `planned_trip_id` | `uuid` FK → `planned_trips.id` ON DELETE SET NULL | Set by matching (D4). The leg's position in the plan's chain isn't stored; the API orders the plan's legs by `start_time`. |
+| `inference_version` | `text` NOT NULL | `'telemetry-v1'`. |
+| `is_simulated` | `boolean` NOT NULL | Default `false`. Copied from the vehicle. |
+| `created_at`, `updated_at` | `timestamptz` NOT NULL | Default `now()`. `updated_at` is set by the ORM on update; a bulk `UPDATE` or upsert must set it itself. |
 
-Index: `INDEX (vehicle_id, start_time DESC)`.
+Indexes: `UNIQUE (vehicle_id, odometer_start_km)` (the upsert key); `(user_id, end_time DESC, id)` for lists and analytics; `(vehicle_id, end_time DESC)`; `(planned_trip_id) WHERE planned_trip_id IS NOT NULL` for matching and the SET NULL on plan delete.
+
+RLS enabled.
 
 ### 3.10 `prediction_results`
 
-Pairs a prediction with an observation so the analytics module can compute error.
+Pairs a prediction with what happened, so analytics can compute error. Two kinds of row: `'plan'` scores a matched plan against its chain of legs (D4); `'leg'` is a backtest of the baseline model against one finished leg with energy (D9).
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `uuid` PK | |
-| `planned_trip_id` | `uuid` FK → `planned_trips.id` ON DELETE CASCADE | |
-| `observed_trip_id` | `uuid` FK → `observed_trips.id` ON DELETE SET NULL | Nullable until an observation is matched. |
-| `model_version` | `text` | |
-| `predicted_energy_kwh` | `numeric(8,3)` | |
-| `observed_energy_kwh` | `numeric(8,3)` | Nullable. |
-| `arrival_soc_error_points` | `numeric(5,2)` | Percentage points. Nullable until observed. |
-| `created_at` | `timestamptz` | |
+| `id` | `uuid` PK | `gen_random_uuid()`. |
+| `user_id` | `uuid` FK → `profiles.id` ON DELETE CASCADE | Ownership filter without a join. |
+| `vehicle_id` | `uuid` FK → `vehicles.id` ON DELETE CASCADE | |
+| `kind` | `text` NOT NULL | `'plan'`, `'leg'`. |
+| `planned_trip_id` | `uuid` FK → `planned_trips.id` ON DELETE CASCADE, NULL | CHECK: set iff `kind = 'plan'`. |
+| `observed_trip_id` | `uuid` FK → `observed_trips.id` ON DELETE CASCADE, NULL | CHECK: set iff `kind = 'leg'`. Plan rows reach their legs through `observed_trips.planned_trip_id`. |
+| `model_version` | `text` NOT NULL | `'deterministic-v1'`. |
+| `distance_km` | `numeric(8,2)` NOT NULL | Distance the prediction is for: plan route + detours, or the leg's odometer distance. |
+| `observed_distance_km` | `numeric(8,2)` NOT NULL | Leg distance, or the chain's sum. |
+| `predicted_energy_kwh` | `numeric(8,3)` NOT NULL | |
+| `observed_energy_kwh` | `numeric(8,3)` NULL | `NULL` when any leg lacks energy. |
+| `error_kwh` | `numeric(8,3)` NULL | `observed − predicted`. |
+| `predicted_arrival_soc`, `observed_arrival_soc` | `numeric(4,3)` NULL | Plan rows only. CHECK 0..1. |
+| `observed_start_soc` | `numeric(4,3)` NULL | Plan rows only. CHECK 0..1. |
+| `arrival_soc_error_points` | `numeric(5,2)` NULL | `(observed − predicted) × 100`. Plan rows only. |
+| `inputs` | `jsonb` NOT NULL | `{baseline_kwh_per_km, baseline_source, usable_capacity_kwh}` (leg rows) or `{plan_model_version}` (plan rows). |
+| `is_simulated` | `boolean` NOT NULL | Default `false`. |
+| `created_at`, `updated_at` | `timestamptz` NOT NULL | Default `now()`; `updated_at` as in §3.9. |
 
-Index: `INDEX (model_version, created_at)`.
+Indexes: `UNIQUE (planned_trip_id, model_version)` and `UNIQUE (observed_trip_id, model_version)`: one row per plan or leg per model version. They are plain unique constraints rather than partial indexes `WHERE kind = …`: the kind ↔ FK checks make them equivalent (`NULL`s never collide), `ON CONFLICT` needs no index predicate, and the FK cascades use them. Also `(user_id, kind, created_at DESC)`, `(model_version, created_at)` and `(vehicle_id)` for the vehicle cascade.
+
+RLS enabled.
+
+**Retention (P6-F5):** only unsaved, unmatched plans expire (`saved_at IS NULL AND status = 'planned'`), so matched plans and their `'plan'` rows are kept.
 
 ## 4. Provenance and unit discipline
 

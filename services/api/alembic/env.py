@@ -19,6 +19,7 @@ from app.db.session import Base
 from app.modules.stations import favorites_models as _favorites_models  # noqa: F401
 from app.modules.stations import models as _stations_models  # noqa: F401
 from app.modules.trips import models as _trips_models  # noqa: F401
+from app.modules.trips import observed_models as _observed_trips_models  # noqa: F401
 from app.modules.users import models as _users_models  # noqa: F401
 from app.modules.vehicles import models as _vehicles_models  # noqa: F401
 
