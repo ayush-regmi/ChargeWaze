@@ -728,7 +728,7 @@ Checks: in this plan each departure happens to be the smallest grid value that r
 
 ## 6. PRD §9 acceptance mapping
 
-Filled in by F9 on 2026-11-19. Backend paths are under `services/api/tests/routing/`; web paths under `apps/web/`. Every test named here passed on `feature/phase4-closeout` (rebased on `main` at `3088f06`) in the same session: `uv run pytest tests/routing tests/energy` (170 passed), `npm run test` and the Playwright `e2e/planner.spec.ts` run listed in the F9 PR.
+Filled in by F9 on 2026-11-19. Backend paths are under `services/api/tests/routing/`; web paths under `apps/web/`. Every test named here passed on `feature/phase4-closeout` (from `main` at `3088f06`, then merged with docs-only `48297c5`) in the same session: `uv run pytest tests/routing tests/energy` (170 passed), `npm run test` and the Playwright `e2e/planner.spec.ts` run listed in the F9 PR.
 
 | PRD §9 case | Planned test (feature) | Test |
 |---|---|---|
