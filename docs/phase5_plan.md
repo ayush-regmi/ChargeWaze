@@ -252,6 +252,26 @@ Config block "analytics": `analytics_max_buckets = 366`, `analytics_export_max_r
 
 **Tests:** day/week/month in `UTC` and `America/New_York` (a leg ending 2026-11-02 03:30Z lands on 2026-11-01 in New York); ISO week labels across a year boundary; empty buckets; the bucket cap; `include_simulated` default false plus the `excluded_simulated_trips` count; needs_review/rejected/in-progress excluded from aggregates; CSV rows = JSON rows (same filters, all pages); CSV injection escaping on `origin_label`; the export cap; ownership (another user's `vehicle_id` → 404); MAE on §5 example 3 = 0.485 kWh.
 
+**As built (P5-F5, 2026-11-19):** no migration. Files:
+- `modules/trips/observed_queries.py`: read-only functions returning frozen dataclasses: `list_legs`, `page_legs` (keyset on `end_time DESC, id`, matching `observed_trips_user_end_idx`), `count_legs`, `count_simulated_legs`, `list_plan_scores`. Every query filters on the caller and one vehicle and drops rejected legs. Legs are outer-joined to their `deterministic-v1` `kind = 'leg'` row and to the matched plan's `origin`/`destination` labels.
+- `modules/analytics/`: `buckets.py` (pure: zone, default range, labels, `bucket_start`, cap), `aggregates.py` (pure: D12 and the F5 definitions), `csv_export.py`, `schemas.py`, `service.py`, `router.py`. The vehicle ownership check calls `vehicles.garage.get_vehicle_detail`, which works for disconnected vehicles too. The config block "analytics" has `analytics_max_buckets` (366) and `analytics_export_max_rows` (10000), mirrored as comments in `.env.example`.
+- **`in_progress`** (D14) = `NOT closed AND now − end_time < stop_split_minutes`. The window comes from F2's `InferenceSettings().stop_split_minutes` (20), because the "trips" config block belongs to F3. A leg that is not closed but has had no reading for 20 minutes counts as finished.
+- **`error_kwh`** on a row is the leg's `energy_kwh − predicted_energy_kwh` of its backtest, rounded to 0.001. It is not the stored `prediction_results.error_kwh`. The two are equal while F4 keeps backtests current, and computing it this way means observed, estimated and error always agree within a row. Plan accuracy (`plans`) uses the stored plan-row values. A plan counts in a range when its chain's last non-rejected leg ends in that range. Simulated plan rows are excluded unless `include_simulated`.
+- **Rounding:** `distance_km` to 0.01. Energies, kWh/km, MAE and bias to 0.001. `mean_arrival_soc_error_points` to 0.01. Per-row `observed_kwh_per_km` to 0.001.
+- **`excluded_simulated_trips`** counts the non-rejected simulated legs ending in the range, and is `0` when `include_simulated=true`. `/analytics/trips` and the CSV apply the same simulated filter and report no count (approved readings).
+- **Defaults and errors:** with only `from` given, `to` = max(`from`, today in `tz`); with only `to`, `from` = `to` − 29 days. 422 `details.reason` values: `UNKNOWN_TIME_ZONE`, `INVALID_RANGE` (`from > to`, or a date that overflows), `RANGE_TOO_LARGE` (+ `buckets`, `max_buckets`), `EXPORT_TOO_LARGE` (+ `rows`, `max_rows`) and `INVALID_CURSOR`. The CSV cap counts rows before reading them, so a file is never cut short.
+- **CSV:** each row is rendered from the same `model_dump(mode="json")` the JSON route returns. Numbers are written with Python `repr`, so they parse to the same floats. `null` becomes an empty cell, booleans become `true`/`false`, and `quality_reasons` is joined with `;`. Only string cells (labels, ids, enums, timestamps) get the `'` prefix. CRLF line ends.
+- **Tests (64)** in `tests/analytics/`: `test_buckets.py`, `test_aggregates.py` and `test_csv_export.py` (pure), and `test_analytics_api.py`. The API tests cover:
+  - §5 example 3 (day bucket, totals, MAE 0.485, bias −0.485, plan MAE 0.29, arrival −0.3);
+  - New York vs UTC bucketing over the DST change, and ISO weeks across 2026-W53 → 2027-W01;
+  - month buckets, empty buckets and the 366/367 bucket cap;
+  - `include_simulated` plus the excluded count;
+  - auto, confirmed, needs_review, rejected, in-progress and stale-open legs;
+  - every row field;
+  - CSV = JSON over paged results with a tied `end_time`, injection escaping on plan labels with a negative number left unchanged, and the export cap;
+  - 404 on all three routes, bad params, auth, and bad cursors.
+  Legs and backtests are written straight through the F1 models.
+
 ### F6 — Analytics UI
 
 Replaces the placeholder `app/(app)/analytics/page.tsx`. No chart library (D5): `components/analytics/charts/` has `bar-chart.tsx`, `line-chart.tsx` and `scatter-chart.tsx`, plain SVG with linear scales, "nice" axis ticks, a `<title>` per mark, `role="img"` and an `aria-label`, plus a data table under each chart (visually collapsible, always in the DOM). They follow the theme tokens in light and dark.
