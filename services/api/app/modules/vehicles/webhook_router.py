@@ -10,6 +10,9 @@ raw body (``SC-Signature``). Order matters and follows ``phase2_plan.md`` F5:
 4. Ingest (``telemetry_service``). Unknown / disconnected vehicle → 200
    ``accepted: false`` so Smartcar stops retrying (D12).
 5. Database failure → 5xx so Smartcar retries.
+6. A delivery that inserted rows schedules the post-ingest hooks (ADR 0009,
+   ``ingest_hooks.py``) as background tasks. They run after the response, and
+   their failures are logged, never returned to Smartcar.
 
 Logs carry the event ID and outcome only, never Smartcar user/vehicle IDs or
 signal values.
@@ -17,10 +20,12 @@ signal values.
 
 from __future__ import annotations
 
+import inspect
 import json
 import logging
+from contextlib import contextmanager
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, status
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -33,7 +38,13 @@ from app.integrations.smartcar.signatures import (
     verify_challenge_response,
     verify_webhook_signature,
 )
-from app.modules.vehicles.telemetry_service import ingest_vehicle_event
+from app.modules.vehicles.ingest_hooks import (
+    SessionOpener,
+    TelemetryIngested,
+    registered_ingest_hooks,
+    run_ingest_hooks,
+)
+from app.modules.vehicles.telemetry_service import IngestResult, ingest_vehicle_event
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +78,7 @@ async def _raw_body(request: Request) -> bytes:
 )
 def receive_smartcar_webhook(
     request: Request,
+    background_tasks: BackgroundTasks,
     raw_body: bytes = Depends(_raw_body),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
@@ -142,7 +154,47 @@ def receive_smartcar_webhook(
             "smartcar_webhook_not_accepted",
             extra={"event_id": result.event_id, "reason": result.reason},
         )
+    _schedule_ingest_hooks(request, background_tasks, result)
     return WebhookAck(accepted=result.accepted, event_id=result.event_id)
+
+
+def _schedule_ingest_hooks(
+    request: Request, background_tasks: BackgroundTasks, result: IngestResult
+) -> None:
+    """Queue the registered hooks when this delivery stored new readings."""
+
+    hooks = registered_ingest_hooks()
+    if (
+        not hooks
+        or not result.accepted
+        or not result.inserted_codes
+        or result.vehicle_id is None
+        or result.user_id is None
+        or result.earliest_recorded_at is None
+    ):
+        return
+    event = TelemetryIngested(
+        vehicle_id=result.vehicle_id,
+        user_id=result.user_id,
+        signal_codes=result.inserted_codes,
+        earliest_recorded_at=result.earliest_recorded_at,
+        is_simulated=result.is_simulated,
+    )
+    background_tasks.add_task(run_ingest_hooks, event, _session_opener(request), hooks)
+
+
+def _session_opener(request: Request) -> SessionOpener:
+    """Open sessions the way this request got its own (``get_db`` or its override).
+
+    The request's session is closed when hooks run, so each hook opens its
+    own. Using the app's provider keeps hooks on the same database as the
+    request (in tests, the rolled-back test connection).
+    """
+
+    provider = request.app.dependency_overrides.get(get_db, get_db)
+    if not inspect.isgeneratorfunction(provider):
+        provider = get_db
+    return contextmanager(provider)
 
 
 def _parse_event(raw_body: bytes) -> WebhookEvent:

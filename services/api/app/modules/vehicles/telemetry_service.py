@@ -24,11 +24,12 @@ Everything happens in the caller's transaction with the vehicle row locked
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+import uuid
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -44,6 +45,7 @@ from app.integrations.smartcar.schemas import (
     supported_signal_codes,
 )
 from app.modules.vehicles.models import Vehicle, VehicleTelemetry
+from app.modules.vehicles.vehicle_state import KM_PER_MILE
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,14 @@ class IngestResult:
     inserted: int = 0
     # Short machine reason when not accepted; logged, never returned to Smartcar.
     reason: str | None = None
+    # Set when accepted, for the post-ingest hooks (ADR 0009).
+    vehicle_id: uuid.UUID | None = None
+    user_id: uuid.UUID | None = None
+    is_simulated: bool = False
+    # Signal codes actually inserted by this delivery (empty for a duplicate).
+    inserted_codes: frozenset[str] = frozenset()
+    # Oldest provider timestamp among the inserted rows (late deliveries).
+    earliest_recorded_at: datetime | None = None
 
 
 def ingest_vehicle_event(
@@ -127,6 +137,7 @@ def ingest_vehicle_event(
         )
 
     inserted_codes: list[str] = []
+    inserted_times: list[datetime] = []
     if rows:
         stmt = (
             pg_insert(VehicleTelemetry)
@@ -137,7 +148,9 @@ def ingest_vehicle_event(
             )
             .returning(VehicleTelemetry.signal_code, VehicleTelemetry.recorded_at)
         )
-        inserted_codes = [row.signal_code for row in db.execute(stmt)]
+        for row in db.execute(stmt):
+            inserted_codes.append(row.signal_code)
+            inserted_times.append(row.recorded_at)
 
     if inserted_codes:
         inserted = [by_code[code] for code in inserted_codes]
@@ -165,7 +178,124 @@ def ingest_vehicle_event(
             "inserted": len(inserted_codes),
         },
     )
-    return IngestResult(accepted=True, event_id=event_id, inserted=len(inserted_codes))
+    return IngestResult(
+        accepted=True,
+        event_id=event_id,
+        inserted=len(inserted_codes),
+        vehicle_id=vehicle.id,
+        user_id=vehicle.user_id,
+        is_simulated=vehicle.is_simulated,
+        inserted_codes=frozenset(inserted_codes),
+        earliest_recorded_at=min(inserted_times, default=None),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Read-only access for trip inference (phase5_plan.md §3 F3)
+# ---------------------------------------------------------------------------
+
+ReadingCode = Literal["odometer", "soc", "charging_status"]
+READING_CODES: tuple[ReadingCode, ...] = ("odometer", "soc", "charging_status")
+
+# Same unit rules as ``vehicle_state.py``: an unrecognised unit is skipped,
+# never guessed (PRD §7).
+_ODOMETER_TO_KM: dict[str, float] = {
+    "km": 1.0,
+    "kilometers": 1.0,
+    "kilometres": 1.0,
+    "mi": KM_PER_MILE,
+    "mile": KM_PER_MILE,
+    "miles": KM_PER_MILE,
+}
+
+
+@dataclass(frozen=True)
+class TelemetryReading:
+    """One usable reading: odometer in km, SoC in percent, charging as 1.0/0.0."""
+
+    recorded_at: datetime
+    code: ReadingCode
+    value: float
+    is_simulated: bool
+
+
+def list_readings(
+    db: Session,
+    *,
+    vehicle_id: uuid.UUID,
+    since: datetime | None = None,
+    codes: Iterable[ReadingCode] = READING_CODES,
+) -> list[TelemetryReading]:
+    """Readings of ``codes`` recorded at or after ``since`` (all when ``None``).
+
+    When ``since`` is given, the latest usable reading of each code *before*
+    it is included too, so a window's first odometer pair is complete and the
+    engine knows the SoC and charging state at its start. Errored rows
+    (``value`` ``NULL``) and unknown units are dropped. Ordered by
+    ``(recorded_at, code)``. Read-only; the caller owns the transaction.
+    """
+
+    wanted = tuple(codes)
+    base = select(
+        VehicleTelemetry.recorded_at,
+        VehicleTelemetry.signal_code,
+        VehicleTelemetry.value,
+        VehicleTelemetry.unit,
+        VehicleTelemetry.is_simulated,
+    ).where(
+        VehicleTelemetry.vehicle_id == vehicle_id,
+        VehicleTelemetry.value.is_not(None),
+    )
+
+    readings: list[TelemetryReading] = []
+    window = base.where(VehicleTelemetry.signal_code.in_(wanted))
+    if since is not None:
+        window = window.where(VehicleTelemetry.recorded_at >= since)
+    for row in db.execute(window):
+        reading = _to_reading(row)
+        if reading is not None:
+            readings.append(reading)
+
+    if since is not None:
+        for code in wanted:
+            # A few candidates in case the newest has an unknown unit.
+            prior = (
+                base.where(
+                    VehicleTelemetry.signal_code == code,
+                    VehicleTelemetry.recorded_at < since,
+                )
+                .order_by(VehicleTelemetry.recorded_at.desc())
+                .limit(5)
+            )
+            for row in db.execute(prior):
+                reading = _to_reading(row)
+                if reading is not None:
+                    readings.append(reading)
+                    break
+
+    readings.sort(key=lambda r: (r.recorded_at, r.code, r.value))
+    return readings
+
+
+def _to_reading(row: Any) -> TelemetryReading | None:
+    code = row.signal_code
+    raw = float(row.value)
+    unit = row.unit.strip().lower() if isinstance(row.unit, str) else None
+    value: float | None
+    if code == "odometer":
+        factor = _ODOMETER_TO_KM.get(unit) if unit else None
+        value = None if factor is None else round(raw * factor, 3)
+    elif code == "soc":
+        value = raw if unit in (None, "percent") else None
+    elif code == "charging_status":
+        value = 1.0 if raw else 0.0
+    else:
+        value = None
+    if value is None:
+        return None
+    return TelemetryReading(
+        recorded_at=row.recorded_at, code=code, value=value, is_simulated=row.is_simulated
+    )
 
 
 def apply_to_latest_state(
@@ -267,4 +397,11 @@ def _parse_iso(value: Any) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
-__all__ = ["IngestResult", "apply_to_latest_state", "ingest_vehicle_event"]
+__all__ = [
+    "READING_CODES",
+    "IngestResult",
+    "TelemetryReading",
+    "apply_to_latest_state",
+    "ingest_vehicle_event",
+    "list_readings",
+]

@@ -114,6 +114,16 @@ class Settings(BaseSettings):
     planner_max_corridor_km: float = Field(default=16.0, ge=0.5, le=16)
 
     # ---- Trips (Phase 4 F1, Phase 5 F3/F4) ----
+    # Observed-trip inference (phase5_plan.md §3 F2 table, D1, D8, D14).
+    trips_stop_split_minutes: float = Field(default=20.0, gt=0, le=24 * 60)
+    trips_min_move_km: float = Field(default=0.1, ge=0, le=10)
+    trips_min_leg_km: float = Field(default=0.5, ge=0, le=100)
+    trips_high_min_soc_delta: float = Field(default=10.0, ge=0, le=100)
+    trips_medium_min_soc_delta: float = Field(default=4.0, ge=0, le=100)
+    trips_high_max_soc_age_minutes: float = Field(default=15.0, ge=0)
+    trips_medium_max_soc_age_minutes: float = Field(default=360.0, ge=0)
+    trips_soc_resolution_points: float = Field(default=1.0, gt=0, le=10)
+    trips_soc_increase_tolerance_points: float = Field(default=1.0, ge=0, le=10)
 
     # ---- Analytics (Phase 5 F5) ----
 
