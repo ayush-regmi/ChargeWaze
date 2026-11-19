@@ -183,6 +183,42 @@ Below the curve's first point the first point's power holds; above its last poin
 - The departure SoC is on the grid and is the smallest grid value that works.
 - Latency of the pure search on the real Frederick → Toronto AFDC fixture (all DC stations) < 500 ms.
 
+**As built (P4-F3, 2026-11-18):**
+- **Files:** `app/modules/routing/plan_types.py` (§4.1) and `app/modules/routing/optimizer.py` (§4.3). Both signatures are implemented **unchanged**. The optimizer uses the F2 functions (`cumulative_charge_minutes`, `charging_minutes`, `soc_used`, `segment_energy_kwh`, `max_charge_soc`) and doesn't recompute charging time itself.
+- **Search (the §4.3 DP with one extra pruning step):** each label (a departure from a station, or the origin) sits on a single axis, its *potential* `v = departure + along_km · soc_per_km`. Detour energy is charged to the arriving leg, so the arrival at station *j* is `v − (along_j + detour_j) · soc_per_km`, whatever station the label is at.
+  - That makes it safe to keep only the Pareto frontier of (potential, cost) across all earlier stations. A label is dropped when another one has at least its potential for no more cost.
+  - The predecessors of *j* are then a contiguous slice of the frontier, found by bisection and already sorted by arrival. The §4.3 prefix minimum of `cost − F_j(a)` runs over that slice.
+  - On the real fixture this cut the time from about 360 ms (every state from every station within one charge's reach) to about 30 ms, with identical plans. A test checks optimality against an unpruned brute-force search on 12 seeded random instances (0–3 stops plus all three infeasible codes).
+- **Tie-breaks (§4.3 step 5):** the comparison key is (minutes rounded to 1e-9, stops, charging minutes, station indices in route order). Every part is additive, so the prefix minimum and the frontier keep it exact. Route order is `(distance_along_route_km, station_id)`.
+- **Grid:** departures are `k · soc_grid_step` up to `floor(charge_to / step)`, built from integer `k` so float drift doesn't creep in. A stop must charge (`departure > arrival`). A station where you'd arrive at or above the top grid value is never a stop. Arrivals are compared with the reserve with a 1e-9 tolerance.
+- **Limiting segments (where §4.3 left a choice):**
+  - `RESERVE_SOC_UNREACHABLE`: uses the leg of the reserve-0 plan with the **largest shortfall**, `reserve + soc used − best SoC available at its start` (the start SoC at the origin, the top grid SoC at a charger). Ties go to the lowest arrival. §4.3 said "lowest arrival", but that leg isn't always the one that can't be crossed.
+  - `NO_COMPATIBLE_CHARGER_IN_RANGE`: the segment runs from the origin to the reserve point, as specified. `required_soc` is the SoC needed to reach the **first candidate** (with its detour), or the destination when there are no candidates, so the UI gets a number to compare with `available_soc`. Read literally, the field definition would have made it equal to the start SoC.
+  - `DESTINATION_UNREACHABLE`: a forward pass charges to the top grid SoC at every reachable charger. The segment runs from the furthest reachable charger to the next candidate, or to the destination. `available_soc` is the top grid SoC.
+- **Input validation:** `optimize` raises `ValueError` for inputs F4 must never send. That covers SoCs outside [0, 1]; `reserve >= charge_to`; `charge_to` above the curve's last point; a grid step outside (0, 1]; negative overhead or road factor; a detour speed ≤ 0; and a candidate with power ≤ 0 or a negative route position. NaN counts as invalid everywhere. Turning user input into a 422 stays in F4.
+- **§5 results (exact):**
+  - Trip 1: arrival 0.49465, 60 min.
+  - Trip 2: B, 0.17296 → 0.66, 16.648 min charging, total 294.77 min, arrival 0.15296.
+  - Trip 3: W → B → Q with 0.162 → 0.61, 0.151 → 0.55, 0.152 → 0.68 and 14.617 / 12.443 / 18.269 min. Extra time is 68.13 min; energy is 150.92 kWh.
+    - On the fixture's exact route (748.108 km, 514.845 min) the total is **582.97** min (§5 rounds the route and says 582.9; API 583) and the arrival is **0.15012** (§5: 0.15014; API 0.150).
+  - Two short stops: P → Q, 0.18 → 0.46 and 0.15 → 0.63, **34.20** extra min. P alone is 0.18 → 0.94, **45.23** min.
+- **Latency:** measured on the real fixture: route A distance and duration, and all 121 stations from `nearby_route_cross_border_dc_fast.json` that have a bZ-compatible connector with known power (84 CCS1, 37 NACS; one of the 122 is excluded). Over 20 runs each on an Apple M3 Pro:
+
+  | Start SoC | Median | Max | Stops |
+  |---|---|---|---|
+  | 0.30 | 37 ms | 38 ms | 5 |
+  | 0.50 | 34 ms | 34 ms | 4 |
+  | 0.90 | 30 ms | 32 ms | 3 |
+  | 1.00 | 29 ms | 29 ms | 3 |
+
+  The test asserts < 500 ms across the four starts.
+- **Tests:** `tests/routing/` has 50 tests.
+  - `test_optimizer.py`: every F3 bullet above. It also covers the reserve failing on the first leg, a coarser grid, ties between identical stations, a slow station losing to a fast one, detour accounting, unsorted input, validation and the reference search.
+  - `test_optimizer_trips.py`: the §5 trips and the two-stop case.
+  - `test_optimizer_latency.py`: the latency check.
+  - `tests/routing/conftest.py` is new. It maps the AFDC fixture to candidates through the real `normalize_station` and projects them onto the simplified route sent to AFDC. **F4 note:** you can add your own fixtures to this file. Keep the optimizer helpers.
+- **No new fixture files.** The existing AFDC and Mapbox fixtures were enough.
+
 ### F4 — `POST /routes/plan`
 
 **Contract:** [`api-contracts.md`](api-contracts.md) §3.7. `modules/routing/planner_service.py` follows §4.5, step by step. Config block "planner":
