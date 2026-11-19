@@ -20,7 +20,7 @@ Last updated 2026-11-18 (after W3: #38, #39, #40, #41; Codex review fixes on #42
 | M-04 | Along-route Frederick → Toronto returns US and CA stations (E2 live) | Mapbox + AFDC keys | P3-F9 | open |
 | M-05 | Charging page near Frederick, MD (P3-F6) | Mapbox public + secret, AFDC | P3-F9 | open |
 | M-06 | Trip Planner Frederick → Toronto, both sides of the border (P3-F7, E1/E2) | Mapbox public + secret, AFDC | P3-F9 | open |
-| M-07 | Saved-trips list and detail pages look right (P4-F7) | A planned trip | P4-F9 | blocked (P4-F4) |
+| M-07 | Saved-trips list and detail pages look right (P4-F7) | A planned trip | P4-F9 | open |
 | M-08 | Real DC charging session logged for the bZ curve | Real car, DC charger | phase4_plan §7 item 2 (not blocking) | open |
 | M-09 | Clean up local per-session databases | Docker | Nothing | open |
 

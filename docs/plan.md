@@ -428,19 +428,19 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 | P3-F8 | merged 2026-11-19 | `feature/phase3-favorites` / #44 | Migration lane released (head `20261119_01`). New `FAVORITES_LIMIT` (409) at 500 favorites. Codex fixes: cap race (profile row lock), Favorites tab kept through the station page. Nothing manual left. |
 | P4-F4 | merged 2026-11-19 | `feature/phase4-plan-endpoint` / #43 | ★ `POST /routes/plan`. Unblocks P4-F6 and P4-F8. |
 | P3-F9 | blocked (P3-R1: M-03) | — | Code dependencies are merged. To start, it needs M-03 (Places + directions with real keys). To finish, it also needs M-04, M-05 and M-06 (live cross-border stations, Charging page, Trip Planner), which phase3_plan §F9 requires. |
-| P4-F6 | in progress (W5) | `feature/phase4-planner-ui` | ★ critical path. Also adds the limiting-segment map highlight left by P4-F7. |
-| P5-F1 | in progress (W5) | `feature/phase5-observed-schema` | Holds the migration lane. |
-| P4-F9 | blocked (P4-F6) | — | |
-| P4-F8 | blocked (migration lane, held by P5-F1) | — | Added by P4-F0 (#28). Dependencies merged; W7. Not a dependency of P4-F9. |
-| P5-F3 | blocked (P5-F1) | — | |
-| P5-F5 | blocked (P5-F1) | — | |
-| P6-F1 | in progress (W5, started early) | `feature/phase6-sentry` | Holds the dependency lane. No dependencies, and no other ready feature needs that lane, so §3.1 lets it start now. |
+| P4-F6 | merged 2026-11-19 | `feature/phase4-planner-ui` / #47 | ★ Planner on `/trips`, with the limiting-segment highlight. Codex fixes: map draws the plan's own geometry; plan settings kept per route. Real-key screenshot moves to P4-F9. |
+| P5-F1 | merged 2026-11-19 | `feature/phase5-observed-schema` / #48 | Migration `20261120_01`. Migration lane released. Coordinator fixed the ER diagram and §9 questions in `database-design.md`. |
+| P4-F9 | in progress (W6) | `feature/phase4-closeout` | ★ Phase 4 close-out. Needs your real-key run and screenshot, plus M-07. |
+| P4-F8 | in progress (W6, started early) | `feature/phase4-vehicle-baseline` | Holds the migration lane. Not a dependency of P4-F9. |
+| P5-F3 | in progress (W6) | `feature/phase5-trip-ingestion` | |
+| P5-F5 | in progress (W6) | `feature/phase5-analytics-api` | |
+| P6-F1 | merged 2026-11-19 | `feature/phase6-sentry` / #46 | Dependency lane released. Off without a DSN; scrubs IDs, coordinates and route geometry; frame locals off (Codex fixes). Sentry projects created and local DSNs set by you; hosted DSNs go in at P6-F3. |
 | P5-F4 | blocked (P5-F3, P4-F4) | — | |
 | P5-F6 | blocked (P5-F5) | — | |
 | P6-F3 | blocked (P4-F9) | — | |
 | P5-F7 | blocked (P5-F3) | — | |
 | P6-F4 | blocked (P6-F3) | — | |
-| P6-F5 | blocked (P5-F1) | — | |
+| P6-F5 | blocked (migration lane, held by P4-F8) | — | Dependencies merged. |
 | P5-F8 | blocked (P5-F4, P5-F6, P5-F7) | — | |
 | P6-F2 | blocked (P5-F8) | — | |
 | P6-F6 | blocked (P6-F1, P6-F2, P6-F4, P6-F5) | — | |
@@ -448,4 +448,4 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 
 ## 7. Next step
 
-W4 is merged (#43, #44). W5 is running: **P4-F6** (Planner UI, critical path), **P5-F1** (observed-trips schema, holds the migration lane) and **P6-F1** (Sentry, holds the dependency lane; started early because it was ready). When P5-F1 merges, start P5-F3, P5-F5 and P4-F8 (migration lane). When P4-F6 merges, start P4-F9. P3-F9 starts once you've passed M-03 (P3-R1). It can't close until M-04, M-05 and M-06 pass too. All four are in [`manual-test-log.md`](manual-test-log.md), along with the other manual checks waiting on you.
+W5 is merged (#45–#48). W6 is running with four sessions (the §2.7 maximum): **P4-F9** (Phase 4 close-out, critical path), **P5-F3** (observed-trip ingestion), **P5-F5** (analytics API) and **P4-F8** (vehicle baseline, holds the migration lane; started early because its lane was free). When P4-F9 merges, start P6-F3. When P5-F3 merges, start P5-F4 and P5-F7. When P5-F5 merges, start P5-F6. When P4-F8 merges, start P6-F5 (migration lane). P3-F9 starts once you've passed M-03 (P3-R1). It can't close until M-04, M-05 and M-06 pass too. M-07 is unblocked now that plans exist. All of them are in [`manual-test-log.md`](manual-test-log.md).
