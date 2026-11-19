@@ -412,6 +412,12 @@ Added after P4-F0 review (D1): every vehicle consumes differently, so the user s
 
 Fills §6 with test names, records the ~500 mi latency in the roadmap, runs the real-key Frederick → Toronto plan with a screenshot, and checks the §5 numbers still pass.
 
+**As built (2026-11-19, `feature/phase4-closeout`):**
+- §6 filled in. Two PRD §9 cases had no test of their own (pricing, Smartcar failure); the coordinator approved a new F9-owned file, `services/api/tests/routing/test_plan_guarantees.py`, which reuses F4's fixtures: the §5 trip-2 plan is identical with and without station pricing, `CandidateStation` has no pricing/cost field, and `POST /routes/plan` succeeds from cached telemetry while every `SmartcarClient` method and the `get_smartcar_client` dependency raise.
+- §5 hand check: arrivals, departures, charging minutes and totals for trips 1–3 re-derived with a standalone script (the F2 formula, no app code). All match the tables above: trip 1 arrival 0.49465; trip 2 arrival at B 0.17296, charging 16.648 min, total 294.8 min, destination 0.15296; trip 3 arrivals 0.16175/0.15051/0.15197/0.15014, charging 14.617/12.443/18.269 min, total 582.9 min. The tests asserting them pass.
+- Latency (~500 mi, fixtures): whole `POST /routes/plan` Frederick → Toronto 241–272 ms over five runs; optimizer alone 22–27 ms median. Table in the roadmap Phase 4 section.
+- Manual, left for the project lead: M-10 (real-key Frederick → Toronto plan, latency, screenshot) and M-07 (saved-trips pages) in [`manual-test-log.md`](manual-test-log.md), written as copy-paste steps. The roadmap says "awaiting manual checks" until both pass.
+
 ---
 
 ## 4. Interfaces (D9)
@@ -722,23 +728,31 @@ Checks: in this plan each departure happens to be the smallest grid value that r
 
 ## 6. PRD §9 acceptance mapping
 
-F9 fills in the "Test" column with real test names.
+Filled in by F9 on 2026-11-19. Backend paths are under `services/api/tests/routing/`; web paths under `apps/web/`. Every test named here passed on `feature/phase4-closeout` (rebased on `main` at `3088f06`) in the same session: `uv run pytest tests/routing tests/energy` (170 passed), `npm run test` and the Playwright `e2e/planner.spec.ts` run listed in the F9 PR.
 
 | PRD §9 case | Planned test (feature) | Test |
 |---|---|---|
-| Start at 100 % | F3: start 1.00 above charge-to, plan valid | |
-| Start at 0 % | F3: `STARTING_SOC_TOO_LOW` | |
-| Unknown SoC | F4: `STARTING_SOC_REQUIRED` (missing reading) | |
-| No charging needed | F3 trip 1; F4 no stations call | |
-| Chargers nearby but incompatible | F3/F4: X excluded, `NO_COMPATIBLE_CHARGER_IN_RANGE` when only incompatible | |
-| Charger too far to reach | F3: first candidate beyond the reserve point | |
-| Two shorter stops beat one long | F3: P+Q case (F3 tests) | |
-| Missing station power or pricing | F4: unknown power excluded and counted; pricing is never used | |
-| Stale telemetry | F4: `STARTING_SOC_REQUIRED` (stale `soc_percent`) | |
-| Smartcar / Mapbox / AFDC failure | F4: `MAPBOX_UNREACHABLE`, `STATIONS_UNREACHABLE`; Smartcar isn't called (cached state, D7) | |
-| Reserve unreachable → infeasible | F3: `RESERVE_SOC_UNREACHABLE`; F6: infeasible state | |
+| Start at 100 % | F3: start 1.00 above charge-to, plan valid | `test_optimizer.py::test_start_at_100_percent_is_not_capped_by_charge_to`, `test_optimizer.py::test_start_at_100_percent_with_a_stop` |
+| Start at 0 % | F3: `STARTING_SOC_TOO_LOW` | `test_optimizer.py::test_start_at_or_below_reserve_is_too_low[0.0]` (also `[0.1]`, `[0.15]`); endpoint: `test_plan_endpoint.py::test_starting_soc_at_reserve_is_infeasible_without_stations` (override 0.0) |
+| Unknown SoC | F4: `STARTING_SOC_REQUIRED` (missing reading) | `test_plan_endpoint.py::test_stale_or_missing_soc_requires_override` (case `[None-age1-None]`, never reported); UI: `tests/plan-panel.test.tsx` "says there is no reading when the car never reported one" |
+| No charging needed | F3 trip 1; F4 no stations call | `test_optimizer_trips.py::test_trip_1_local_no_charge`, `test_optimizer.py::test_no_charging_needed_has_zero_stops_and_exact_arrival`, `test_plan_endpoint.py::test_short_trip_needs_no_charge_and_skips_stations` |
+| Chargers nearby but incompatible | F3/F4: X excluded, `NO_COMPATIBLE_CHARGER_IN_RANGE` when only incompatible | `test_plan_endpoint.py::test_no_usable_charger_is_infeasible_with_a_located_segment` (only CHAdeMO nearby), `test_plan_endpoint.py::test_exclusion_counts` (`excluded_incompatible`), `test_plan_endpoint.py::test_synthetic_trip2_matches_hand_checked_numbers` (X excluded) |
+| Charger too far to reach | F3: first candidate beyond the reserve point | `test_optimizer.py::test_charger_beyond_reach`, `test_optimizer.py::test_gap_between_chargers_too_long`, `test_optimizer.py::test_gap_to_destination_too_long` |
+| Two shorter stops beat one long | F3: P+Q case (F3 tests) | `test_optimizer_trips.py::test_two_short_stops_beat_one_long_stop` |
+| Missing station power or pricing | F4: unknown power excluded and counted; pricing is never used | Power: `test_plan_endpoint.py::test_exclusion_counts` (`excluded_unknown_power: 1`). Pricing: `test_plan_guarantees.py::test_station_pricing_never_changes_the_plan`, `test_plan_guarantees.py::test_optimizer_candidates_cannot_carry_pricing` (F9) |
+| Stale telemetry | F4: `STARTING_SOC_REQUIRED` (stale `soc_percent`) | `test_plan_endpoint.py::test_stale_or_missing_soc_requires_override` (case `[64-age0-0.64]`, 16 min old); UI: `tests/plan-panel.test.tsx` "prompts for the starting charge and re-plans with the override", `e2e/planner.spec.ts` "asks for the starting charge and plans with the override" |
+| Smartcar / Mapbox / AFDC failure | F4: `MAPBOX_UNREACHABLE`, `STATIONS_UNREACHABLE`; Smartcar isn't called (cached state, D7) | Mapbox: `test_plan_endpoint.py::test_mapbox_failure_is_an_error_envelope_and_stores_nothing`, `test_plan_endpoint.py::test_mapbox_timeout_is_504`. AFDC: `test_plan_endpoint.py::test_afdc_down_is_stations_unreachable_and_stores_nothing`, `test_plan_endpoint.py::test_stations_provider_error_mid_plan_stores_nothing`. Smartcar: `test_plan_guarantees.py::test_planning_uses_cached_state_when_smartcar_is_down` (F9). UI: `tests/plan-panel.test.tsx` "retries a provider error, and offers sign-in when the session ended" |
+| Reserve unreachable → infeasible | F3: `RESERVE_SOC_UNREACHABLE`; F6: infeasible state | `test_optimizer.py::test_reserve_unreachable`, `test_optimizer.py::test_reserve_unreachable_on_the_first_leg`; UI: `tests/plan-panel.test.tsx` "shows an infeasible plan prominently with its reason and no totals", `e2e/planner.spec.ts` "re-planning with a tight charge window shows a prominent infeasible state" |
 
----
+Exit criteria evidence (§1):
+
+| # | Evidence | State |
+|---|---|---|
+| X1 | §5 numbers: `test_optimizer_trips.py::test_trip_1_local_no_charge`, `::test_trip_2_one_stop_at_b`, `::test_trip_3_frederick_toronto_three_stops`; `services/api/tests/energy/test_sample_trips.py` (9 tests); `test_plan_endpoint.py::test_synthetic_trip2_matches_hand_checked_numbers`; real fixture route: `test_plan_endpoint.py::test_frederick_toronto_plans_stores_and_matches_get_trip`. Hand re-check: F9 notes. | Automated half done; real-key run is manual-test-log M-10 |
+| X2 | `test_plan_endpoint.py::test_stale_or_missing_soc_requires_override`; `e2e/planner.spec.ts` "asks for the starting charge…" | Done |
+| X3 | Roadmap Phase 4 latency table (fixtures). | Done on fixtures; real-provider number added by M-10 |
+| X4 | This table. | Done |
+| X5 | `test_optimizer.py::test_reserve_unreachable*`, `test_plan_endpoint.py::test_no_usable_charger_is_infeasible_with_a_located_segment` (no stops/totals), `e2e/planner.spec.ts` "…prominent infeasible state" (no stops, no totals) | Done |
 
 ## 7. Open questions and follow-ups
 
