@@ -9,6 +9,8 @@ import {
   type StationConnector,
 } from "@/lib/stations";
 
+import { FavoriteToggle } from "./favorite-toggle";
+
 export function ConnectorChips({ connectors }: { connectors: readonly StationConnector[] }) {
   if (connectors.length === 0) {
     return <p className="text-xs text-neutral-500">Connector types not reported</p>;
@@ -60,6 +62,8 @@ export function StationCard({
   distanceText = null,
   selected = false,
   onSelect,
+  favorite,
+  onFavoriteChange,
 }: {
   station: Station;
   href: string;
@@ -67,6 +71,9 @@ export function StationCard({
   distanceText?: string | null;
   selected?: boolean;
   onSelect?: (id: string) => void;
+  /** Whether the user starred it. Leave undefined to hide the star (F8). */
+  favorite?: boolean;
+  onFavoriteChange?: (favorite: boolean) => void;
 }) {
   const unknownPower = hasUnknownPower(station);
   const liveAvailability = (station as { live_availability?: unknown }).live_availability;
@@ -95,11 +102,21 @@ export function StationCard({
             {station.network ?? "Network not reported"}
           </p>
         </div>
-        {distanceText ? (
-          <span className="shrink-0 text-xs font-medium text-neutral-700 dark:text-neutral-300">
-            {distanceText}
-          </span>
-        ) : null}
+        <div className="flex shrink-0 items-start gap-1">
+          {distanceText ? (
+            <span className="pt-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300">
+              {distanceText}
+            </span>
+          ) : null}
+          {favorite !== undefined ? (
+            <FavoriteToggle
+              stationId={station.id}
+              stationName={station.name}
+              favorite={favorite}
+              onChange={onFavoriteChange}
+            />
+          ) : null}
+        </div>
       </div>
       <ConnectorChips connectors={station.connectors} />
       <div className="flex flex-wrap gap-1.5">

@@ -24,6 +24,7 @@ import {
 } from "@/lib/stations";
 import type { UnitSystem } from "@/lib/units";
 
+import { withView, type ChargingTab, type FavoriteStation } from "./charging-tab";
 import { useUrlFilters } from "./use-url-filters";
 
 export type ChargingVehicle = {
@@ -57,6 +58,8 @@ export function ChargingView({
   result,
   error,
   networkOptions,
+  view = "nearby",
+  favorites = null,
 }: {
   filters: ChargingFilters;
   units: UnitSystem;
@@ -64,6 +67,9 @@ export function ChargingView({
   result: ChargingResult | null;
   error: StationsErrorCode | null;
   networkOptions: string[];
+  view?: ChargingTab;
+  /** The user's favorites, newest first; null when they couldn't be loaded. */
+  favorites?: FavoriteStation[] | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -96,6 +102,11 @@ export function ChargingView({
     [rows],
   );
   const detailQuery = serializeFilters(current);
+  // Undefined (no star shown) when the favorites couldn't be loaded.
+  const favoriteIds = useMemo(
+    () => (favorites ? new Set(favorites.map((f) => f.id)) : null),
+    [favorites],
+  );
 
   const selectStation = (id: string) => {
     setSelectedId(id);
@@ -112,8 +123,33 @@ export function ChargingView({
     );
   };
 
+  const tabs = (
+    <ChargingTabs
+      view={view}
+      nearbyHref={chargingHref(current)}
+      favoritesHref={withView(chargingHref(current), "favorites")}
+    />
+  );
+
+  if (view === "favorites") {
+    return (
+      <div className="space-y-5">
+        {tabs}
+        <FavoritesPanel
+          favorites={favorites}
+          center={center}
+          units={units}
+          detailQuery={detailQuery}
+          onChange={() => startTransition(() => router.refresh())}
+          pending={pending}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
+      {tabs}
       <div className="flex flex-wrap items-end gap-3">
         <PlaceSearch
           key={current.location ? `${current.location.lat},${current.location.lon}` : "none"}
@@ -214,6 +250,7 @@ export function ChargingView({
                           distanceText={formatDistanceText(distanceKm, units)}
                           selected={station.id === selectedId}
                           onSelect={setSelectedId}
+                          favorite={favoriteIds ? favoriteIds.has(station.id) : undefined}
                         />
                       </li>
                     ))}
@@ -225,6 +262,141 @@ export function ChargingView({
           </section>
         </div>
       )}
+    </div>
+  );
+}
+
+function ChargingTabs({
+  view,
+  nearbyHref,
+  favoritesHref,
+}: {
+  view: ChargingTab;
+  nearbyHref: string;
+  favoritesHref: string;
+}) {
+  const tab = (active: boolean) =>
+    active
+      ? "border-blue-600 text-blue-700 dark:border-blue-400 dark:text-blue-300"
+      : "border-transparent text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100";
+  return (
+    <nav
+      aria-label="Charging views"
+      className="flex gap-4 border-b border-neutral-200 text-sm font-medium dark:border-neutral-800"
+    >
+      <Link
+        href={nearbyHref}
+        aria-current={view === "nearby" ? "page" : undefined}
+        className={`-mb-px border-b-2 pb-2 ${tab(view === "nearby")}`}
+      >
+        Nearby
+      </Link>
+      <Link
+        href={favoritesHref}
+        aria-current={view === "favorites" ? "page" : undefined}
+        className={`-mb-px border-b-2 pb-2 ${tab(view === "favorites")}`}
+      >
+        Favorites
+      </Link>
+    </nav>
+  );
+}
+
+/**
+ * The Favorites tab: every starred station, wherever it is. Nearest first when
+ * a place is set, otherwise newest favorite first. Unstarring one refreshes
+ * the list, so it drops out.
+ */
+function FavoritesPanel({
+  favorites,
+  center,
+  units,
+  detailQuery,
+  onChange,
+  pending,
+}: {
+  favorites: FavoriteStation[] | null;
+  center: ChargingFilters["location"];
+  units: UnitSystem;
+  detailQuery: string;
+  onChange: () => void;
+  pending: boolean;
+}) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const rows = useMemo(() => {
+    if (!favorites) return [];
+    return center
+      ? sortByDistance(favorites, center)
+      : favorites.map((station) => ({ station, distanceKm: null as number | null }));
+  }, [favorites, center]);
+  const mapStations = useMemo(
+    () =>
+      rows.map(({ station }) => ({
+        id: station.id,
+        location: station.location,
+        name: station.name,
+        compatible: station.compatible,
+      })),
+    [rows],
+  );
+
+  if (favorites === null) {
+    return (
+      <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        Couldn&apos;t load your favorite stations. Please refresh to try again.
+      </p>
+    );
+  }
+  if (favorites.length === 0) {
+    return (
+      <StationsEmpty>
+        No favorite stations yet. Star a station to keep it here.
+      </StationsEmpty>
+    );
+  }
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
+      <div className="h-80 lg:sticky lg:top-4 lg:h-[36rem]">
+        <LazyMapView
+          label="Favorite stations map"
+          center={center}
+          stations={mapStations}
+          selectedStationId={selectedId}
+          onSelect={setSelectedId}
+          className="h-full"
+        />
+      </div>
+      <section
+        aria-label="Favorite stations"
+        aria-busy={pending || undefined}
+        className="space-y-3"
+      >
+        <p role="status" className="text-sm text-neutral-600 dark:text-neutral-400">
+          {pending
+            ? "Updating…"
+            : `${rows.length} favorite ${rows.length === 1 ? "station" : "stations"}`}
+        </p>
+        <ol className="space-y-2">
+          {rows.map(({ station, distanceKm }) => (
+            <li key={station.id}>
+              <StationCard
+                station={station}
+                // Carry the tab so "Back" on the station page returns here.
+                href={withView(
+                  `/charging/${station.id}${detailQuery ? `?${detailQuery}` : ""}`,
+                  "favorites",
+                )}
+                distanceText={distanceKm === null ? null : formatDistanceText(distanceKm, units)}
+                selected={station.id === selectedId}
+                onSelect={setSelectedId}
+                favorite
+                onFavoriteChange={onChange}
+              />
+            </li>
+          ))}
+        </ol>
+        <DataAttribution />
+      </section>
     </div>
   );
 }

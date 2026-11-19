@@ -26,6 +26,8 @@ erDiagram
     vehicles ||--o{ observed_trips : drove
     planned_trips ||--o{ planned_stops : contains
     planned_stops }o--|| charging_stations : refers
+    profiles ||--o{ favorite_stations : stars
+    charging_stations ||--o{ favorite_stations : starred_in
     planned_trips ||--o| prediction_results : scored_by
     observed_trips ||--o| prediction_results : compared_in
 
@@ -95,6 +97,11 @@ erDiagram
         timestamptz fetched_at
         jsonb raw_payload
         boolean is_simulated
+    }
+    favorite_stations {
+        uuid user_id PK_FK
+        uuid station_id PK_FK
+        timestamptz created_at
     }
     planned_trips {
         uuid id PK
@@ -279,6 +286,21 @@ Cached station records. Treated as a local cache of external data, not the sourc
 Constraints and indexes:
 - `UNIQUE (provider, external_id)` — the upsert target.
 - `INDEX (lat, lon)` — upgradable to a PostGIS `GIST` index on `geography(Point)` when needed.
+
+### 3.6a `favorite_stations`
+
+A user's starred charging stations ([phase3_plan.md](phase3_plan.md) F8, PRD §4.3). User-owned: every read and write is scoped to the caller (api-contracts §3.19). RLS enabled. Migration `20261119_01`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `user_id` | `uuid` PK, FK → `profiles.id` | `ON DELETE CASCADE`: deleting the account deletes its favorites. |
+| `station_id` | `uuid` PK, FK → `charging_stations.id` | `ON DELETE CASCADE`: if a station leaves the cache, its favorites go too. |
+| `created_at` | `timestamptz` | Default `now()`. Returned as `favorited_at`; the list is ordered by it, newest first. |
+
+Constraints and indexes:
+- `PRIMARY KEY (user_id, station_id)`. This makes `PUT` idempotent (`ON CONFLICT DO NOTHING`), and its leading `user_id` serves the per-user list.
+- `INDEX (station_id)`, so the cascade from `charging_stations` doesn't scan the table.
+- At most 500 rows per user, enforced by the API (`FAVORITES_LIMIT`), not the database.
 
 ### 3.7 `planned_trips`
 

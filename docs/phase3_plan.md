@@ -373,6 +373,41 @@ PRD §4.3 asks for favorites; the roadmap's Phase 3 scope doesn't list them. The
 - A star toggle on station cards and the detail page; a "Favorites" filter tab on `/charging`.
 - Tests: idempotency, per-user isolation, cascade on account deletion, and favorites survive sign-out/sign-in (Playwright).
 
+**As built (2026-11-19, P3-F8):**
+- **Schema.** Migration `20261119_01`: `favorite_stations` as specified, with an extra `INDEX (station_id)` so the cascade from `charging_stations` doesn't scan the table, and RLS on. See database-design §3.6a. The model is in `modules/stations/favorites_models.py`. The schemas and service are in `favorites.py`. The routes are in `stations/router.py`, with `GET /favorites` declared before `/{station_id}`.
+- **Contract (§3.19, §3.19a, §3.19b).**
+  - `PUT` and `DELETE` return 204 and are idempotent. Re-favoriting keeps the first `favorited_at`. Deleting a station that isn't a favorite still returns 204. An unknown station returns 404 on both.
+  - The first `PUT` creates the caller's profile lazily, as vehicle connect does.
+  - `GET /favorites` returns `{items: [station + favorited_at]}`, newest first, with optional `vehicle_id` for `compatible`. It reads the cache only, with no provider call. `is_stale` means `fetched_at` is older than the TTL, and opening the station refreshes it.
+  - Restricted, closed and private stations stay in the list.
+- **Cap (decided 2026-11-19).** A user can have at most 500 favorites. Past that, `PUT` returns `FAVORITES_LIMIT` (409, `details.limit`). This keeps the list unpaged. Re-favoriting an existing favorite is still a no-op at the cap.
+- **Cap under concurrency (review fix, 2026-11-19).**
+  - The problem: under READ COMMITTED, two parallel `PUT`s for different stations at 499 favorites could both count 499 and both insert.
+  - The fix: `add_favorite` now takes `SELECT … FROM profiles WHERE id = :user FOR UPDATE` before re-checking for an existing favorite and counting. The lock holds until commit.
+  - The test: `test_concurrent_puts_cannot_pass_the_cap` runs two real connections with committed data. It checks that the second `PUT` waits, then gets 409. It was confirmed to fail without the lock.
+- **Favorites tab kept across the station page (review fix, 2026-11-19).**
+  - Links from the Favorites list carry `view=favorites`.
+  - The station page builds "Back to Charging" and its sign-in return path with `stationPageLinks()` in `charging-tab.ts`. That function re-parses the filters and keeps only `view=favorites`, so Back returns to the Favorites tab instead of an empty Nearby screen.
+  - The E2E spec covers it: open a station from Favorites, click Back, and the Favorites tab is still open.
+- **Web.**
+  - `components/stations/favorite-toggle.tsx` is a star button with `aria-pressed` and the label "Add/Remove {name} to/from favorites". It flips at once, then saves; if the save fails it flips back and shows an alert. It doesn't propagate the click to the card.
+  - The server action is `components/stations/favorite-actions.ts`. It deliberately doesn't call `revalidatePath`: that would re-run `/charging`'s provider search on every star.
+  - `StationCard` has an optional `favorite` prop, and the star shows only when it's passed. The Trip Planner's cards are unchanged.
+  - The station page loads the favorites list alongside the station. If that list fails to load, it shows no star.
+- **`/charging` tabs.**
+  - The page has "Nearby" and "Favorites" tabs. `?view=favorites` selects Favorites; Nearby is the default and isn't written to the URL. The tab helpers are in `_components/charging-tab.ts`, a plain module rather than a client one, so the server page can use them.
+  - The Nearby cards show stars. The page fetches the favorites alongside the search, and if that fetch fails the cards show no star.
+  - The Favorites tab lists every favorite with a map. The list is newest first, or nearest first when a place is set. It has no search or filters, and it has empty and error states. Unstarring a station refreshes the list, so it drops out.
+  - The tab label has no count, because the count would go stale after starring on the Nearby tab.
+- **E2E (`e2e/favorites.spec.ts`).** The stub has no AFDC "nearest" fixture, so the spec gets a station from the Trip Planner's along-route list. It then:
+  1. stars the station on its page, and checks the star survives a reload;
+  2. finds it on the Favorites tab;
+  3. clears cookies and checks the page redirects to `/sign-in`;
+  4. adds the session back and checks the favorite is still there;
+  5. unstars it from the list and checks the empty state.
+  
+  `seed` doesn't clear favorites, so the spec first removes any left over from an earlier run.
+
 ---
 
 ### F9 — Phase close-out

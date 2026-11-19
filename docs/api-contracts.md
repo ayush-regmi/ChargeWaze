@@ -47,6 +47,7 @@ Reserved codes (grow this list as the API grows):
 | `MAPBOX_NOT_CONFIGURED` | 503 | The server's Mapbox token is missing or Mapbox rejected it (401/403). |
 | `STATIONS_UNREACHABLE` | 502/504 | The station provider (AFDC) failed, timed out or returned an unexpected response; the upstream HTTP status (if any) is in `details`. |
 | `STATIONS_NOT_CONFIGURED` | 503 | The server's AFDC API key is missing or AFDC rejected it (401/403). |
+| `FAVORITES_LIMIT` | 409 | The caller already has the maximum number of favorite stations (500; see §3.19a). |
 | `ROUTE_INFEASIBLE` | 200 | Returned by `/routes/plan` when no feasible plan exists (see §3.7). |
 | `WEBHOOK_SIGNATURE_INVALID` | 401 | Smartcar webhook signature did not verify. |
 | `WEBHOOK_PAYLOAD_INVALID` | 400 | Smartcar webhook was signed but is not a usable event (not JSON, no `eventType`, `VEHICLE_STATE` without vehicle/user or `eventId`). |
@@ -80,6 +81,9 @@ Reserved codes (grow this list as the API grows):
 | `GET` | `/api/v1/stations` | Search compatible charging stations near a point. |
 | `GET` | `/api/v1/stations/{id}` | One cached station (refreshed after the cache TTL). |
 | `POST` | `/api/v1/stations/along-route` | Stations within a corridor of a route, in route order. |
+| `GET` | `/api/v1/stations/favorites` | The caller's favorite stations, newest first. |
+| `PUT` | `/api/v1/stations/{id}/favorite` | Add a station to the caller's favorites (idempotent). |
+| `DELETE` | `/api/v1/stations/{id}/favorite` | Remove a station from the caller's favorites (idempotent). |
 | `GET` | `/api/v1/places/suggest` | Autocomplete addresses, places and POIs (Mapbox Search Box). |
 | `GET` | `/api/v1/places/{id}` | Coordinates and address for a suggestion. |
 | `POST` | `/api/v1/routes/directions` | Driving routes between two points (no charging plan). |
@@ -933,6 +937,50 @@ Stations within a corridor around a route, in order along the route. Stateless: 
 - The route and coordinates are never logged (D13).
 
 **Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (geometry too large, not a valid polyline, fewer than two points or out of range; other bad fields); `NOT_FOUND` (`vehicle_id` not the caller's); `STATIONS_NOT_CONFIGURED` (503); `STATIONS_UNREACHABLE` (502/504).
+
+### 3.19 `GET /api/v1/stations/favorites`
+
+The caller's favorite stations ([`phase3_plan.md`](phase3_plan.md) F8, PRD §4.3), newest favorite first. Favorites belong to the user, so they survive sign-out and sign-in and are deleted with the account. Optional `?vehicle_id=` sets `compatible`, as in §3.10.
+
+**Response 200**
+
+```json
+{
+  "items": [
+    {
+      "id": "6f1c…",
+      "name": "Tesla Supercharger Frederick",
+      "…": "every field of a §3.10 station",
+      "favorited_at": "2026-11-19T14:02:11Z"
+    }
+  ]
+}
+```
+
+- Read from the `charging_stations` cache only; no provider call. `is_stale` is `true` when the row's `fetched_at` is older than `STATIONS_CACHE_TTL_HOURS`; opening the station (§3.16) refreshes it.
+- Restricted, closed and private stations stay in the list: the list holds what the user starred, not a search.
+- Not paged: a user has at most 500 favorites (§3.19a).
+- If a station leaves the cache, its favorites go with it (`ON DELETE CASCADE`).
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (`vehicle_id` not a UUID); `NOT_FOUND` (`vehicle_id` not the caller's).
+
+### 3.19a `PUT /api/v1/stations/{id}/favorite`
+
+Adds the station (`id` from §3.10 / §3.16 / §3.17) to the caller's favorites. No body. Idempotent: favoriting a favorite changes nothing and keeps its first `favorited_at`.
+
+The cap holds under concurrency: a caller's `PUT`s are serialized (a row lock on the caller's profile, held until commit), so two parallel `PUT`s at 499 favorites add one and the other gets `FAVORITES_LIMIT`.
+
+**Response 204** — no body.
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (`id` is not a UUID); `NOT_FOUND` (unknown station); `FAVORITES_LIMIT` (409, the caller already has 500 favorites and this station isn't one of them).
+
+### 3.19b `DELETE /api/v1/stations/{id}/favorite`
+
+Removes the station from the caller's favorites. Idempotent: removing a station that isn't a favorite also returns 204.
+
+**Response 204** — no body.
+
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (`id` is not a UUID); `NOT_FOUND` (unknown station).
 
 ### 3.18 `GET /api/v1/observed-trips`
 

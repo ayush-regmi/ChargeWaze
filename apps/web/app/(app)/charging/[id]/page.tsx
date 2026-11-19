@@ -3,10 +3,12 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
+import { FavoriteToggle } from "@/components/stations/favorite-toggle";
 import { StationDetail } from "@/components/stations/station-detail";
 import { requireSessionApi } from "@/lib/session-api";
-import { parseFilters, serializeFilters } from "@/lib/stations";
 import { pickDashboardVehicle } from "@/lib/vehicles";
+
+import { stationPageLinks } from "../_components/charging-tab";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -30,12 +32,11 @@ async function Station({ params, searchParams }: Props) {
   const { id } = await params;
   if (!UUID_RE.test(id)) notFound();
 
-  // The list passes its filters along so "Back" returns to the same search.
+  // The list passes its filters (and tab) along so "Back" returns to the same search.
   // They are re-parsed, never echoed raw.
-  const qs = serializeFilters(parseFilters(await searchParams));
-  const back = qs ? `/charging?${qs}` : "/charging";
+  const { back, self } = stationPageLinks(id, await searchParams);
 
-  const api = await requireSessionApi(`/charging/${id}${qs ? `?${qs}` : ""}`);
+  const api = await requireSessionApi(self);
   const [{ data: me }, { data: vehicles }] = await Promise.all([
     api.GET("/api/v1/me"),
     api.GET("/api/v1/vehicles"),
@@ -44,22 +45,35 @@ async function Station({ params, searchParams }: Props) {
     ? pickDashboardVehicle(vehicles.items, me?.preferences.primary_vehicle_id)
     : null;
 
-  const { data, response } = await api.GET("/api/v1/stations/{station_id}", {
-    params: {
-      path: { station_id: id },
-      query: vehicle ? { vehicle_id: vehicle.id } : {},
-    },
-  });
+  const [{ data, response }, { data: favorites }] = await Promise.all([
+    api.GET("/api/v1/stations/{station_id}", {
+      params: {
+        path: { station_id: id },
+        query: vehicle ? { vehicle_id: vehicle.id } : {},
+      },
+    }),
+    api.GET("/api/v1/stations/favorites"),
+  ]);
   if (response.status === 404) notFound();
 
   return (
     <>
-      <Link
-        href={back}
-        className="text-sm text-neutral-600 hover:underline dark:text-neutral-400"
-      >
-        ← Back to Charging
-      </Link>
+      <div className="flex items-start justify-between gap-3">
+        <Link
+          href={back}
+          className="text-sm text-neutral-600 hover:underline dark:text-neutral-400"
+        >
+          ← Back to Charging
+        </Link>
+        {/* Without the favorites list we can't say whether it's starred, so no star. */}
+        {data && favorites ? (
+          <FavoriteToggle
+            stationId={data.id}
+            stationName={data.name}
+            favorite={favorites.items.some((f) => f.id === data.id)}
+          />
+        ) : null}
+      </div>
       {data ? (
         <StationDetail station={data} />
       ) : (
