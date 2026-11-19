@@ -210,7 +210,7 @@ A wave is a set of sessions that run together. Waves are a guide; the real rule 
 | **W5** | P3-F9 · P4-F6 ★ · P5-F1 | CI (F9), migration (P5-F1) | Phase 3 closes here. |
 | **W6** | P4-F9 · P5-F3 · P5-F5 · P6-F1 | dependency (P6-F1) | Phase 4 closes here. |
 | **W7** | P5-F4 · P5-F6 · P6-F3 · P4-F8 | CI (P6-F3), migration (P4-F8) | P5-F6 adds no dependency (phase5_plan D5), so it can start as soon as P5-F5 merges. P4-F8 is a Phase 4 follow-up (added by P4-F0); it can start any time after P4-F4 once the migration lane is free. **As run:** P4-F8 ran in W6, and P5-F7 moved up from W8 into its slot. |
-| **W8** | P5-F7 · P6-F4 · P6-F5 | CI (P6-F4), migration (P6-F5) | |
+| **W8** | P5-F7 · P6-F4 · P6-F5 | CI (P6-F4), migration (P6-F5) | **As run:** P5-F7 ran in W7, so P5-F8 (ready once W7 merged) joins W8. |
 | **W9** | P5-F8 · then P6-F2 | — | Phase 5 closes here. P6-F2 seeds every table, so it waits for P5-F8. |
 | **W10** | P6-F6 | — | MVP done. |
 
@@ -435,17 +435,17 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 | P5-F3 | merged 2026-11-19 | `feature/phase5-trip-ingestion` / #53 | Webhooks now create legs via ADR 0009 hooks. Hooks take `(event, open_session)`. F4 replaces the placeholder `observed_service._match_and_score_vehicle`. |
 | P5-F5 | merged 2026-11-19 | `feature/phase5-analytics-api` / #51 | No migration. Analytics reads only via `trips/observed_queries.py`. Extra 422 reasons `UNKNOWN_TIME_ZONE`, `INVALID_RANGE`, `INVALID_CURSOR`. |
 | P6-F1 | merged 2026-11-19 | `feature/phase6-sentry` / #46 | Dependency lane released. Off without a DSN; scrubs IDs, coordinates and route geometry; frame locals off (Codex fixes). Sentry projects created and local DSNs set by you; hosted DSNs go in at P6-F3. |
-| P5-F4 | in progress (W7) | `feature/phase5-prediction-matching` | Approved Owns addition: `trips/schemas.py` (typed `TripObservation` / `TripObservationLeg`). |
-| P5-F6 | in progress (W7) | `feature/phase5-analytics-ui` | |
-| P6-F3 | in progress (W7) | `feature/phase6-deploy` | Holds the CI lane. Approved: a `docker-build` job in `ci.yml`; production only, with no preview/staging yet (architecture §7.1); web built in `deploy.yml` because the generated API types are gitignored. |
-| P5-F7 | in progress (W7, started early) | `feature/phase5-history-observations` | Ready since P5-F3 merged. The planned-vs-actual panel reads `observation`, which stays `null` until P5-F4 merges. Observed drives is a tab on `/trips/saved`. Approved Owns exception: the "Completed" badge in `components/trips/trip-list.tsx`. |
-| P6-F4 | blocked (P6-F3) | — | |
-| P6-F5 | ready (waiting for a session slot) | — | Dependencies merged; migration lane free. Start when the first W7 session merges. |
-| P5-F8 | blocked (P5-F4, P5-F6, P5-F7) | — | |
+| P5-F4 | merged 2026-11-19 | `feature/phase5-prediction-matching` / #56 | `modules/trips/matching.py` replaces F3's placeholder; `GET /trips/{id}` now returns the typed `observation`. Approved Owns addition: `trips/schemas.py`. Codex fix: clearing the only baseline removes the vehicle's leg backtests (plan rows kept). |
+| P5-F6 | merged 2026-11-19 | `feature/phase5-analytics-ui` / #58 | Plain-SVG charts (no chart library), quality badges with reasons, CSV route, simulated-data banner. Codex fix: drive times shown in the analytics time zone. |
+| P6-F3 | merged 2026-11-19 | `feature/phase6-deploy` / #55 | CI lane released. Render (Docker API) + Vercel (web built in `deploy.yml`); `docker-build` job in `ci.yml`; production only (architecture §7.1). Nothing deploys until you finish `docs/deployment.md` §2–§8. |
+| P5-F7 | merged 2026-11-19 | `feature/phase5-history-observations` / #57 | Observed drives tab on `/trips/saved`; planned-vs-actual panel on `/trips/[id]`. Codex fix: cross-midnight start times. Follow-up for P5-F8: switch `parseObservation` to the typed `TripObservation` (now in the client after #56) and add a Playwright check of the panel on a matched plan. |
+| P6-F4 | ready | — | P6-F3 merged; CI lane free. |
+| P6-F5 | ready | — | Dependencies merged; migration lane free. |
+| P5-F8 | ready | — | P5-F4, P5-F6 and P5-F7 merged. Picks up the P5-F7 follow-up above. |
 | P6-F2 | blocked (P5-F8) | — | |
 | P6-F6 | blocked (P6-F1, P6-F2, P6-F4, P6-F5) | — | |
 | P2-R1, P2-R2, P3-R1 | manual (you) | — | Every open manual check is listed in [`manual-test-log.md`](manual-test-log.md). |
 
 ## 7. Next step
 
-W6 is merged (#49–#53). Phase 4 is code complete; it becomes "complete" once you pass M-07 and M-10. W7 is running with four sessions (the §2.7 maximum): **P5-F4** (plan ↔ observation matching), **P5-F6** (analytics UI), **P5-F7** (history with observations; started early, since it was ready and is on the P5-F8 → P6-F2 → P6-F6 chain) and **P6-F3** (deployment, holds the CI lane). P6-F5 is ready too (migration lane free) and starts when the first W7 session merges. When P6-F3 merges, start P6-F4 (CI lane). When P5-F4, P5-F6 and P5-F7 have all merged, start P5-F8. P3-F9 starts once you've passed M-03 (P3-R1). It can't close until M-04, M-05 and M-06 pass too. Every open manual check is in [`manual-test-log.md`](manual-test-log.md).
+W7 is merged (#55–#58), so every in-flight session has finished. Outside the plan, Dependabot #8 (TypeScript 5.9.3 → 7.0.2) also merged; the next feature sessions run their web checks on it. Three features are ready and none is started yet: **P5-F8** (Phase 5 close-out), **P6-F4** (monitoring + rate limits, CI lane) and **P6-F5** (account deletion + privacy, migration lane). They don't share files or lanes, so they can run together as W8. P5-F8 closes Phase 5 and unblocks P6-F2 → P6-F6. P6-F3 deploys nothing until you finish the account setup in [`deployment.md`](deployment.md) §2–§8. Phase 4 becomes "complete" once you pass M-07 and M-10. P3-F9 starts once you've passed M-03 (P3-R1) and can't close until M-04, M-05 and M-06 pass too. Every open manual check is in [`manual-test-log.md`](manual-test-log.md).
