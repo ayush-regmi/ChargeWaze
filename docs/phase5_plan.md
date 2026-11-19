@@ -144,6 +144,15 @@ Constraints and indexes: `CHECK ((kind = 'plan') = (planned_trip_id IS NOT NULL)
 
 **Note for P6-F5 (retention):** unsaved plans are deleted after 30 days (phase4_plan D6). Only delete `saved_at IS NULL AND status = 'planned'`, so matched (`completed`) plans and their prediction rows are kept.
 
+**As built (P5-F1, 2026-11-19):** migration `20261120_01_observed_trips_predictions` (revises `20261119_01`), models in `modules/trips/observed_models.py` (plus value tuples such as `REVIEW_STATUSES` and `FROZEN_REVIEW_STATUSES`), `alembic/env.py` imports them, tests in `tests/trips/test_observed_models.py`, and `database-design.md` §3.9–3.10 rewritten to match. Columns, types, FKs and indexes are as in the tables above. Differences, approved with the F1 plan:
+- **Plain unique constraints instead of partial unique indexes** on `prediction_results`: `UNIQUE (planned_trip_id, model_version)` and `UNIQUE (observed_trip_id, model_version)`. With the kind ↔ FK checks they are equivalent to `WHERE kind = 'plan' / 'leg'` (`NULL`s never collide), F4 can upsert with `ON CONFLICT ON CONSTRAINT prediction_results_leg_model_uq` and no index predicate, and the FK cascades use them.
+- **Extra checks:** `distance_km = odometer_end_km − odometer_start_km`; `capacity_source` is `NULL` iff `usable_capacity_kwh` is `NULL`; plan-row SoC columns (`predicted_arrival_soc`, `observed_arrival_soc`, `observed_start_soc`) are 0..1. `energy_source` `NULL` iff `energy_kwh` `NULL` is a `CHECK`.
+- **Extra index** `prediction_results_vehicle_idx (vehicle_id)` for the vehicle cascade (same pattern as `planned_trips_vehicle_idx`).
+- **No `energy_kwh >= 0` check**, as F2's notes describe: a SoC rise within tolerance can give a slightly negative value on a `low` leg.
+- **`updated_at`** has a `now()` default and ORM `onupdate`; there's no trigger (the repo has none). A Core upsert (`insert … on_conflict_do_update`) must set `updated_at = now()` itself, as the upsert test does.
+- **Tests (50):** RLS on both tables; no model/migration drift; one head (`20261120_01`, revises `20261119_01`) plus a downgrade/upgrade round trip inside the test transaction; every `CHECK` and required column rejects a bad row; the upsert key, including an `ON CONFLICT` upsert that extends an open leg; one prediction per leg/plan per model version; cascades (profile → both, vehicle → both, leg → its leg row only, plan → its plan row with its legs kept and unlinked).
+- **Not changed (outside F1's files):** the ER diagram in `database-design.md` §2 still shows the old draft columns, and §9 questions 2–3 (`path` column, weather) are answered by D7 and the "Not in Phase 5" list but not marked answered.
+
 ### F2 — Trip inference engine
 
 `modules/trips/inference.py`: pure functions, no DB, no HTTP. Signatures in §4.1, algorithm in §4.1, worked examples in §5 (the F2 tests assert them). Settings live in a frozen dataclass with these defaults; F3 builds it from the config block "trips":
