@@ -34,10 +34,8 @@ async function pickPlace(page: Page, label: string, query: string) {
 test("search a trip, compare routes and see the stations along each", async ({ page }) => {
   await page.goto("/trips");
   await expect(page.getByRole("heading", { name: "Trip Planner" })).toBeVisible();
-  // Phase 3 never presents a route as checked against the battery.
-  await expect(page.getByTestId("next-release-note")).toContainText(
-    "Charging stops and arrival battery are planned in the next release",
-  );
+  // The Phase 3 next-release note was removed by P4-F6 (charging plans ship).
+  await expect(page.getByTestId("next-release-note")).not.toBeAttached();
 
   await pickPlace(page, "From", "Tesla Supercharger Frederick");
   await pickPlace(page, "To", "Toronto");

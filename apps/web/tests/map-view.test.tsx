@@ -6,7 +6,7 @@ vi.mock("mapbox-gl", () => ({ default: {} }));
 vi.mock("mapbox-gl/dist/mapbox-gl.css", () => ({}));
 
 import { LazyMapView } from "@/components/map/lazy-map-view";
-import { boundsOf, routeFeatures, stationFeatures } from "@/components/map/map-view";
+import { boundsOf, routeFeatures, segmentFeatures, stationFeatures } from "@/components/map/map-view";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -59,6 +59,33 @@ describe("map features", () => {
       ["c", "unknown", false],
     ]);
     expect(features[0].geometry).toEqual({ type: "Point", coordinates: [2, 1] });
+  });
+
+  it("marks plan stops and carries their labels", () => {
+    const [stop, plain] = stationFeatures(
+      [
+        { id: "s", location: { lat: 1, lon: 2 }, kind: "stop", label: "16% → 61%" },
+        { id: "p", location: { lat: 3, lon: 4 } },
+      ],
+      null,
+    );
+    expect([stop.properties.stop, stop.properties.label]).toEqual([true, "16% → 61%"]);
+    expect([plain.properties.stop, plain.properties.label]).toEqual([false, ""]);
+  });
+
+  it("draws segments as lines and skips ones with fewer than two points", () => {
+    const features = segmentFeatures([
+      { id: "gap", coordinates: [{ lat: 1, lon: 2 }, { lat: 3, lon: 4 }] },
+      { id: "dot", coordinates: [{ lat: 1, lon: 2 }] },
+    ]);
+    expect(features).toHaveLength(1);
+    expect(features[0].geometry).toEqual({
+      type: "LineString",
+      coordinates: [
+        [2, 1],
+        [4, 3],
+      ],
+    });
   });
 
   it("computes bounds over everything drawn", () => {

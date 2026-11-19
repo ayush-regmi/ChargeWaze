@@ -324,6 +324,46 @@ Uses `POST /routes/plan` on the `/trips` page after a route is selected. Owns li
 - Infeasible: a prominent state with `reason.message` and the limiting segment highlighted on the map; no route styled as valid.
 - Save → `POST /trips/{id}/save`; "Saved trips" link to F7's pages. Re-plan with preferences sends `preferences` in the request.
 
+**As built (P4-F6, 2026-11-19):**
+- **Files:**
+  - `lib/plan-format.ts` (pure): maps a failed `POST /routes/plan` to a typed outcome, labels stops ("16% → 61%"), parses the starting-SoC prompt, builds the per-request `preferences`, and has `sliceRouteByKm`.
+  - `trips/_components/plan-*`: `plan-actions.ts` (server actions `planTrip` and `saveTrip`), `plan-panel.tsx`, `plan-result.tsx`, `plan-soc-prompt.tsx`, `plan-preferences.tsx` and `plan-assumptions.tsx`.
+  - `trips/page.tsx` passes the stored preferences and adds the "Saved trips →" link.
+  - No migration and no new dependency.
+- **Approved edits outside the Owns list** (coordinator, 2026-11-19):
+  - `trips/_components/trip-planner.tsx`: the next-release note is removed, and the panel and map wiring are added. Its prop `preferredNetworks` is replaced by `preferences`.
+  - `e2e/trip-planner.spec.ts` and `tests/trip-planner.test.tsx`: now assert that the note is gone.
+  - `components/map/`: new optional props `segments`, `selectedRouteTone` and `MapStation.kind`/`label`. Existing callers are unchanged.
+  - `components/trips/trip-map.tsx`: the saved-trip detail page now greys an infeasible route, draws its limiting segment and labels its stops. This closes F7's open map item.
+  - `e2e/support/seed.ts` and `services/api/scripts/e2e_backend.py`: a `staleSoc` / `--stale-soc` seed option. The webhook keeps the fixture's old timestamps, so `STARTING_SOC_REQUIRED` can be tested end to end. No new provider fixtures were needed: the AFDC stub already matches the planner's stations call by route.
+- **Flow:**
+  - The selected route gets a "Plan charging stops" button. The planner never plans on its own, because every plan stores an unsaved trip (D6).
+  - Each outcome is kept per endpoints, route index and geometry hash (the same key as the stations cache). The panel remounts per route, so one route's plan is never shown for another.
+  - Without a vehicle, the panel links to the Garage instead.
+- **Feasible plan:**
+  - A summary (stop count, arrival SoC, distance, drive, charging, "Detours (estimate)", overhead and total) and the stops (network, connector, kW, arrival → departure SoC, charging minutes, km along the route, detour estimate, link to `/charging/{id}`).
+  - The starting SoC is shown with its source.
+  - "How this was calculated" (a `<details>`) shows the sources, "derived from published figures, not measured", reserve, charge-to, detour, overhead, networks, the relaxed-networks note and the candidate and exclusion counts.
+  - "Save trip" leads to "Saved. View trip" (`/trips/{id}`).
+- **Infeasible plan:**
+  - A red, `role="alert"`, 2px-bordered "Not feasible: {title}" block with `reason.message` and the limiting segment in the user's units. No stops and no totals are shown.
+  - On the map the route is grey and dashed (`selectedRouteTone="infeasible"`) and the limiting segment is red. The segment is cut from the route by `from_km`/`to_km`, with the decoded line scaled to `route.distance_km`, the same axis the API uses.
+- **Map with a plan:** it shows only the plan's stops (larger, blue, labelled "arrival → departure"). The chargers list below still lists every charger.
+- **Stale SoC:** an amber prompt with the last reading and its time, prefilled as a whole percent, which re-plans with `starting_soc_override`. With no reading, it says so and the field stays empty. The re-plan panel is hidden while the prompt is open.
+- **Re-plan panel:**
+  - Reserve, charge-to, max detour, a comma-separated list of preferred networks, and an optional "Starting battery" field (an override, D7).
+  - It reuses P4-F5's `validatePreferencesForm` and sends only the keys that differ from the stored preferences. The stored preferences are never changed.
+  - A starting charge entered earlier is kept for later re-plans of that route.
+- **Other errors:**
+  - `VEHICLE_SPECS_INCOMPLETE` names the missing fields and links to `/garage/{id}`.
+  - `ROUTE_INDEX_UNAVAILABLE` asks the user to search again.
+  - Preference `fields` errors explain the reserve rule, including `max_charge_soc`.
+  - Provider errors have a retry. `UNAUTHENTICATED` has a sign-in link.
+- **Tests:**
+  - Vitest: `tests/plan-format.test.ts` (12), `plan-actions.test.ts` (7), `plan-panel.test.tsx` (13, including TripPlanner map wiring and per-route plans) and 2 new `map-view.test.tsx` cases.
+  - Playwright `e2e/planner.spec.ts` (3 tests): a feasible Frederick → Toronto route A plan with stops, totals and assumptions, then save and open from Saved trips; re-plan at reserve 50 % / charge-to 55 % for the infeasible alert; and the stale-seed prompt prefilled with 64, re-planned at 90 % ("entered by you").
+- **Not checked live:** E2E has no Mapbox public token, so the map markers, labels and red segment are covered by unit tests on the props and features, not by pixels. The real-key screenshot is F9's.
+
 ### F7 — Trip history UI
 
 `GET /trips` (saved by default) with pagination and empty state; detail from `GET /trips/{id}` rendering the stored plan (no recompute); delete via `DELETE /trips/{id}`. Shows infeasible saved trips with their reason.
