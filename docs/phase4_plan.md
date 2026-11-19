@@ -362,6 +362,9 @@ Uses `POST /routes/plan` on the `/trips` page after a route is selected. Owns li
 - **Tests:**
   - Vitest: `tests/plan-format.test.ts` (12), `plan-actions.test.ts` (7), `plan-panel.test.tsx` (13, including TripPlanner map wiring and per-route plans) and 2 new `map-view.test.tsx` cases.
   - Playwright `e2e/planner.spec.ts` (3 tests): a feasible Frederick → Toronto route A plan with stops, totals and assumptions, then save and open from Saved trips; re-plan at reserve 50 % / charge-to 55 % for the infeasible alert; and the stale-seed prompt prefilled with 64, re-planned at 90 % ("entered by you").
+- **Review fixes (Codex, PR #47):**
+  - With a plan shown, the selected route is drawn from the plan's own `route.geometry_polyline6`, not the listed Directions line. The server fetches directions again, so the two can differ, and the stops and the limiting segment must sit on the line they were planned on.
+  - Each route's cached outcome keeps the settings that produced it (per-request preferences and starting charge). Switching routes and back restores "Plan again" and the re-plan form to those settings.
 - **Not checked live:** E2E has no Mapbox public token, so the map markers, labels and red segment are covered by unit tests on the props and features, not by pixels. The real-key screenshot is F9's.
 
 ### F7 — Trip history UI

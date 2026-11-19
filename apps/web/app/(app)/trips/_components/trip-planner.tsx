@@ -15,7 +15,12 @@ import { StationFilters } from "@/components/stations/station-filters";
 import { StationsEmpty, StationsError } from "@/components/stations/station-states";
 import { Button } from "@/components/ui/button";
 import { formatDistanceText } from "@/lib/geo-format";
-import { sliceRouteByKm, stopSocLabel, type PlanOutcome } from "@/lib/plan-format";
+import {
+  sliceRouteByKm,
+  stopSocLabel,
+  type PlanOutcome,
+  type PlanRequestSettings,
+} from "@/lib/plan-format";
 import type { ConnectorType } from "@/lib/stations";
 import {
   DEFAULT_TRIP_FILTERS,
@@ -230,11 +235,16 @@ export function TripPlanner({
   const selectedItems = selectedResult && "items" in selectedResult ? selectedResult.items : null;
 
   // ---- Charging plans, one per route (keyed like the stations cache) ------
-  const [plans, setPlans] = useState<Record<string, PlanOutcome>>({});
+  // Each entry keeps the settings that produced it, so switching routes and
+  // back restores both the result and how it was asked for.
+  const [plans, setPlans] = useState<
+    Record<string, { outcome: PlanOutcome; request: PlanRequestSettings }>
+  >({});
   const selectedRoute = routeAt(selectedIndex);
   const planKey =
     endpoints && selectedRoute ? stationsKey(endpoints, selectedRoute, "plan") : null;
-  const planOutcome = planKey ? (plans[planKey] ?? null) : null;
+  const planEntry = planKey ? (plans[planKey] ?? null) : null;
+  const planOutcome = planEntry?.outcome ?? null;
   const shownPlan = planOutcome?.kind === "plan" ? planOutcome.plan : null;
   const networkOptions = [
     ...new Set([
@@ -244,9 +254,15 @@ export function TripPlanner({
   ];
 
   // The React Compiler memoizes these, so the map only refits when they change.
+  // The planner fetches directions again and plans on that response's route,
+  // so with a plan shown the selected line is the plan's own geometry: stops
+  // and the limiting segment are drawn against the line they were planned on.
   const mapRoutes: MapRoute[] = (routes ?? []).map((r) => ({
     index: r.index,
-    geometry_polyline6: r.geometry_polyline6,
+    geometry_polyline6:
+      r.index === selectedIndex && shownPlan?.route
+        ? shownPlan.route.geometry_polyline6
+        : r.geometry_polyline6,
   }));
   const mapStations: MapStation[] = shownPlan
     ? shownPlan.stops.map((s) => ({
@@ -507,7 +523,10 @@ export function TripPlanner({
                       preferences={preferences}
                       units={units}
                       outcome={planOutcome}
-                      onOutcome={(outcome) => setPlans((p) => ({ ...p, [planKey]: outcome }))}
+                      request={planEntry?.request ?? null}
+                      onOutcome={(outcome, request) =>
+                        setPlans((p) => ({ ...p, [planKey]: { outcome, request } }))
+                      }
                       signInHref={`/sign-in?next=${encodeURIComponent(tripHref(trip))}`}
                     />
                   ) : null}

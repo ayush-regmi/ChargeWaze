@@ -9,7 +9,12 @@ import {
   type PreferencesFormErrors,
 } from "@/components/profile/preferences";
 import { Button } from "@/components/ui/button";
-import { changedPlanPreferences, parseSocPercent, type PlanPreferences } from "@/lib/plan-format";
+import {
+  changedPlanPreferences,
+  parseSocPercent,
+  type PlanPreferences,
+  type PlanRequestSettings,
+} from "@/lib/plan-format";
 
 export type ReplanRequest = {
   preferences: PlanPreferences | null;
@@ -48,6 +53,17 @@ function Field({
   );
 }
 
+/** Per-request keys that are set (the API never gets explicit nulls). */
+function withoutNulls(p: PlanPreferences | null): Partial<Preferences> {
+  const out: Partial<Preferences> = {};
+  if (!p) return out;
+  if (p.reserve_soc != null) out.reserve_soc = p.reserve_soc;
+  if (p.preferred_charge_to != null) out.preferred_charge_to = p.preferred_charge_to;
+  if (p.max_detour_minutes != null) out.max_detour_minutes = p.max_detour_minutes;
+  if (p.preferred_networks != null) out.preferred_networks = p.preferred_networks;
+  return out;
+}
+
 const INPUT =
   "w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -55,24 +71,29 @@ const INPUT =
  * "Re-plan with different preferences" (phase4_plan F6). Starts from the
  * stored preferences; only the keys that differ are sent as the request's
  * `preferences`, so the stored ones stay unchanged (edit them on Profile).
- * Validation is the Profile editor's (api §3.1a).
+ * Validation is the Profile editor's (api §3.1a). `initial` (the settings of
+ * the plan on screen) prefills the form, so it shows what that plan used.
  */
 export function PlanPreferencesPanel({
   stored,
+  initial: settings,
   pending,
   onReplan,
 }: {
   stored: Preferences;
+  initial: PlanRequestSettings;
   pending: boolean;
   onReplan: (request: ReplanRequest) => void;
 }) {
   const id = useId();
-  const initial = preferencesToFormValues(stored);
+  const initial = preferencesToFormValues({ ...stored, ...withoutNulls(settings.preferences) });
   const [reserve, setReserve] = useState(initial.reservePercent);
   const [chargeTo, setChargeTo] = useState(initial.chargeToPercent);
   const [detour, setDetour] = useState(initial.maxDetourMinutes);
   const [networks, setNetworks] = useState(initial.networks.join(", "));
-  const [startingSoc, setStartingSoc] = useState("");
+  const [startingSoc, setStartingSoc] = useState(
+    settings.startingSoc === null ? "" : String(Math.round(settings.startingSoc * 100)),
+  );
   const [errors, setErrors] = useState<Errors>({});
 
   const submit = () => {

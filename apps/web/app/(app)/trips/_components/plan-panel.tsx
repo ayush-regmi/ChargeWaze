@@ -6,10 +6,11 @@ import { useState, useTransition } from "react";
 import type { Preferences } from "@/components/profile/preferences";
 import { Button } from "@/components/ui/button";
 import {
+  DEFAULT_PLAN_REQUEST,
   specFieldLabel,
   type PlanErrorCode,
   type PlanOutcome,
-  type PlanPreferences,
+  type PlanRequestSettings,
 } from "@/lib/plan-format";
 import type { TripPoint } from "@/lib/trip-url";
 import type { UnitSystem } from "@/lib/units";
@@ -31,8 +32,6 @@ const ERROR_TEXT: Record<PlanErrorCode, string> = {
   UNKNOWN: "Couldn't plan this trip.",
 };
 
-type Request = { preferences: PlanPreferences | null; startingSoc: number | null };
-
 function Notice({ tone, children }: { tone: "error" | "info"; children: React.ReactNode }) {
   return (
     <div
@@ -52,8 +51,10 @@ function Notice({ tone, children }: { tone: "error" | "info"; children: React.Re
  * Charging plan for the selected route (phase4_plan F6): one button that
  * calls `POST /routes/plan`, then the result, the stale-battery prompt, a
  * "vehicle specs incomplete" notice, or an error. The parent keeps each
- * route's outcome (so the map can show the stops) and remounts this panel
- * per route, so one route's plan is never shown for another.
+ * route's outcome and the settings that produced it (so the map can show the
+ * stops, and "Plan again" and the re-plan form reuse the same settings) and
+ * remounts this panel per route, so one route's plan is never shown for
+ * another.
  */
 export function PlanPanel({
   vehicleId,
@@ -65,6 +66,7 @@ export function PlanPanel({
   preferences,
   units,
   outcome,
+  request,
   onOutcome,
   signInHref,
 }: {
@@ -77,25 +79,27 @@ export function PlanPanel({
   preferences: Preferences | null;
   units: UnitSystem;
   outcome: PlanOutcome | null;
-  onOutcome: (outcome: PlanOutcome) => void;
+  /** The settings behind `outcome`, or null before the first plan. */
+  request: PlanRequestSettings | null;
+  onOutcome: (outcome: PlanOutcome, request: PlanRequestSettings) => void;
   signInHref: string;
 }) {
   const [pending, startTransition] = useTransition();
-  const [last, setLast] = useState<Request>({ preferences: null, startingSoc: null });
+  const [last, setLast] = useState<PlanRequestSettings>(request ?? DEFAULT_PLAN_REQUEST);
 
-  const run = (request: Request) => {
+  const run = (next: PlanRequestSettings) => {
     if (!vehicleId) return;
-    setLast(request);
+    setLast(next);
     startTransition(async () => {
       const result = await planTrip({
         vehicleId,
         origin,
         destination,
         routeIndex,
-        preferences: request.preferences,
-        startingSocOverride: request.startingSoc,
+        preferences: next.preferences,
+        startingSocOverride: next.startingSoc,
       });
-      onOutcome(result);
+      onOutcome(result, next);
     });
   };
 
@@ -192,6 +196,7 @@ export function PlanPanel({
       {vehicleId && preferences && outcome && outcome.kind !== "soc_required" ? (
         <PlanPreferencesPanel
           stored={preferences}
+          initial={last}
           pending={pending}
           onReplan={(r) =>
             run({ preferences: r.preferences, startingSoc: r.startingSoc ?? last.startingSoc })

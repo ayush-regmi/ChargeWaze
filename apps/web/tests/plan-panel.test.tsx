@@ -59,7 +59,8 @@ function Harness({
       preferences={PREFS}
       units="imperial"
       outcome={outcome}
-      onOutcome={setOutcome}
+      request={null}
+      onOutcome={(o) => setOutcome(o)}
       signInHref="/sign-in?next=%2Ftrips"
     />
   );
@@ -287,6 +288,62 @@ describe("TripPlanner with a plan", () => {
     expect(lastMap().selectedRouteTone).toBe("infeasible");
     expect(lastMap().segments).toHaveLength(1);
     expect(lastMap().segments![0].coordinates.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("draws the selected route from the plan's own geometry", async () => {
+    // Mapbox answered the planner with a different line than the one listed.
+    const PLAN_LINE = "_ibE?_ibE_ibE";
+    const plan = feasible();
+    plan.route = { ...plan.route!, geometry_polyline6: PLAN_LINE };
+    planActions.planTrip.mockResolvedValue({ kind: "plan", plan });
+    renderPlanner();
+    await screen.findByRole("button", { name: "Plan charging stops" });
+    expect(lastMap().routes!.map((r) => r.geometry_polyline6)).toEqual([
+      EQUATOR_LINE,
+      EQUATOR_LINE,
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Plan charging stops" }));
+    await screen.findByTestId("plan-result");
+    expect(lastMap().selectedRouteIndex).toBe(0);
+    // Route A (planned) uses the plan's line; Route B is unchanged.
+    expect(lastMap().routes).toEqual([
+      { index: 0, geometry_polyline6: PLAN_LINE },
+      { index: 1, geometry_polyline6: EQUATOR_LINE },
+    ]);
+  });
+
+  it("restores a route's plan settings after switching routes and back", async () => {
+    planActions.planTrip.mockResolvedValue({ kind: "plan", plan: feasible() });
+    renderPlanner();
+    fireEvent.click(await screen.findByRole("button", { name: "Plan charging stops" }));
+    await screen.findByTestId("plan-result");
+
+    const form = () => screen.getByRole("form", { name: "Re-plan with different preferences" });
+    fireEvent.change(within(form()).getByLabelText("Reserve (%)"), { target: { value: "20" } });
+    fireEvent.change(within(form()).getByLabelText("Starting battery (%)"), {
+      target: { value: "70" },
+    });
+    fireEvent.click(within(form()).getByRole("button", { name: "Re-plan" }));
+    await waitFor(() => expect(planActions.planTrip).toHaveBeenCalledTimes(2));
+    await screen.findByTestId("plan-result");
+    const settings = { preferences: { reserve_soc: 0.2 }, startingSocOverride: 0.7 };
+    expect(planActions.planTrip).toHaveBeenLastCalledWith(expect.objectContaining(settings));
+
+    fireEvent.click(screen.getByRole("button", { name: /Route B/ }));
+    await screen.findByRole("heading", { name: "Charging plan for Route B" });
+    fireEvent.click(screen.getByRole("button", { name: /Route A/ }));
+    await screen.findByRole("heading", { name: "Charging plan for Route A" });
+
+    // The form shows what the displayed plan used, not the profile defaults.
+    expect(within(form()).getByLabelText("Reserve (%)")).toHaveValue("20");
+    expect(within(form()).getByLabelText("Starting battery (%)")).toHaveValue("70");
+
+    fireEvent.click(screen.getByRole("button", { name: "Plan again" }));
+    await waitFor(() => expect(planActions.planTrip).toHaveBeenCalledTimes(3));
+    expect(planActions.planTrip).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ...settings, routeIndex: 0 }),
+    );
   });
 
   it("keeps each route's plan to itself", async () => {

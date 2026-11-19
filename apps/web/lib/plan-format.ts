@@ -18,6 +18,18 @@ export type PlanResponse = components["schemas"]["PlanResponse"];
 export type PlanStop = components["schemas"]["PlanStopOut"];
 export type PlanPreferences = components["schemas"]["PlanPreferences"];
 
+/**
+ * The user's settings behind one plan: per-request preferences (only the
+ * changed keys) and a starting-charge override. Kept with each route's
+ * outcome so "Plan again" and the re-plan form reuse them.
+ */
+export type PlanRequestSettings = {
+  preferences: PlanPreferences | null;
+  startingSoc: number | null;
+};
+
+export const DEFAULT_PLAN_REQUEST: PlanRequestSettings = { preferences: null, startingSoc: null };
+
 /** Request errors that have their own UI; everything else is a retryable error. */
 export type PlanErrorCode =
   | "MAPBOX_NOT_CONFIGURED"
