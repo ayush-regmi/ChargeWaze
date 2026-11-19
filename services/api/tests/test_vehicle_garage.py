@@ -19,7 +19,8 @@ import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Connection
+from sqlalchemy import Connection, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
@@ -308,6 +309,10 @@ def test_detail_returns_vehicle_with_specs(
         "usable_capacity_kwh": 71.4,
         "connectors": ["NACS"],
         "charging_curve": [{"soc": 0.1, "power_kw": 150.0}, {"soc": 0.8, "power_kw": 60.0}],
+        # "bZ XLE" has no catalog entry and no user baseline (phase4_plan F8).
+        "baseline_kwh_per_km": None,
+        "catalog_baseline_kwh_per_km": None,
+        "baseline_source": None,
     }
     assert body["is_stale"] is True
     assert smartcar.requests == []
@@ -324,7 +329,66 @@ def test_detail_null_capacity_and_missing_specs(
     unknown.specs = VehicleSpecs(usable_capacity_kwh=None, connectors=[], charging_curve=[])
     db.commit()
     body = api.get(f"{VEHICLES}/{unknown.id}", headers=_auth(key_material)).json()
-    assert body["specs"] == {"usable_capacity_kwh": None, "connectors": [], "charging_curve": []}
+    assert body["specs"] == {
+        "usable_capacity_kwh": None,
+        "connectors": [],
+        "charging_curve": [],
+        "baseline_kwh_per_km": None,
+        "catalog_baseline_kwh_per_km": None,
+        "baseline_source": None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Consumption baseline in GET /vehicles/{id} (phase4_plan F8)
+# ---------------------------------------------------------------------------
+
+
+def _baseline_fields(body: dict[str, Any]) -> tuple[Any, Any, Any]:
+    specs = body["specs"]
+    return (
+        specs["baseline_kwh_per_km"],
+        specs["catalog_baseline_kwh_per_km"],
+        specs["baseline_source"],
+    )
+
+
+def test_detail_baseline_from_catalog(api: TestClient, db: Session, key_material: Any) -> None:
+    vehicle = _add_vehicle(db, model="bZ XLE AWD")
+    body = api.get(f"{VEHICLES}/{vehicle.id}", headers=_auth(key_material)).json()
+    assert _baseline_fields(body) == (None, 0.2, "catalog")
+
+
+def test_detail_baseline_from_vehicle_overrides_catalog(
+    api: TestClient, db: Session, key_material: Any
+) -> None:
+    vehicle = _add_vehicle(db, model="bZ XLE AWD")
+    assert vehicle.specs is not None
+    vehicle.specs.baseline_kwh_per_km = Decimal("0.185")
+    db.commit()
+    body = api.get(f"{VEHICLES}/{vehicle.id}", headers=_auth(key_material)).json()
+    assert _baseline_fields(body) == (0.185, 0.2, "vehicle")
+
+
+def test_detail_baseline_from_vehicle_without_catalog(
+    api: TestClient, db: Session, key_material: Any
+) -> None:
+    vehicle = _add_vehicle(db)
+    assert vehicle.specs is not None
+    vehicle.specs.baseline_kwh_per_km = Decimal("0.2")
+    db.commit()
+    body = api.get(f"{VEHICLES}/{vehicle.id}", headers=_auth(key_material)).json()
+    assert _baseline_fields(body) == (0.2, None, "vehicle")
+
+
+def test_baseline_check_constraint(db: Session) -> None:
+    vehicle = _add_vehicle(db)
+    for bad in ("0", "-0.1", "1.001"):
+        with pytest.raises(IntegrityError), db.begin_nested():
+            db.execute(
+                text("UPDATE vehicle_specs SET baseline_kwh_per_km = :v WHERE vehicle_id = :id"),
+                {"v": Decimal(bad), "id": vehicle.id},
+            )
 
 
 def test_detail_of_disconnected_vehicle_is_readable(
@@ -506,3 +570,22 @@ def test_disconnect_logs_no_smartcar_ids(
     assert SC_CONNECTION_ID not in text
     assert vehicle.smartcar_vehicle_id is not None
     assert vehicle.smartcar_vehicle_id not in text
+
+
+def test_baseline_migration_is_in_the_single_head_chain() -> None:
+    """P4-F8 migration. Later revisions build on it, so don't assert it's head."""
+
+    from pathlib import Path
+
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    cfg = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    script = ScriptDirectory.from_config(cfg)
+    heads = script.get_heads()
+    assert len(heads) == 1
+    chain = {rev.revision for rev in script.walk_revisions("base", heads[0])}
+    assert "20261121_01" in chain
+    revision = script.get_revision("20261121_01")
+    assert revision is not None
+    assert revision.down_revision == "20261120_01"

@@ -4,10 +4,13 @@ import { useId, useState, useTransition } from "react";
 
 import { updateVehicleSpecs } from "@/app/(app)/garage/actions";
 import { Button } from "@/components/ui/button";
+import type { UnitSystem } from "@/lib/units";
 import {
   CONNECTORS,
   MAX_CAPACITY_KWH,
   MAX_CURVE_POINTS,
+  consumptionUnit,
+  kwhPerKmToDisplay,
   specsToFormValues,
   validateSpecsForm,
   type Connector,
@@ -25,9 +28,11 @@ import { SpecsPanel } from "./specs-panel";
 export function SpecsEditor({
   vehicleId,
   specs,
+  units,
 }: {
   vehicleId: string;
   specs: VehicleSpecs | null;
+  units: UnitSystem;
 }) {
   const [editing, setEditing] = useState(false);
 
@@ -35,6 +40,7 @@ export function SpecsEditor({
     return (
       <SpecsPanel
         specs={specs}
+        units={units}
         action={
           <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
             Edit specs
@@ -43,7 +49,9 @@ export function SpecsEditor({
       />
     );
   }
-  return <SpecsForm vehicleId={vehicleId} specs={specs} onDone={() => setEditing(false)} />;
+  return (
+    <SpecsForm vehicleId={vehicleId} specs={specs} units={units} onDone={() => setEditing(false)} />
+  );
 }
 
 const inputClass =
@@ -53,13 +61,18 @@ const errorClass = "text-xs text-red-700 dark:text-red-400";
 function SpecsForm({
   vehicleId,
   specs,
+  units,
   onDone,
 }: {
   vehicleId: string;
   specs: VehicleSpecs | null;
+  units: UnitSystem;
   onDone: () => void;
 }) {
-  const [values, setValues] = useState<SpecsFormValues>(() => specsToFormValues(specs));
+  const [values, setValues] = useState<SpecsFormValues>(() => specsToFormValues(specs, units));
+  const catalogBaseline = specs?.catalog_baseline_kwh_per_km;
+  const catalogDisplay =
+    catalogBaseline != null ? String(kwhPerKmToDisplay(catalogBaseline, units)) : undefined;
   const [errors, setErrors] = useState<SpecsFormErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -83,7 +96,7 @@ function SpecsForm({
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setServerError(null);
-    const result = validateSpecsForm(values);
+    const result = validateSpecsForm(values, units);
     if (!result.ok) {
       setErrors(result.errors);
       return;
@@ -124,6 +137,35 @@ function SpecsForm({
         {errors.capacityKwh ? (
           <p role="alert" className={errorClass}>
             {errors.capacityKwh}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="space-y-1">
+        <label htmlFor={`${ids}-consumption`} className="text-sm">
+          Consumption ({consumptionUnit(units)})
+        </label>
+        <input
+          id={`${ids}-consumption`}
+          inputMode="decimal"
+          className={`${inputClass} max-w-40`}
+          value={values.consumption}
+          placeholder={catalogDisplay}
+          onChange={(e) => update({ consumption: e.target.value })}
+          aria-invalid={errors.consumption ? true : undefined}
+          aria-describedby={`${ids}-consumption-help`}
+        />
+        <p
+          id={`${ids}-consumption-help`}
+          className="text-xs text-neutral-500 dark:text-neutral-400"
+        >
+          {catalogDisplay
+            ? `Leave empty to use the catalog's highway estimate (${catalogDisplay} ${consumptionUnit(units)}).`
+            : "Your typical highway consumption. Trip planning needs it for this vehicle."}
+        </p>
+        {errors.consumption ? (
+          <p role="alert" className={errorClass}>
+            {errors.consumption}
           </p>
         ) : null}
       </div>

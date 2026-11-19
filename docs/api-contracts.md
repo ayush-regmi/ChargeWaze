@@ -242,7 +242,10 @@ Webhook subscription is not done here yet; see F5 in [`phase2_plan.md`](phase2_p
       { "soc": 0.1, "power_kw": 150 },
       { "soc": 0.5, "power_kw": 120 },
       { "soc": 0.8, "power_kw": 60 }
-    ]
+    ],
+    "baseline_kwh_per_km": null,
+    "baseline_source": "catalog",
+    "catalog_baseline_kwh_per_km": 0.2
   }
 }
 ```
@@ -250,6 +253,11 @@ Webhook subscription is not done here yet; see F5 in [`phase2_plan.md`](phase2_p
 `connectors` reflects the physical port plus adapters the user has configured. `charging_curve` is a piecewise representation consumed by the energy module.
 
 The vehicle may be disconnected (it's still the caller's). `last_state_recorded_at`, `is_stale` and `disconnected_at` are the same as in §3.2. `usable_capacity_kwh` is `null` when it isn't known (no catalog entry and not entered by the user); `specs` is `null` if the row has none. Never calls Smartcar.
+
+Consumption baseline (phase4_plan F8), in kWh/km:
+- `baseline_kwh_per_km`: the user's own value, or `null` if they haven't entered one. Never copied from the catalog.
+- `catalog_baseline_kwh_per_km`: read-only catalog value for the vehicle's make/model/year (a mild-weather highway estimate), or `null` if the catalog has none. The Garage shows it as the placeholder.
+- `baseline_source`: where the value the planner will use comes from: `"vehicle"` if `baseline_kwh_per_km` is set, else `"catalog"` if `catalog_baseline_kwh_per_km` is set, else `null` (the vehicle can't be planned: §3.7 returns `VEHICLE_SPECS_INCOMPLETE`).
 
 **Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID; `NOT_FOUND` if it doesn't exist **or belongs to another user** (the two are indistinguishable).
 
@@ -265,7 +273,8 @@ Partially updates a vehicle's specs. Only the keys present in the body change. R
   "charging_curve": [
     { "soc": 0.1, "power_kw": 150 },
     { "soc": 0.8, "power_kw": 60 }
-  ]
+  ],
+  "baseline_kwh_per_km": 0.185
 }
 ```
 
@@ -274,6 +283,7 @@ Partially updates a vehicle's specs. Only the keys present in the body change. R
 - `usable_capacity_kwh`: `> 0` and `≤ 300`, at most two decimal places; `null` clears it (back to "unknown").
 - `connectors`: distinct values from `NACS`, `CCS1`, `J1772`, `CHAdeMO`; `[]` clears them.
 - `charging_curve`: at most 20 points; `soc` in `[0, 1]` and strictly increasing; `power_kw` `> 0` and `≤ 1000`; `[]` clears it.
+- `baseline_kwh_per_km`: `> 0` and `≤ 1` kWh/km, at most three decimal places; `null` clears it (back to the catalog value). `catalog_baseline_kwh_per_km` and `baseline_source` are read-only and rejected as unknown keys.
 - `connectors` and `charging_curve` must be omitted rather than set to `null`.
 
 **Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID, a key is unknown, or a value breaks the rules above; `NOT_FOUND` if the vehicle doesn't exist or belongs to another user.

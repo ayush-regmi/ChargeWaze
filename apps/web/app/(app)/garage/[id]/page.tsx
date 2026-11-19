@@ -9,6 +9,7 @@ import { LocalTime } from "@/components/garage/local-time";
 import { SpecsEditor } from "@/components/garage/specs-editor";
 import { SignalList } from "@/components/garage/vehicle-card";
 import { requireSessionApi } from "@/lib/session-api";
+import type { UnitSystem } from "@/lib/units";
 import { vehicleTitle } from "@/lib/vehicles";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -35,9 +36,12 @@ async function VehicleDetails({ params }: { params: Promise<{ id: string }> }) {
   if (!UUID_RE.test(id)) notFound();
 
   const api = await requireSessionApi(`/garage/${id}`);
-  const { data, response } = await api.GET("/api/v1/vehicles/{vehicle_id}", {
-    params: { path: { vehicle_id: id } },
-  });
+  const [{ data, response }, { data: me }] = await Promise.all([
+    api.GET("/api/v1/vehicles/{vehicle_id}", {
+      params: { path: { vehicle_id: id } },
+    }),
+    api.GET("/api/v1/me"),
+  ]);
   if (response.status === 404) notFound();
   if (!data) {
     return (
@@ -48,6 +52,8 @@ async function VehicleDetails({ params }: { params: Promise<{ id: string }> }) {
   }
 
   const title = vehicleTitle(data);
+  // /me failing shouldn't hide the car; fall back to the default preference.
+  const units: UnitSystem = me?.preferences.units ?? "imperial";
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -81,7 +87,7 @@ async function VehicleDetails({ params }: { params: Promise<{ id: string }> }) {
         <SignalList signals={data.supported_signals} />
       </div>
 
-      <SpecsEditor vehicleId={data.id} specs={data.specs} />
+      <SpecsEditor vehicleId={data.id} specs={data.specs} units={units} />
     </div>
   );
 }

@@ -31,12 +31,14 @@ from app.modules.users.service import clear_primary_vehicle
 from app.modules.vehicles.latest_state import is_stale, last_recorded_at
 from app.modules.vehicles.models import Vehicle, VehicleSpecs
 from app.modules.vehicles.schemas import (
+    BaselineSource,
     ChargingCurvePoint,
     VehicleDetail,
     VehicleSpecsOut,
     VehicleSpecsUpdate,
     VehicleSummary,
 )
+from app.modules.vehicles.spec_catalog import lookup_spec
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +83,7 @@ def get_vehicle_detail(
         **summary.model_dump(),
         connected_at=vehicle.connected_at,
         disconnected_at=vehicle.disconnected_at,
-        specs=None if specs is None else _specs_out(specs),
+        specs=None if specs is None else _specs_out(specs, vehicle),
     )
 
 
@@ -142,17 +144,33 @@ def update_specs(
         specs.charging_curve = [
             {"soc": p["soc"], "power_kw": p["power_kw"]} for p in fields["charging_curve"]
         ]
+    if "baseline_kwh_per_km" in fields:
+        specs.baseline_kwh_per_km = fields["baseline_kwh_per_km"]
     db.flush()
-    return _specs_out(specs)
+    return _specs_out(specs, vehicle)
 
 
-def _specs_out(specs: VehicleSpecs) -> VehicleSpecsOut:
+def _specs_out(specs: VehicleSpecs, vehicle: Vehicle) -> VehicleSpecsOut:
+    catalog = lookup_spec(vehicle.make, vehicle.model, vehicle.year)
+    catalog_baseline = (
+        float(catalog.baseline_kwh_per_km)
+        if catalog is not None and catalog.baseline_kwh_per_km is not None
+        else None
+    )
+    baseline = None if specs.baseline_kwh_per_km is None else float(specs.baseline_kwh_per_km)
+    # Same rule as the planner (phase4_plan.md D14): row, then catalog, else none.
+    baseline_source: BaselineSource | None = (
+        "vehicle" if baseline is not None else "catalog" if catalog_baseline is not None else None
+    )
     return VehicleSpecsOut(
         usable_capacity_kwh=None
         if specs.usable_capacity_kwh is None
         else float(specs.usable_capacity_kwh),
         connectors=list(specs.connectors),
         charging_curve=[ChargingCurvePoint.model_validate(p) for p in specs.charging_curve],
+        baseline_kwh_per_km=baseline,
+        catalog_baseline_kwh_per_km=catalog_baseline,
+        baseline_source=baseline_source,
     )
 
 

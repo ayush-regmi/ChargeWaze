@@ -83,11 +83,20 @@ class ChargingCurvePoint(BaseModel):
     power_kw: float
 
 
+BaselineSource = Literal["vehicle", "catalog"]
+
+
 class VehicleSpecsOut(BaseModel):
     # Null when no catalog entry exists and the user hasn't entered one (D8).
     usable_capacity_kwh: float | None
     connectors: list[str]
     charging_curve: list[ChargingCurvePoint]
+    # kWh/km (phase4_plan.md F8). The user's own value, or null.
+    baseline_kwh_per_km: float | None
+    # Read-only catalog value for this make/model/year (highway estimate), or null.
+    catalog_baseline_kwh_per_km: float | None
+    # Where the planner's value comes from; null means the vehicle can't be planned.
+    baseline_source: BaselineSource | None
 
 
 Connector = Literal["NACS", "CCS1", "J1772", "CHAdeMO"]
@@ -95,6 +104,7 @@ Connector = Literal["NACS", "CCS1", "J1772", "CHAdeMO"]
 MAX_USABLE_CAPACITY_KWH = Decimal("300")
 MAX_CHARGING_POWER_KW = 1000.0
 MAX_CHARGING_CURVE_POINTS = 20
+MAX_BASELINE_KWH_PER_KM = Decimal("1")
 
 
 class ChargingCurvePointIn(BaseModel):
@@ -108,7 +118,8 @@ class VehicleSpecsUpdate(BaseModel):
     """Body for ``PATCH /api/v1/vehicles/{id}/specs`` (api §3.4a).
 
     Only keys present in the body change. ``usable_capacity_kwh: null`` clears
-    the capacity; ``connectors`` and ``charging_curve`` can't be null (send
+    the capacity and ``baseline_kwh_per_km: null`` clears the baseline (back
+    to the catalog value); ``connectors`` and ``charging_curve`` can't be null (send
     ``[]`` to clear them).
     """
 
@@ -120,6 +131,9 @@ class VehicleSpecsUpdate(BaseModel):
     connectors: list[Connector] | None = Field(default=None, max_length=4)
     charging_curve: list[ChargingCurvePointIn] | None = Field(
         default=None, max_length=MAX_CHARGING_CURVE_POINTS
+    )
+    baseline_kwh_per_km: Decimal | None = Field(
+        default=None, gt=0, le=MAX_BASELINE_KWH_PER_KM, decimal_places=3
     )
 
     @field_validator("connectors", "charging_curve")
@@ -181,6 +195,7 @@ class VehicleState(BaseModel):
 
 
 __all__ = [
+    "BaselineSource",
     "ChargingCurvePoint",
     "ChargingCurvePointIn",
     "ConnectCompleteRequest",
