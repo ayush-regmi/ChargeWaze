@@ -6,9 +6,10 @@ import { BarChart } from "@/components/analytics/charts/bar-chart";
 import { PLOT } from "@/components/analytics/charts/frame";
 import { LineChart } from "@/components/analytics/charts/line-chart";
 import { ScatterChart } from "@/components/analytics/charts/scatter-chart";
-import type {
-  AnalyticsTrip,
-  ConsumptionBucket,
+import {
+  tripTimeLabel,
+  type AnalyticsTrip,
+  type ConsumptionBucket,
 } from "@/components/analytics/format";
 import { SimulatedNotice } from "@/components/analytics/simulated-notice";
 import { SummaryCards } from "@/components/analytics/summary-cards";
@@ -251,6 +252,51 @@ describe("AnalyticsCharts", () => {
 });
 
 describe("TripsTable", () => {
+  // 03:30 UTC on Nov 8 is still Nov 7 in Los Angeles and already midday in
+  // Tokyo. Neither is the runner's zone (America/New_York locally, UTC in CI),
+  // so these only pass if the table uses the analytics tz, not the browser's.
+  const zoned = makeTrip({
+    start_time: "2026-11-08T02:00:00Z",
+    start_time_latest: "2026-11-08T02:45:00Z",
+    end_time: "2026-11-08T03:30:00Z",
+  });
+
+  it("shows drive times in the analytics time zone, and says which", () => {
+    render(
+      <TripsTable trips={[zoned]} units="metric" tz="America/Los_Angeles" />,
+    );
+    const row = screen.getAllByRole("row")[1];
+    expect(row).toHaveTextContent("Ended Nov 7, 2026, 7:30 PM");
+    expect(row).toHaveTextContent(
+      "Started between Nov 7, 2026, 6:00 PM and Nov 7, 2026, 6:45 PM",
+    );
+    expect(row.querySelector("time")).toHaveAttribute(
+      "dateTime",
+      "2026-11-08T03:30:00Z",
+    );
+    expect(screen.getByTestId("trips-table-tz")).toHaveTextContent(
+      "(times in America/Los_Angeles)",
+    );
+  });
+
+  it("moves a drive to the next day in a zone east of UTC", () => {
+    render(<TripsTable trips={[zoned]} units="metric" tz="Asia/Tokyo" />);
+    const row = screen.getAllByRole("row")[1];
+    expect(row).toHaveTextContent("Ended Nov 8, 2026, 12:30 PM");
+    expect(row).toHaveTextContent(
+      "Started between Nov 8, 2026, 11:00 AM and Nov 8, 2026, 11:45 AM",
+    );
+  });
+
+  it("agrees with the scatter's label for the same drive", () => {
+    render(
+      <TripsTable trips={[zoned]} units="metric" tz="America/Los_Angeles" />,
+    );
+    expect(screen.getAllByRole("row")[1]).toHaveTextContent(
+      `Ended ${tripTimeLabel(zoned.end_time, "America/Los_Angeles")}`,
+    );
+  });
+
   it("shows a quality badge with the reasons as its description", () => {
     const trip = makeTrip({
       quality_flag: "low",
@@ -259,7 +305,7 @@ describe("TripsTable", () => {
       included_in_aggregates: false,
       start_time: "2026-11-08T08:00:00Z",
     });
-    render(<TripsTable trips={[trip]} units="metric" />);
+    render(<TripsTable trips={[trip]} units="metric" tz="UTC" />);
     const badge = screen.getByText("Low quality");
     expect(badge).toHaveAttribute("tabindex", "0");
     expect(badge).toHaveAccessibleDescription(
@@ -285,6 +331,7 @@ describe("TripsTable", () => {
           }),
         ]}
         units="metric"
+        tz="UTC"
       />,
     );
     const links = screen.getAllByRole("link", { name: "Needs review" });
@@ -317,6 +364,7 @@ describe("TripsTable", () => {
           }),
         ]}
         units="metric"
+        tz="UTC"
       />,
     );
     const [first, second] = screen.getAllByRole("row").slice(1);

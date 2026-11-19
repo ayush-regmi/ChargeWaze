@@ -317,6 +317,7 @@ Replaces the placeholder `app/(app)/analytics/page.tsx`. No chart library (D5): 
 - **Units:** `components/analytics/format.ts` converts kWh/km to Wh/mi (× 1609.344) or kWh/100 km (× 100). It also holds the distance conversion, signed errors, human labels for the D8 reason codes and the review statuses.
 - **Table:** `trips-table.tsx`. The quality badge is focusable, and its reasons are a tooltip on hover or focus that is also its `aria-describedby`.
   - Bounded starts read "Started between X and Y".
+  - Every time in the table (end, start and both start bounds) is shown in the analytics `tz` (`tripTimeLabel` in `format.ts`, the same helper as the scatter), not the browser's zone, and the Drive header names the zone. A shared `tz=UTC` link opened elsewhere then lists the same days the API filtered on (Codex review on #58).
   - Status tags: Needs review, In progress, Simulated, Not in totals.
   - "Needs review" links to `/trips/{planned_trip_id}` when the leg is matched, else to `/trips/saved`, where F7 adds Observed drives.
   - The table scrolls inside its box (`contain: inline-size`), because the app layout's `<main>` has no `min-w-0`.

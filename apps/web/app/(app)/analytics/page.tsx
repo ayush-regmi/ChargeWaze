@@ -207,7 +207,7 @@ async function Analytics({ searchParams }: { searchParams: SearchParams }) {
                 No more drives in this range.
               </p>
             ) : (
-              <TripsTable trips={items} units={units} />
+              <TripsTable trips={items} units={units} tz={data.tz} />
             )}
             {nextCursor || params.cursor ? (
               <nav aria-label="Drive pages" className="flex gap-4 text-sm">

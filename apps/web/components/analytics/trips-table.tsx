@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { LocalTime } from "@/components/garage/local-time";
 import type { UnitSystem } from "@/lib/units";
 
 import {
@@ -14,6 +13,7 @@ import {
   qualityReasonLabel,
   reviewHref,
   reviewLabel,
+  tripTimeLabel,
   type AnalyticsTrip,
 } from "./format";
 
@@ -69,22 +69,26 @@ export function QualityBadge({
 }
 
 /** When the drive happened: an exact start, or a bounded one ("between X and Y"), then the end. */
-function DriveTime({ trip }: { trip: AnalyticsTrip }) {
+function ZonedTime({ iso, tz }: { iso: string; tz: string }) {
+  return <time dateTime={iso}>{tripTimeLabel(iso, tz)}</time>;
+}
+
+function DriveTime({ trip, tz }: { trip: AnalyticsTrip; tz: string }) {
   const bounded = trip.start_time !== trip.start_time_latest;
   return (
     <div className="space-y-0.5">
       <div>
-        Ended <LocalTime iso={trip.end_time} />
+        Ended <ZonedTime iso={trip.end_time} tz={tz} />
       </div>
       <div className="text-xs text-neutral-500 dark:text-neutral-400">
         {bounded ? (
           <>
-            Started between <LocalTime iso={trip.start_time} /> and{" "}
-            <LocalTime iso={trip.start_time_latest} />
+            Started between <ZonedTime iso={trip.start_time} tz={tz} /> and{" "}
+            <ZonedTime iso={trip.start_time_latest} tz={tz} />
           </>
         ) : (
           <>
-            Started <LocalTime iso={trip.start_time} />
+            Started <ZonedTime iso={trip.start_time} tz={tz} />
           </>
         )}
       </div>
@@ -165,9 +169,12 @@ function observed(trip: AnalyticsTrip): string {
 export function TripsTable({
   trips,
   units,
+  tz,
 }: {
   trips: readonly AnalyticsTrip[];
   units: UnitSystem;
+  /** The analytics time zone (the API's `tz`); every time in the table is shown in it. */
+  tz: string;
 }) {
   return (
     <div className="overflow-x-auto rounded-lg border [contain:inline-size] border-neutral-200 dark:border-neutral-800">
@@ -175,11 +182,16 @@ export function TripsTable({
         className="w-full min-w-[56rem] text-left text-sm"
         data-testid="analytics-trips-table"
       >
-        <caption className="sr-only">Observed drives, newest first</caption>
+        <caption className="sr-only">
+          Observed drives, newest first. Times in {tz}.
+        </caption>
         <thead className="bg-neutral-50 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400">
           <tr>
             <th scope="col" className="px-3 py-2 font-medium">
-              Drive
+              Drive{" "}
+              <span className="font-normal" data-testid="trips-table-tz">
+                (times in {tz})
+              </span>
             </th>
             <th scope="col" className="px-3 py-2 font-medium">
               Distance
@@ -211,7 +223,7 @@ export function TripsTable({
           {trips.map((trip) => (
             <tr key={trip.id} data-trip-id={trip.id} className="align-top">
               <td className="px-3 py-2">
-                <DriveTime trip={trip} />
+                <DriveTime trip={trip} tz={tz} />
               </td>
               <td className="whitespace-nowrap px-3 py-2 tabular-nums">
                 {formatDistanceValue(trip.distance_km, units) ?? MISSING}

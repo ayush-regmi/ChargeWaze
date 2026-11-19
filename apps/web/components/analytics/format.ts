@@ -145,3 +145,22 @@ const GROUP_LABELS: Record<GroupBy, string> = {
 export function groupLabel(groupBy: GroupBy): string {
   return GROUP_LABELS[groupBy];
 }
+
+/**
+ * A timestamp in the analytics time zone (the URL's `tz`, which the API also
+ * buckets and filters by), so the table, the charts and the range agree even
+ * when the page is opened in another zone. Not the browser's zone.
+ */
+export function tripTimeLabel(iso: string, tz: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      timeZone: tz,
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(d);
+  } catch {
+    return `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+  }
+}

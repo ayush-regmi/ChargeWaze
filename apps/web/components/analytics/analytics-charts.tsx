@@ -11,6 +11,7 @@ import {
   QUALITY_LABELS,
   toConsumption,
   toDistance,
+  tripTimeLabel,
   type AnalyticsTrip,
   type ConsumptionBucket,
   type GroupBy,
@@ -19,21 +20,6 @@ import {
 function fixed(digits: number, unit: string) {
   return (v: number) =>
     `${v.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })} ${unit}`;
-}
-
-/** A trip's end time in the page's time zone, for chart titles and table rows. */
-export function tripTimeLabel(iso: string, tz: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      timeZone: tz,
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(d);
-  } catch {
-    return `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
-  }
 }
 
 function Panel({
