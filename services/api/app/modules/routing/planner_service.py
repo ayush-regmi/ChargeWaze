@@ -145,7 +145,7 @@ def plan_trip(
         usable_capacity_kwh=specs.vehicle.usable_capacity_kwh,
         usable_capacity_source=specs.capacity_source,
         baseline_kwh_per_km=specs.vehicle.baseline_kwh_per_km,
-        baseline_source="catalog",
+        baseline_source=specs.baseline_source,
         charging_curve_source=specs.curve_source,
         adjustments_applied=[],
         reserve_soc=prefs.reserve_soc,
@@ -262,6 +262,7 @@ class ResolvedSpecs:
     vehicle: EnergyVehicle
     connectors: frozenset[ConnectorType]
     capacity_source: Literal["vehicle", "catalog"]
+    baseline_source: Literal["vehicle", "catalog"]
     curve_source: Literal["vehicle", "catalog", "catalog_derived"]
 
 
@@ -310,13 +311,23 @@ def resolve_specs(detail: VehicleDetail) -> ResolvedSpecs:
     if not curve:
         missing.append("charging_curve")
 
-    # Baseline: catalog only until P4-F8.
-    baseline = (
+    # Baseline (P4-F8). Connecting never copies the catalog baseline into the
+    # row, so a row value is always the user's own and reported as ``vehicle``.
+    row_baseline = (
+        float(row.baseline_kwh_per_km)
+        if row is not None and row.baseline_kwh_per_km is not None
+        else None
+    )
+    catalog_baseline = (
         float(catalog.baseline_kwh_per_km)
         if catalog is not None and catalog.baseline_kwh_per_km is not None
         else None
     )
-    if baseline is None:
+    baseline = row_baseline if row_baseline is not None else catalog_baseline
+    baseline_source: Literal["vehicle", "catalog"] = (
+        "vehicle" if row_baseline is not None else "catalog"
+    )
+    if baseline is None or baseline <= 0:
         missing.append("baseline_kwh_per_km")
 
     if not missing:
@@ -334,6 +345,7 @@ def resolve_specs(detail: VehicleDetail) -> ResolvedSpecs:
                 vehicle=vehicle,
                 connectors=connectors,
                 capacity_source=capacity_source,
+                baseline_source=baseline_source,
                 curve_source=curve_source,
             )
     raise ApiError(

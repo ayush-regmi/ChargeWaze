@@ -93,6 +93,10 @@ class VehicleSpecs(Base):
     __tablename__ = "vehicle_specs"
     __table_args__ = (
         CheckConstraint("usable_capacity_kwh > 0", name="vehicle_specs_usable_capacity_positive"),
+        CheckConstraint(
+            "baseline_kwh_per_km > 0 AND baseline_kwh_per_km <= 1",
+            name="vehicle_specs_baseline_range",
+        ),
     )
 
     vehicle_id: Mapped[uuid.UUID] = mapped_column(
@@ -107,6 +111,9 @@ class VehicleSpecs(Base):
     charging_curve: Mapped[list[dict[str, Any]]] = mapped_column(
         JSON_TYPE, nullable=False, default=list, server_default=text("'[]'::jsonb")
     )
+    # User-entered consumption (phase4_plan.md F8). NULL means "use the catalog
+    # value"; never copied from the catalog, so a value here is the user's own.
+    baseline_kwh_per_km: Mapped[Decimal | None] = mapped_column(Numeric(5, 3), nullable=True)
 
     vehicle: Mapped[Vehicle] = relationship("Vehicle", back_populates="specs")
 

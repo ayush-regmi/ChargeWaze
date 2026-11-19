@@ -264,6 +264,7 @@ def add_vehicle(db: Session) -> Callable[..., Vehicle]:
         capacity: Decimal | None = None,
         connectors: list[str] | None = None,
         curve: list[dict[str, float]] | None = None,
+        baseline: Decimal | None = None,
         soc_percent: float | None = None,
         soc_age: timedelta = timedelta(minutes=5),
     ) -> Vehicle:
@@ -290,7 +291,10 @@ def add_vehicle(db: Session) -> Callable[..., Vehicle]:
             latest_state=latest_state,
         )
         vehicle.specs = VehicleSpecs(
-            usable_capacity_kwh=capacity, connectors=connectors or [], charging_curve=curve or []
+            usable_capacity_kwh=capacity,
+            connectors=connectors or [],
+            charging_curve=curve or [],
+            baseline_kwh_per_km=baseline,
         )
         db.add(vehicle)
         db.commit()
@@ -823,6 +827,101 @@ def test_row_copy_of_catalog_is_reported_as_catalog(
 
     assert assumptions["usable_capacity_source"] == "catalog"
     assert assumptions["charging_curve_source"] == "catalog_derived"
+
+
+# ---------------------------------------------------------------------------
+# Per-vehicle consumption baseline (phase4_plan F8)
+# ---------------------------------------------------------------------------
+
+
+def test_vehicle_without_catalog_plans_once_user_sets_a_baseline(
+    wire: Callable[..., TestClient],
+    auth: Callable[..., dict[str, str]],
+    add_vehicle: Callable[..., Vehicle],
+    mapbox: FakeMapbox,
+    scripted: ScriptedStations,
+) -> None:
+    mapbox.serve(synthetic_directions(80, 60))
+    api = wire(scripted)
+    vehicle = add_vehicle(
+        model="bZ Limited", capacity=Decimal("57.7"), connectors=["NACS"], curve=BZ_CURVE
+    )
+    plan_body = synthetic_body(vehicle, 80, starting_soc_override=0.72)
+
+    before = api.post(PLAN, json=plan_body, headers=auth())
+    assert before.status_code == 422
+    assert before.json()["error"]["details"] == {
+        "reason": "VEHICLE_SPECS_INCOMPLETE",
+        "missing": ["baseline_kwh_per_km"],
+    }
+
+    patched = api.patch(
+        f"/api/v1/vehicles/{vehicle.id}/specs",
+        json={"baseline_kwh_per_km": 0.18},
+        headers=auth(),
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["baseline_source"] == "vehicle"
+
+    after = api.post(PLAN, json=plan_body, headers=auth())
+    assert after.status_code == 200, after.text
+    plan = after.json()
+    assert plan["status"] == "feasible"
+    assert plan["assumptions"]["baseline_kwh_per_km"] == 0.18
+    assert plan["assumptions"]["baseline_source"] == "vehicle"
+    # 80 km x 0.18 kWh/km = 14.4 kWh of 57.7 kWh → 0.72 - 0.2496 ≈ 0.470.
+    assert plan["arrival_soc"] == pytest.approx(0.470, abs=0.001)
+
+
+def test_user_baseline_overrides_catalog(
+    wire: Callable[..., TestClient],
+    auth: Callable[..., dict[str, str]],
+    add_vehicle: Callable[..., Vehicle],
+    mapbox: FakeMapbox,
+    scripted: ScriptedStations,
+) -> None:
+    """Same trip as the short-trip test (arrival 0.495 on the 0.20 catalog value)."""
+
+    mapbox.serve(synthetic_directions(80, 60))
+    api = wire(scripted)
+    vehicle = add_vehicle(baseline=Decimal("0.250"))
+
+    response = api.post(
+        PLAN, json=synthetic_body(vehicle, 80, starting_soc_override=0.72), headers=auth()
+    )
+
+    assert response.status_code == 200, response.text
+    plan = response.json()
+    assert plan["assumptions"]["baseline_kwh_per_km"] == 0.25
+    assert plan["assumptions"]["baseline_source"] == "vehicle"
+    # 80 km x 0.25 kWh/km = 20 kWh of 71 kWh → 0.72 - 0.2817 ≈ 0.438.
+    assert plan["arrival_soc"] == pytest.approx(0.438, abs=0.001)
+
+
+def test_clearing_the_user_baseline_falls_back_to_catalog(
+    wire: Callable[..., TestClient],
+    auth: Callable[..., dict[str, str]],
+    add_vehicle: Callable[..., Vehicle],
+    mapbox: FakeMapbox,
+    scripted: ScriptedStations,
+) -> None:
+    mapbox.serve(synthetic_directions(80, 60))
+    api = wire(scripted)
+    vehicle = add_vehicle(baseline=Decimal("0.250"))
+    cleared = api.patch(
+        f"/api/v1/vehicles/{vehicle.id}/specs",
+        json={"baseline_kwh_per_km": None},
+        headers=auth(),
+    )
+    assert cleared.status_code == 200, cleared.text
+
+    plan = api.post(
+        PLAN, json=synthetic_body(vehicle, 80, starting_soc_override=0.72), headers=auth()
+    ).json()
+
+    assert plan["assumptions"]["baseline_kwh_per_km"] == 0.2
+    assert plan["assumptions"]["baseline_source"] == "catalog"
+    assert plan["arrival_soc"] == 0.495
 
 
 def test_vehicle_charge_limit_caps_charge_to(

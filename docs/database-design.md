@@ -229,6 +229,7 @@ One-to-one with `vehicles`. Separated so vendor-provided and user-configured spe
 | `usable_capacity_kwh` | `numeric(6,2)` | User-editable; defaults seeded per make/model from a static catalog. `NULL` when unknown (never guessed). `CHECK (> 0)`. |
 | `connectors` | `jsonb` | e.g. `["NACS", "J1772", "CCS1"]`. Default `[]`. |
 | `charging_curve` | `jsonb` | Piecewise `[{soc, power_kw}, ...]`. Default `[]`. |
+| `baseline_kwh_per_km` | `numeric(5,3)` | User-entered consumption baseline (phase4_plan F8). `NULL` means "use the catalog value" ([`phase4_plan.md`](phase4_plan.md) D14); never copied from the catalog, so a non-null value is always the user's. `CHECK (> 0 AND <= 1)`. |
 
 ### 3.5 `vehicle_telemetry`
 

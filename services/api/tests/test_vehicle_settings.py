@@ -30,6 +30,13 @@ smartcar = garage.smartcar
 
 PREFS = "/api/v1/me/preferences"
 
+# "bZ XLE" (the test vehicle) has no catalog entry, so no baseline at all.
+NO_BASELINE = {
+    "baseline_kwh_per_km": None,
+    "catalog_baseline_kwh_per_km": None,
+    "baseline_source": None,
+}
+
 
 def _specs_url(vehicle_id: object) -> str:
     return f"{VEHICLES}/{vehicle_id}/specs"
@@ -163,6 +170,13 @@ def test_primary_unknown_vehicle_is_404_and_nothing_changes(
         {"reserve_soc": None},
         {"primary_vehicle_id": "not-a-uuid"},
         {"surprise": True},
+        {"baseline_kwh_per_km": 0},
+        {"baseline_kwh_per_km": -0.1},
+        {"baseline_kwh_per_km": 1.001},
+        {"baseline_kwh_per_km": 0.1855},
+        {"baseline_kwh_per_km": "thirsty"},
+        {"catalog_baseline_kwh_per_km": 0.2},
+        {"baseline_source": "vehicle"},
     ],
 )
 def test_prefs_validation_errors(
@@ -239,13 +253,15 @@ def test_specs_full_update(api: TestClient, db: Session, key_material: Any) -> N
             {"soc": 0.5, "power_kw": 120.5},
             {"soc": 1.0, "power_kw": 7},
         ],
+        "baseline_kwh_per_km": 0.185,
     }
+    expected = {**body, "catalog_baseline_kwh_per_km": None, "baseline_source": "vehicle"}
     response = api.patch(_specs_url(vehicle.id), json=body, headers=_auth(key_material))
     assert response.status_code == 200
-    assert response.json() == body
+    assert response.json() == expected
 
     detail = api.get(f"{VEHICLES}/{vehicle.id}", headers=_auth(key_material)).json()
-    assert detail["specs"] == body
+    assert detail["specs"] == expected
 
 
 def test_specs_partial_update_keeps_other_fields(
@@ -270,7 +286,12 @@ def test_specs_clear_values(api: TestClient, db: Session, key_material: Any) -> 
         headers=_auth(key_material),
     )
     assert response.status_code == 200
-    assert response.json() == {"usable_capacity_kwh": None, "connectors": [], "charging_curve": []}
+    assert response.json() == {
+        "usable_capacity_kwh": None,
+        "connectors": [],
+        "charging_curve": [],
+        **NO_BASELINE,
+    }
 
 
 def test_specs_creates_row_when_missing(api: TestClient, db: Session, key_material: Any) -> None:
@@ -279,7 +300,12 @@ def test_specs_creates_row_when_missing(api: TestClient, db: Session, key_materi
         _specs_url(vehicle.id), json={"usable_capacity_kwh": 70}, headers=_auth(key_material)
     )
     assert response.status_code == 200
-    assert response.json() == {"usable_capacity_kwh": 70.0, "connectors": [], "charging_curve": []}
+    assert response.json() == {
+        "usable_capacity_kwh": 70.0,
+        "connectors": [],
+        "charging_curve": [],
+        **NO_BASELINE,
+    }
     db.expire_all()
     row = db.get(VehicleSpecs, vehicle.id)
     assert row is not None
@@ -346,6 +372,13 @@ def test_specs_non_uuid_is_validation_error(api: TestClient, key_material: Any) 
         {"charging_curve": [{"soc": i / 100, "power_kw": 50} for i in range(21)]},
         {"charging_curve": [{"soc": 0.5, "power_kw": 50, "extra": 1}]},
         {"surprise": True},
+        {"baseline_kwh_per_km": 0},
+        {"baseline_kwh_per_km": -0.1},
+        {"baseline_kwh_per_km": 1.001},
+        {"baseline_kwh_per_km": 0.1855},
+        {"baseline_kwh_per_km": "thirsty"},
+        {"catalog_baseline_kwh_per_km": 0.2},
+        {"baseline_source": "vehicle"},
     ],
 )
 def test_specs_validation_errors(
@@ -377,3 +410,64 @@ def test_primary_check_locks_the_vehicle_row(db: Session) -> None:
     finally:
         event.remove(engine, "before_cursor_execute", _capture)
     assert any("FOR UPDATE" in s for s in statements)
+
+
+# ---------------------------------------------------------------------------
+# baseline_kwh_per_km (phase4_plan F8)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("value", [0.001, 0.2, 1, 1.0])
+def test_specs_baseline_bounds_accepted(
+    api: TestClient, db: Session, key_material: Any, value: float
+) -> None:
+    vehicle = _add_vehicle(db)
+    response = api.patch(
+        _specs_url(vehicle.id), json={"baseline_kwh_per_km": value}, headers=_auth(key_material)
+    )
+    assert response.status_code == 200
+    assert response.json()["baseline_kwh_per_km"] == pytest.approx(value)
+    db.expire_all()
+    row = db.get(VehicleSpecs, vehicle.id)
+    assert row is not None
+    assert row.baseline_kwh_per_km == Decimal(str(value)).quantize(Decimal("0.001"))
+
+
+def test_specs_baseline_partial_update_keeps_other_fields(
+    api: TestClient, db: Session, key_material: Any
+) -> None:
+    vehicle = _add_vehicle(db)
+    response = api.patch(
+        _specs_url(vehicle.id), json={"baseline_kwh_per_km": 0.19}, headers=_auth(key_material)
+    )
+    body = response.json()
+    assert body["usable_capacity_kwh"] == pytest.approx(71.4)
+    assert body["connectors"] == ["NACS"]
+    assert len(body["charging_curve"]) == 2
+    # And other fields leave the baseline alone.
+    response = api.patch(
+        _specs_url(vehicle.id), json={"connectors": ["CCS1"]}, headers=_auth(key_material)
+    )
+    assert response.json()["baseline_kwh_per_km"] == pytest.approx(0.19)
+
+
+def test_specs_baseline_null_clears_back_to_catalog(
+    api: TestClient, db: Session, key_material: Any
+) -> None:
+    vehicle = _add_vehicle(db, model="bZ XLE AWD")
+    set_response = api.patch(
+        _specs_url(vehicle.id), json={"baseline_kwh_per_km": 0.25}, headers=_auth(key_material)
+    )
+    assert set_response.json()["baseline_source"] == "vehicle"
+    response = api.patch(
+        _specs_url(vehicle.id), json={"baseline_kwh_per_km": None}, headers=_auth(key_material)
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["baseline_kwh_per_km"] is None
+    assert body["catalog_baseline_kwh_per_km"] == pytest.approx(0.2)
+    assert body["baseline_source"] == "catalog"
+    db.expire_all()
+    row = db.get(VehicleSpecs, vehicle.id)
+    assert row is not None
+    assert row.baseline_kwh_per_km is None
