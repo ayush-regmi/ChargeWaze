@@ -5,15 +5,22 @@ import { useEffect, useRef, useState } from "react";
 
 import { DataAttribution } from "@/components/map/attribution";
 import { LazyMapView } from "@/components/map/lazy-map-view";
-import type { MapRoute, MapStation } from "@/components/map/types";
+import type { MapRoute, MapSegment, MapStation } from "@/components/map/types";
 import type { Place } from "@/components/places/actions";
 import { PlaceSearch } from "@/components/places/place-search";
+import type { Preferences } from "@/components/profile/preferences";
 import { UseMyLocation } from "@/components/places/use-my-location";
 import { StationCard } from "@/components/stations/station-card";
 import { StationFilters } from "@/components/stations/station-filters";
 import { StationsEmpty, StationsError } from "@/components/stations/station-states";
 import { Button } from "@/components/ui/button";
 import { formatDistanceText } from "@/lib/geo-format";
+import {
+  sliceRouteByKm,
+  stopSocLabel,
+  type PlanOutcome,
+  type PlanRequestSettings,
+} from "@/lib/plan-format";
 import type { ConnectorType } from "@/lib/stations";
 import {
   DEFAULT_TRIP_FILTERS,
@@ -40,6 +47,7 @@ import {
   type DirectionsRoute,
   type NoRouteReason,
 } from "./actions";
+import { PlanPanel } from "./plan-panel";
 import { RouteList, routeLabel, type RouteStationsSummary } from "./route-list";
 
 export type TripVehicle = {
@@ -112,19 +120,24 @@ function summarize(result: AlongRouteResult | undefined, hasVehicle: boolean): R
  * route first and for the other routes afterwards (D15), and cached per
  * route and filter set.
  *
- * Phase 3 shows no charging stops, arrival battery or feasibility (PRD §4.2).
+ * Phase 4 (phase4_plan F6) adds the charging plan for the selected route
+ * (`PlanPanel`, `POST /routes/plan`). A plan is kept per route and geometry;
+ * while one is shown, the map shows its stops (labelled arrival → departure
+ * charge) instead of every charger, and an infeasible plan greys the route and
+ * draws its limiting segment in red.
  */
 export function TripPlanner({
   initial,
   units,
   vehicle,
-  preferredNetworks,
+  preferences,
 }: {
   initial: TripState;
   units: UnitSystem;
   vehicle: TripVehicle | null;
-  preferredNetworks: readonly string[];
+  preferences: Preferences | null;
 }) {
+  const preferredNetworks = preferences?.preferred_networks ?? [];
   const [trip, setTrip] = useState<TripState>(initial);
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
 
@@ -220,6 +233,19 @@ export function TripPlanner({
   for (const r of routes ?? []) summaries[r.index] = summarize(resultFor(r.index), hasVehicle);
 
   const selectedItems = selectedResult && "items" in selectedResult ? selectedResult.items : null;
+
+  // ---- Charging plans, one per route (keyed like the stations cache) ------
+  // Each entry keeps the settings that produced it, so switching routes and
+  // back restores both the result and how it was asked for.
+  const [plans, setPlans] = useState<
+    Record<string, { outcome: PlanOutcome; request: PlanRequestSettings }>
+  >({});
+  const selectedRoute = routeAt(selectedIndex);
+  const planKey =
+    endpoints && selectedRoute ? stationsKey(endpoints, selectedRoute, "plan") : null;
+  const planEntry = planKey ? (plans[planKey] ?? null) : null;
+  const planOutcome = planEntry?.outcome ?? null;
+  const shownPlan = planOutcome?.kind === "plan" ? planOutcome.plan : null;
   const networkOptions = [
     ...new Set([
       ...preferredNetworks,
@@ -228,16 +254,44 @@ export function TripPlanner({
   ];
 
   // The React Compiler memoizes these, so the map only refits when they change.
+  // The planner fetches directions again and plans on that response's route,
+  // so with a plan shown the selected line is the plan's own geometry: stops
+  // and the limiting segment are drawn against the line they were planned on.
   const mapRoutes: MapRoute[] = (routes ?? []).map((r) => ({
     index: r.index,
-    geometry_polyline6: r.geometry_polyline6,
+    geometry_polyline6:
+      r.index === selectedIndex && shownPlan?.route
+        ? shownPlan.route.geometry_polyline6
+        : r.geometry_polyline6,
   }));
-  const mapStations: MapStation[] = (selectedItems ?? []).map((s) => ({
-    id: s.id,
-    location: s.location,
-    name: s.name,
-    compatible: s.compatible,
-  }));
+  const mapStations: MapStation[] = shownPlan
+    ? shownPlan.stops.map((s) => ({
+        id: s.station.id,
+        location: s.station.location,
+        name: `Stop ${s.sequence}: ${s.station.name}`,
+        compatible: true,
+        kind: "stop",
+        label: stopSocLabel(s),
+      }))
+    : (selectedItems ?? []).map((s) => ({
+        id: s.id,
+        location: s.location,
+        name: s.name,
+        compatible: s.compatible,
+      }));
+  const limiting = shownPlan?.reason?.limiting_segment ?? null;
+  const limitingPoints =
+    limiting && shownPlan?.route
+      ? sliceRouteByKm(
+          shownPlan.route.geometry_polyline6,
+          shownPlan.route.distance_km,
+          limiting.from_km,
+          limiting.to_km,
+        )
+      : null;
+  const mapSegments: MapSegment[] = limitingPoints
+    ? [{ id: `limiting-${shownPlan?.trip_id}`, coordinates: limitingPoints }]
+    : [];
 
   // ---- Corridor: a slider, committed after a short pause ------------------
   const [corridorDraft, setCorridorDraft] = useState(corridorKm(trip));
@@ -320,14 +374,6 @@ export function TripPlanner({
         onLocate={(p) => setEndpoint("origin", { ...p, label: "My location" })}
       />
 
-      <p
-        className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
-        data-testid="next-release-note"
-      >
-        Charging stops and arrival battery are planned in the next release. These routes
-        haven&apos;t been checked against your battery yet.
-      </p>
-
       {vehicle === null ? (
         <p className="rounded-md bg-neutral-100 px-3 py-2 text-sm text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
           Chargers aren&apos;t checked for compatibility.{" "}
@@ -406,6 +452,8 @@ export function TripPlanner({
                 label="Trip map"
                 routes={mapRoutes}
                 selectedRouteIndex={routes ? selectedIndex : null}
+                selectedRouteTone={shownPlan?.status === "infeasible" ? "infeasible" : "default"}
+                segments={mapSegments}
                 onSelectRoute={(index) => update({ ...trip, routeIndex: index })}
                 stations={mapStations}
                 selectedStationId={selectedStationId}
@@ -463,6 +511,25 @@ export function TripPlanner({
                     hasVehicle={hasVehicle}
                     corridorText={corridorText}
                   />
+                  {planKey && trip.origin && trip.destination ? (
+                    <PlanPanel
+                      key={planKey}
+                      vehicleId={vehicle?.id ?? null}
+                      vehicleTitle={vehicle?.title ?? null}
+                      origin={trip.origin}
+                      destination={trip.destination}
+                      routeIndex={selectedIndex}
+                      routeName={routeLabel(selectedIndex)}
+                      preferences={preferences}
+                      units={units}
+                      outcome={planOutcome}
+                      request={planEntry?.request ?? null}
+                      onOutcome={(outcome, request) =>
+                        setPlans((p) => ({ ...p, [planKey]: { outcome, request } }))
+                      }
+                      signInHref={`/sign-in?next=${encodeURIComponent(tripHref(trip))}`}
+                    />
+                  ) : null}
                   <section
                     aria-label="Chargers along the route"
                     aria-busy={selectedResult === undefined || undefined}

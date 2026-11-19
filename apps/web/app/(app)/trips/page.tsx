@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
@@ -15,11 +16,19 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 export default function TripsPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <section className="mx-auto max-w-6xl space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Trip Planner</h1>
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          Compare driving routes and see the chargers along each one.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Trip Planner</h1>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            Compare driving routes, see the chargers along each one and plan where to charge.
+          </p>
+        </div>
+        <Link
+          href="/trips/saved"
+          className="text-sm font-medium text-blue-700 underline-offset-2 hover:underline dark:text-blue-400"
+        >
+          Saved trips →
+        </Link>
       </div>
       <Suspense
         fallback={
@@ -69,7 +78,7 @@ async function Trips({ searchParams }: { searchParams: SearchParams }) {
       initial={initial}
       units={units}
       vehicle={vehicle}
-      preferredNetworks={me?.preferences.preferred_networks ?? []}
+      preferences={me?.preferences ?? null}
     />
   );
 }

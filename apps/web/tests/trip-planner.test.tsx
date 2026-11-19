@@ -74,7 +74,7 @@ function renderPlanner(props: Partial<Parameters<typeof TripPlanner>[0]> = {}) {
       initial={TRIP}
       units="imperial"
       vehicle={vehicle}
-      preferredNetworks={[]}
+      preferences={null}
       {...props}
     />,
   );
@@ -97,12 +97,10 @@ beforeEach(() => {
 });
 
 describe("TripPlanner", () => {
-  it("asks for both endpoints first and always shows the next-release note", () => {
+  it("asks for both endpoints first; the Phase 3 next-release note is gone", () => {
     renderPlanner({ initial: EMPTY_TRIP });
     expect(screen.getByText(/Choose where you're starting/)).toBeInTheDocument();
-    expect(screen.getByTestId("next-release-note")).toHaveTextContent(
-      "Charging stops and arrival battery are planned in the next release",
-    );
+    expect(screen.queryByTestId("next-release-note")).not.toBeInTheDocument();
     expect(actions.getDirections).not.toHaveBeenCalled();
   });
 

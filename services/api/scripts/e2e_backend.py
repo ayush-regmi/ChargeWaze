@@ -11,6 +11,11 @@ Used by ``apps/web/playwright.config.ts``; you rarely run it by hand.
       signed ``VEHICLE_STATE`` webhook for it through the running API, so the
       Dashboard is fed by the real ingestor rather than rows written directly.
 
+  uv run python scripts/e2e_backend.py seed --stale-soc
+      The same, but the webhook keeps the fixture's fixed (2026-11-07)
+      timestamps instead of "now", so the battery reading is stale and
+      ``POST /routes/plan`` asks for a starting SoC (P4-F6).
+
 Settings come from the environment (the Playwright config sets them). The
 script refuses any ``DATABASE_URL`` that isn't on this machine or whose
 database name doesn't end in ``_e2e``, because ``seed`` deletes the E2E user's
@@ -85,7 +90,7 @@ def prepare() -> None:
     print(f"E2E database {url.database} is at head.")
 
 
-def seed(api_url: str) -> int:
+def seed(api_url: str, *, stale_soc: bool = False) -> int:
     engine = create_engine(_database_url())
     with Session(engine) as db, db.begin():
         db.execute(delete(Vehicle).where(Vehicle.user_id == E2E_USER_ID))
@@ -123,17 +128,16 @@ def seed(api_url: str) -> int:
         )
     engine.dispose()
 
-    return send_test_webhook.main(
-        [
-            "--url",
-            f"{api_url.rstrip('/')}/api/v1/webhooks/smartcar",
-            "--vehicle-id",
-            E2E_SMARTCAR_VEHICLE_ID,
-            "--user-id",
-            E2E_SMARTCAR_USER_ID,
-            "--now",
-        ]
-    )
+    args = [
+        "--url",
+        f"{api_url.rstrip('/')}/api/v1/webhooks/smartcar",
+        "--vehicle-id",
+        E2E_SMARTCAR_VEHICLE_ID,
+        "--user-id",
+        E2E_SMARTCAR_USER_ID,
+    ]
+    # Without --now the fixture's own timestamps (days old) are kept.
+    return send_test_webhook.main(args if stale_soc else [*args, "--now"])
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -142,12 +146,17 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("prepare", help="Create and migrate the E2E database")
     seed_p = sub.add_parser("seed", help="Reset the E2E user and send a signed webhook")
     seed_p.add_argument("--api-url", default="http://127.0.0.1:8765")
+    seed_p.add_argument(
+        "--stale-soc",
+        action="store_true",
+        help="Keep the webhook fixture's old timestamps, so the SoC reading is stale",
+    )
     args = parser.parse_args(argv)
 
     if args.cmd == "prepare":
         prepare()
         return 0
-    return seed(args.api_url)
+    return seed(args.api_url, stale_soc=args.stale_soc)
 
 
 if __name__ == "__main__":

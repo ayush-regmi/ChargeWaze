@@ -22,6 +22,16 @@ export type MapStation = {
   name?: string;
   /** From the stations API: true / false with a vehicle, null without one. */
   compatible?: boolean | null;
+  /** `stop`: a planned charging stop, drawn larger and in the route colour. */
+  kind?: "station" | "stop";
+  /** Short text drawn next to the marker (e.g. "16% → 61%" on a plan stop). */
+  label?: string;
+};
+
+/** A stretch of road drawn on top of the routes (e.g. a plan's limiting segment). */
+export type MapSegment = {
+  id: string;
+  coordinates: readonly MapPoint[];
 };
 
 export type MapViewProps = {
@@ -29,6 +39,13 @@ export type MapViewProps = {
   routes?: readonly MapRoute[];
   /** `index` of the highlighted route, or null for none. */
   selectedRouteIndex?: number | null;
+  /**
+   * How the selected route is styled: `infeasible` greys and dashes it, so a
+   * route the planner couldn't make work is never shown as a valid one.
+   */
+  selectedRouteTone?: "default" | "infeasible";
+  /** Highlighted stretches, drawn in red above the routes. */
+  segments?: readonly MapSegment[];
   /** Called when the user clicks a route line. */
   onSelectRoute?: (index: number) => void;
   /** Station markers. */

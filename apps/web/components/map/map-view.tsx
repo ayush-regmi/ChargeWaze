@@ -9,15 +9,20 @@ import { cn } from "@/lib/utils";
 import { decodePolyline, toLngLat, PolylineDecodeError } from "@/lib/polyline";
 
 import { mapboxPublicToken } from "./token";
-import type { MapPoint, MapRoute, MapStation, MapViewProps } from "./types";
+import type { MapPoint, MapRoute, MapSegment, MapStation, MapViewProps } from "./types";
 
 const STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const ROUTES_SOURCE = "cw-routes";
 const STATIONS_SOURCE = "cw-stations";
 const CENTER_SOURCE = "cw-center";
+const SEGMENTS_SOURCE = "cw-segments";
 const ROUTE_LAYER = "cw-route-lines";
 const ROUTE_SELECTED_LAYER = "cw-route-selected";
 const STATION_LAYER = "cw-stations";
+const STATION_LABEL_LAYER = "cw-station-labels";
+const SEGMENT_LAYER = "cw-segments";
+
+const SELECTED_ROUTE_COLOR = { default: "#2563eb", infeasible: "#9ca3af" } as const;
 
 type Feature = GeoJSON.Feature<GeoJSON.Geometry, Record<string, unknown>>;
 
@@ -59,8 +64,21 @@ export function stationFeatures(
       name: s.name ?? "",
       compat: s.compatible === true ? "yes" : s.compatible === false ? "no" : "unknown",
       selected: s.id === selectedStationId,
+      stop: s.kind === "stop",
+      label: s.label ?? "",
     },
   }));
+}
+
+/** Highlighted stretches as lines; one with fewer than two points is skipped. */
+export function segmentFeatures(segments: readonly MapSegment[]): Feature[] {
+  return segments
+    .filter((s) => s.coordinates.length >= 2)
+    .map((s) => ({
+      type: "Feature",
+      geometry: { type: "LineString", coordinates: s.coordinates.map((p) => [p.lon, p.lat]) },
+      properties: { id: s.id },
+    }));
 }
 
 function centerFeatures(center: MapPoint | null | undefined): Feature[] {
@@ -91,11 +109,15 @@ export function boundsOf(features: readonly Feature[]): [[number, number], [numb
 /**
  * The Mapbox GL map. Client-only: load it through `LazyMapView`, which adds
  * the missing-token panel and the error boundary. Draws routes (selected one
- * on top), station markers coloured by compatibility, and a centre marker.
+ * on top; greyed and dashed when its tone is `infeasible`), station markers
+ * coloured by compatibility (plan stops larger, in the route colour, with an
+ * optional text label), highlighted segments in red, and a centre marker.
  */
 export function MapView({
   routes = [],
   selectedRouteIndex = null,
+  selectedRouteTone = "default",
+  segments = [],
   onSelectRoute,
   stations = [],
   selectedStationId = null,
@@ -141,6 +163,7 @@ export function MapView({
       map.addSource(ROUTES_SOURCE, { type: "geojson", data: collection([]) });
       map.addSource(STATIONS_SOURCE, { type: "geojson", data: collection([]) });
       map.addSource(CENTER_SOURCE, { type: "geojson", data: collection([]) });
+      map.addSource(SEGMENTS_SOURCE, { type: "geojson", data: collection([]) });
       map.addLayer({
         id: ROUTE_LAYER,
         type: "line",
@@ -155,7 +178,14 @@ export function MapView({
         source: ROUTES_SOURCE,
         filter: ["get", "selected"],
         layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": "#2563eb", "line-width": 6 },
+        paint: { "line-color": SELECTED_ROUTE_COLOR.default, "line-width": 6 },
+      });
+      map.addLayer({
+        id: SEGMENT_LAYER,
+        type: "line",
+        source: SEGMENTS_SOURCE,
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#dc2626", "line-width": 7 },
       });
       map.addLayer({
         id: "cw-center",
@@ -173,19 +203,39 @@ export function MapView({
         type: "circle",
         source: STATIONS_SOURCE,
         paint: {
-          "circle-radius": ["case", ["get", "selected"], 9, 6],
+          "circle-radius": ["case", ["get", "selected"], 9, ["get", "stop"], 8, 6],
           "circle-color": [
-            "match",
-            ["get", "compat"],
-            "yes",
-            "#16a34a",
-            "no",
-            "#9ca3af",
-            "#0ea5e9",
+            "case",
+            ["get", "stop"],
+            SELECTED_ROUTE_COLOR.default,
+            [
+              "match",
+              ["get", "compat"],
+              "yes",
+              "#16a34a",
+              "no",
+              "#9ca3af",
+              "#0ea5e9",
+            ],
           ],
           "circle-stroke-color": ["case", ["get", "selected"], "#111827", "#ffffff"],
           "circle-stroke-width": ["case", ["get", "selected"], 3, 1.5],
         },
+      });
+
+      map.addLayer({
+        id: STATION_LABEL_LAYER,
+        type: "symbol",
+        source: STATIONS_SOURCE,
+        filter: ["!=", ["get", "label"], ""],
+        layout: {
+          "text-field": ["get", "label"],
+          "text-size": 12,
+          "text-offset": [0, 1.3],
+          "text-anchor": "top",
+          "text-allow-overlap": true,
+        },
+        paint: { "text-color": "#111827", "text-halo-color": "#ffffff", "text-halo-width": 1.5 },
       });
 
       map.on("click", STATION_LAYER, (e) => {
@@ -220,6 +270,7 @@ export function MapView({
     routes.map((r) => r.index + ":" + r.geometry_polyline6.length),
     stations.map((s) => s.id),
     center,
+    segments.map((s) => s.id),
   ]);
   const lastFitKey = useRef<string | null>(null);
 
@@ -229,20 +280,40 @@ export function MapView({
     const r = routeFeatures(routes, selectedRouteIndex);
     const s = stationFeatures(stations, selectedStationId);
     const c = centerFeatures(center);
+    const g = segmentFeatures(segments);
     (map.getSource(ROUTES_SOURCE) as mapboxgl.GeoJSONSource | undefined)?.setData(collection(r));
     (map.getSource(STATIONS_SOURCE) as mapboxgl.GeoJSONSource | undefined)?.setData(collection(s));
     (map.getSource(CENTER_SOURCE) as mapboxgl.GeoJSONSource | undefined)?.setData(collection(c));
+    (map.getSource(SEGMENTS_SOURCE) as mapboxgl.GeoJSONSource | undefined)?.setData(collection(g));
+    if (map.getLayer(ROUTE_SELECTED_LAYER)) {
+      map.setPaintProperty(ROUTE_SELECTED_LAYER, "line-color", SELECTED_ROUTE_COLOR[selectedRouteTone]);
+      map.setPaintProperty(
+        ROUTE_SELECTED_LAYER,
+        "line-dasharray",
+        selectedRouteTone === "infeasible" ? [1.5, 1.5] : [1, 0],
+      );
+    }
 
     if (lastFitKey.current !== fitKey) {
       lastFitKey.current = fitKey;
-      const bounds = boundsOf([...r, ...s, ...c]);
+      const bounds = boundsOf([...r, ...s, ...c, ...g]);
       if (bounds) {
         const [[x0, y0], [x1, y1]] = bounds;
         if (x0 === x1 && y0 === y1) map.easeTo({ center: [x0, y0], zoom: 12 });
         else map.fitBounds(bounds, { padding: 48, maxZoom: 14, duration: 0 });
       }
     }
-  }, [loaded, routes, selectedRouteIndex, stations, selectedStationId, center, fitKey]);
+  }, [
+    loaded,
+    routes,
+    selectedRouteIndex,
+    selectedRouteTone,
+    stations,
+    selectedStationId,
+    center,
+    segments,
+    fitKey,
+  ]);
 
   return (
     <div
