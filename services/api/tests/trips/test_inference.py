@@ -431,6 +431,71 @@ def test_soc_end_fallback_never_reuses_the_start_reading() -> None:
     assert leg.quality_reasons == ("soc_missing",)
 
 
+def test_two_legs_never_share_one_soc_window() -> None:
+    # PR #39 review (Codex P1): SoC only at min 0 (80 %) and min 50 (60 %). Before the
+    # fix both legs took 80 → 60 and reported 14.2 kWh each (28.4 against 14.2 measured).
+    rows = _series(
+        [(0, 100.0, 80.0, None), (10, 120.0, None, None), (40, 120.0, None, None),
+         (50, 140.0, 60.0, None), (80, 140.0, None, None)]
+    )  # fmt: skip
+    first, second = _infer(rows).legs
+    assert (first.end_time, second.start_time) == (
+        T0 + timedelta(minutes=10),
+        T0 + timedelta(minutes=40),
+    )
+    windows = [(leg.soc_start_recorded_at, leg.soc_end_recorded_at) for leg in (first, second)]
+    assert windows[0] != windows[1]
+    assert first.energy_kwh is None or second.energy_kwh is None
+    for leg in (first, second):
+        assert leg.energy_kwh is None
+        assert leg.quality_reasons[0] == "soc_missing"
+        assert leg.quality_flag == "low"
+    assert first.soc_start_percent == 80.0 and first.soc_end_percent is None
+    assert second.soc_start_percent is None and second.soc_end_percent == 60.0
+
+
+def test_soc_end_is_never_read_across_a_later_charging_session() -> None:
+    # Leg ends at min 10 with no SoC reading; the car then charges (min 12 to 30) and the next
+    # SoC reading (90 %, min 35) is after the charge. It must not be the leg's end SoC.
+    rows = _series(
+        [(0, 100.0, 80.0, 0.0), (10, 120.0, None, None), (12, None, None, 1.0),
+         (30, None, None, 0.0), (35, 120.0, 90.0, None)]
+    )  # fmt: skip
+    result = _infer(rows)
+    (leg,) = result.legs
+    assert len(result.charging_sessions) == 1
+    assert leg.closed
+    assert leg.soc_end_percent is None
+    assert leg.energy_kwh is None
+    assert leg.quality_reasons == ("soc_missing",)
+
+
+def test_soc_start_is_never_read_across_an_earlier_charging_session() -> None:
+    # The last SoC reading before the leg (40 %) predates a charge (min -60 to -10).
+    rows = _series(
+        [(-120, 100.0, 40.0, 0.0), (-60, None, None, 1.0), (-10, None, None, 0.0),
+         (0, 100.0, None, None), (10, 120.0, 85.0, None), (40, 120.0, 85.0, None)]
+    )  # fmt: skip
+    (leg,) = _infer(rows).legs
+    assert leg.soc_start_percent is None
+    assert leg.energy_kwh is None
+    assert "soc_missing" in leg.quality_reasons
+    assert "soc_increased" not in leg.quality_reasons
+
+
+def test_dropped_short_leg_still_bounds_its_neighbours() -> None:
+    # A 0.3 km parking move between two SoC readings is still driving.
+    rows = _series(
+        [(0, 100.0, 80.0, None), (10, 120.0, None, None), (40, 120.0, None, None),
+         (42, 120.3, None, None), (80, 120.3, 66.0, None)]
+    )  # fmt: skip
+    result = _infer(rows)
+    assert result.dropped_short_legs == 1
+    (leg,) = result.legs
+    assert leg.soc_end_percent is None
+    assert leg.energy_kwh is None
+
+
 def test_medium_needs_four_points_and_fresh_enough_readings() -> None:
     def leg_for(soc_end: float, soc_start_age: int) -> InferredLeg:
         rows = _series(
@@ -528,9 +593,25 @@ def test_generated_series_invariants(seed: int) -> None:
         assert leg.soc_start_percent is not None and leg.soc_end_percent is not None
         expected = round((leg.soc_start_percent - leg.soc_end_percent) / 100 * BZ_CAPACITY, 3)
         assert leg.energy_kwh == expected
-        # A leg with energy never overlaps a charging session (X2).
+        # A leg with energy never overlaps a charging session (X2), and nor does the
+        # window between its two SoC readings.
+        assert leg.soc_start_recorded_at is not None and leg.soc_end_recorded_at is not None
         for s in result.charging_sessions:
             assert not (s.start < leg.end_time and (s.end is None or s.end > leg.start_time))
+            assert not (
+                s.start < leg.soc_end_recorded_at
+                and (s.end is None or s.end > leg.soc_start_recorded_at)
+            )
+
+    # Legs with energy never share SoC: each one's window starts where the last ended.
+    windows = [
+        (leg.soc_start_recorded_at, leg.soc_end_recorded_at)
+        for leg in legs
+        if leg.energy_kwh is not None
+    ]
+    for (_, prev_end), (next_start, _) in itertools.pairwise(windows):
+        assert prev_end is not None and next_start is not None
+        assert prev_end <= next_start
 
     shuffled = readings[:]
     rng.shuffle(shuffled)

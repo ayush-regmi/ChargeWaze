@@ -325,16 +325,30 @@ def _finish_leg(
     regressions: Sequence[datetime],
     usable_capacity_kwh: float | None,
     settings: InferenceSettings,
+    *,
+    soc_not_before: datetime | None,
+    soc_not_after: datetime | None,
 ) -> InferredLeg:
-    """Step 7: SoC, energy and quality (D8)."""
+    """Step 7: SoC, energy and quality (D8).
+
+    ``soc_not_before`` / ``soc_not_after`` bound the SoC endpoints so the window
+    from the start reading to the end reading never reaches into another driving
+    leg or a charging session (the previous leg's end or last charge end; the next
+    leg's start or next charge start). A reading outside the bounds counts as
+    missing (``soc_missing``).
+    """
 
     reasons: set[QualityReason] = set()
 
     i_start = soc.latest_at_or_before(leg.start_time)
+    if i_start is not None and soc_not_before is not None and soc.times[i_start] < soc_not_before:
+        i_start = None
     i_end = soc.earliest_at_or_after(leg.end_time)
+    if i_end is not None and soc_not_after is not None and soc.times[i_end] > soc_not_after:
+        i_end = None
     if i_end is None:
-        # Nothing at or after the end yet: the latest reading inside the leg that is
-        # later than every reading before start_time_latest.
+        # Nothing usable at or after the end: the latest reading inside the leg that
+        # is later than every reading before start_time_latest.
         j = soc.latest_at_or_before(leg.end_time)
         if j is not None and soc.times[j] > leg.start_time_latest:
             i_end = j
@@ -441,11 +455,28 @@ def infer_legs(
 
     legs: list[InferredLeg] = []
     dropped_short = 0
-    for raw in _build_legs(pairs, intervals, split):
+    # Bounds come from every leg, short ones included: a parking move is still driving.
+    raw_legs = _build_legs(pairs, intervals, split)
+    for k, raw in enumerate(raw_legs):
         if round(raw.odometer_end_km - raw.odometer_start_km, 2) < settings.min_leg_km:
             dropped_short += 1
             continue
-        legs.append(_finish_leg(raw, soc, intervals, regressions, usable_capacity_kwh, settings))
+        lower = [raw_legs[k - 1].end_time] if k > 0 else []
+        lower += [s.end for s in intervals if s.end is not None and s.end <= raw.start_time]
+        upper = [raw_legs[k + 1].start_time] if k + 1 < len(raw_legs) else []
+        upper += [s.start for s in intervals if s.start >= raw.end_time]
+        legs.append(
+            _finish_leg(
+                raw,
+                soc,
+                intervals,
+                regressions,
+                usable_capacity_kwh,
+                settings,
+                soc_not_before=max(lower, default=None),
+                soc_not_after=min(upper, default=None),
+            )
+        )
 
     sessions = []
     for s in intervals:
