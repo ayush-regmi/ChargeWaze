@@ -379,6 +379,38 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
 
 **P6-F2 Demo mode + seed** · M · Depends: P5-F8 · Lane: — · Branch `feature/phase6-demo-mode`
 - Owns: `services/api/scripts/seed_demo.py` (db-design §5), a demo/live gate (`APP_PUBLIC_DEMO_MODE` + allowlist) in `modules/auth/`, a demo banner component, tests that no real row is returned in demo mode.
+- As built (2026-11-20):
+  - **⚠ Set `LIVE_ALLOWED_USER_IDS` on Render before this deploys.** It holds the owner's Supabase user ID; several IDs are comma-separated. With `APP_ENV=production` an empty list fails closed: every signed-in request gets `403 FORBIDDEN` (`LIVE_ACCESS_RESTRICTED`), the owner's included. `render.yaml` lists it as `sync: false`, and `deployment.md` §3, §8 and §13.1 say so.
+  - **Gate.** `app/modules/auth/access.py`, called by `get_current_user` once the token verifies, so every signed-in route is gated with no router changes. Webhooks and `/health` aren't gated. `get_current_user` now also depends on `get_settings` and `get_db`; the session is lazy and live mode never queries.
+    - **Live mode:** only `LIVE_ALLOWED_USER_IDS` (Supabase UUIDs; anything else fails settings validation). An empty list means open in development/test and nobody in production.
+    - **Demo mode:** first, any real vehicle in the database gives `503 DEMO_MODE_UNSAFE` on every request (one `EXISTS` on `vehicles`; telemetry, plans and legs all cascade from a vehicle). Then every non-GET is refused with `403 FORBIDDEN` (`DEMO_READ_ONLY`), except `POST /routes/plan`, `/routes/directions` and `/stations/along-route`.
+    - Settings refuse `APP_PUBLIC_DEMO_MODE=true` together with `SMARTCAR_CLIENT_SECRET` or `SMARTCAR_MANAGEMENT_TOKEN`.
+  - **Demo access: one shared, seeded account (D1).** `NEXT_PUBLIC_DEMO_MODE`, `NEXT_PUBLIC_DEMO_EMAIL` and `NEXT_PUBLIC_DEMO_PASSWORD` (public on purpose) show **Explore the demo** on the sign-in page (`components/demo/demo-sign-in.tsx`). `components/demo/demo-banner.tsx` sits in `app/(app)/layout.tsx`. In demo mode Analytics includes simulated data by default, and `simulated=0` leaves it out (`components/analytics/params.ts`).
+  - **Seed.** `scripts/seed_demo.py --user-id UUID --target HOST/DB [--now ISO]`. It reads the process environment only, never `services/api/.env`. It refuses (exit 2) without `APP_PUBLIC_DEMO_MODE=true`, with a `--target` that doesn't match the URL's host/database, or when any of `vehicles`, `vehicle_telemetry`, `planned_trips` or `observed_trips` holds an `is_simulated = false` row. Re-running replaces the account's data (and clears a tombstone) in one transaction. On a Supabase database it also installs `chargewise_demo_auth_guard`, a `BEFORE UPDATE` trigger on `auth.users` that refuses changes to the demo user's password, email and phone. It refuses to seed if `--user-id` isn't an auth user or the trigger can't be created. This is the fix for Codex's P1 on #73: Supabase's "Secure password change" only applies to sessions older than 24 hours, so any visitor could have changed the shared password. The SQL is tested against a stand-in `auth.users` table, not a real Supabase project. What it writes:
+    - A simulated 2026 Toyota bZ XLE AWD with catalog specs.
+    - About 28 days of `source = 'simulated'` odometer, SoC, range and charging readings (about 3,300 rows): weekday commutes, Wednesday errands, weekend drives and home L2 charging.
+    - A Frederick → Toronto road trip four days before `--now`. Its plan comes from the real `plan_trip()` over the recorded `fixtures/mapbox` and `fixtures/stations/afdc` files through `httpx.MockTransport` (no network), starting at 90 % and saved. The car then drives the plan, charging at its 3 stops, plus a day in Toronto and an unplanned drive home.
+    - `run_for_vehicle(full=True)` then builds about 62 legs (high, medium and low, the low ones needing review), matches the plan to its 4 legs (+7 kWh, −1.3 pts arrival in the local run), and writes the backtests.
+    - Values come from a fixed RNG seed, so the same `--now` gives the same rows. PRD §10 "Public demo data" is closed.
+  - **Tests.** `tests/demo/test_access.py` (16):
+    - Allowlist parsing, the Smartcar-secret validator, live open, fail-closed and allowlisted cases.
+    - Every mutating route in the OpenAPI document refused in demo mode except the three planning routes.
+    - **No real row returned:** with a real vehicle, telemetry and owner present, every read as either user is 503 and never contains the real ID.
+    - Every vehicle, plan, leg and backtest ID that the demo user's reads return is `is_simulated`.
+
+    `tests/demo/test_seed_demo.py` (10): only simulated rows; the plan matched through the real pipeline with all three quality flags; repeatable and replaces the account; refuses real data, live mode and a wrong `--target`; the auth guard refuses every credential column for the demo user but not sign-in updates or other users, and a `--user-id` missing from `auth.users` is refused. `apps/web/tests/demo-mode.test.tsx` (9): env flags, banner, demo sign-in success and failure, the analytics default both ways.
+  - **Approved Owns additions:** `app/modules/auth/access.py`; `get_current_user` in `auth/dependencies.py`; `services/api/tests/demo/`; `apps/web/components/demo/`, `app/(app)/layout.tsx`, `app/(auth)/sign-in/page.tsx`, `lib/env.ts`, `components/analytics/params.ts`, `tests/demo-mode.test.tsx`; `render.yaml`; `docs/deployment.md` §3, §8, §11 and new §13; `docs/api-contracts.md` §1 and §1.1; `docs/architecture.md` §7.2; `docs/product-requirements.md` §10. Two unavoidable lines outside the config block: the `uuid` and pydantic validator imports at the top of `config.py`.
+  - **Browser check (local, auth stub plus provider stub, demo API and web on 8865/3200).**
+    - Sign-in showed the demo card, and **Explore the demo** opened the Dashboard with the banner and the simulated bZ (stale-data warning, 62 %).
+    - Saved trips → Frederick → Toronto showed "Completed, 4 drives matched" with the planned vs actual table.
+    - Analytics opened with simulated data included and a working "Show real trips only" (`simulated=0`).
+    - Planning Frederick → Toronto asked for the stale starting SoC, then returned 4 stops; the new plan was stored `is_simulated = true`.
+    - Deleting the saved trip got a 403 from the API and the trip stayed. But the dialog shows the trips UI's generic "Couldn't delete the trip. Please try again." rather than the read-only message. Follow-up: map `FORBIDDEN`/`DEMO_READ_ONLY` to the API message in the web write actions (`components/*/actions.ts`; outside this feature's files).
+  - **Not done:** no Playwright spec for demo mode, because the harness runs one live-mode API and a demo spec needs E2E-harness lane changes.
+  - **Manual (you):**
+    1. Set `LIVE_ALLOWED_USER_IDS` on the production API.
+    2. For a public demo, follow `deployment.md` §13.2: a second Supabase project (sign-ups off, Secure email change on, a demo user); migrate and seed its database; a second Render service with `APP_PUBLIC_DEMO_MODE=true` and no Smartcar secrets; a second Vercel project with the three `NEXT_PUBLIC_DEMO_*` values.
+    3. Optionally re-run the seed daily.
 
 **P6-F3 Deployment** · M · Depends: P4-F9 · Lane: CI · Branch `feature/phase6-deploy`
 - Owns: deployment config files (Render/Fly, Vercel), a deploy workflow, `docs/deployment.md` (new). Manual: you create the accounts and secrets.

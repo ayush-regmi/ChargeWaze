@@ -6,10 +6,11 @@ and nothing in ``NEXT_PUBLIC_*`` is referenced here.
 
 from __future__ import annotations
 
+import uuid
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AppEnv = Literal["development", "preview", "production", "test"]
@@ -137,6 +138,46 @@ class Settings(BaseSettings):
     analytics_export_max_rows: int = Field(default=10000, ge=1)
 
     # ---- Demo mode (Phase 6 F2) ----
+    # APP_PUBLIC_DEMO_MODE (App block) turns a deployment into the public demo:
+    # simulated data only, read-only except trip planning, no Smartcar secrets
+    # (architecture.md §7.2, app/modules/auth/access.py).
+    # Live mode: Supabase user IDs (comma-separated UUIDs) allowed to use the
+    # API. Empty means no restriction in development/test, and nobody under
+    # APP_ENV=production (fails closed; set it before deploying).
+    live_allowed_user_ids: str = ""
+
+    @field_validator("live_allowed_user_ids")
+    @classmethod
+    def _check_live_allowed_user_ids(cls, value: str) -> str:
+        for item in value.split(","):
+            if item.strip():
+                try:
+                    uuid.UUID(item.strip())
+                except ValueError as exc:
+                    raise ValueError(
+                        "LIVE_ALLOWED_USER_IDS must be comma-separated Supabase user UUIDs."
+                    ) from exc
+        return value
+
+    @model_validator(mode="after")
+    def _demo_mode_loads_no_smartcar_secrets(self) -> Settings:
+        if self.app_public_demo_mode and (
+            self.smartcar_client_secret or self.smartcar_management_token
+        ):
+            raise ValueError(
+                "APP_PUBLIC_DEMO_MODE=true must run without SMARTCAR_CLIENT_SECRET and "
+                "SMARTCAR_MANAGEMENT_TOKEN, so no real telemetry can reach the demo database."
+            )
+        return self
+
+    @property
+    def live_allowlist(self) -> frozenset[uuid.UUID]:
+        """``LIVE_ALLOWED_USER_IDS`` parsed (validated above)."""
+        return frozenset(
+            uuid.UUID(item.strip())
+            for item in self.live_allowed_user_ids.split(",")
+            if item.strip()
+        )
 
     # ---- Privacy and retention (Phase 6 F5) ----
     # Version of the privacy notice the Profile page shows; acknowledging it

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 
 import { Logo } from "@/components/brand/logo";
+import { DemoBanner } from "@/components/demo/demo-banner";
 import { MobileNav, MobileNavLinks } from "@/components/nav/mobile-nav";
 import { SidebarNav, SidebarNavLinks } from "@/components/nav/sidebar-nav";
 import { TopBar } from "@/components/nav/top-bar";
@@ -27,6 +28,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
+        <DemoBanner />
         <main className="flex-1 px-4 pt-6 pb-28 md:px-10 md:pt-10 md:pb-16">{children}</main>
       </div>
       <Suspense fallback={<MobileNavLinks pathname={null} />}>
