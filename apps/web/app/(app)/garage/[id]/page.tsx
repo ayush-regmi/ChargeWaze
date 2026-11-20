@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
+import { RefreshButton } from "@/components/dashboard/refresh-button";
 import { DisconnectButton } from "@/components/garage/disconnect-button";
 import { FreshnessBadge } from "@/components/garage/freshness-badge";
 import { LocalTime } from "@/components/garage/local-time";
@@ -80,7 +81,12 @@ async function VehicleDetails({ params }: { params: Promise<{ id: string }> }) {
         ) : null}
       </div>
 
-      <FreshnessBadge vehicle={data} />
+      <div className="flex flex-wrap items-start gap-3">
+        <FreshnessBadge vehicle={data} />
+        {data.connection_status === "connected" && data.is_stale ? (
+          <RefreshButton vehicleId={data.id} />
+        ) : null}
+      </div>
 
       <div className="space-y-2">
         <h2 className="text-sm font-medium">Supported data</h2>

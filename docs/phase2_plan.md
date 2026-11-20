@@ -332,6 +332,11 @@ F4 and F5 don't touch the same files and could run in parallel once F3 lands; we
 - Found on the way: the Supabase dev database was one migration behind (no vehicle tables), which made Connect completion and webhooks fail with 500. Fixed with `alembic upgrade head`; the README now says to run it first.
 - 2 (cadence) still open.
 
+**Polling fallback (2026-11-19, [ADR 0010](adr/0010-on-demand-vehicle-refresh.md)):**
+- The webhook gap on 2026-11-18 showed that missed deliveries need a recovery path even before cadence is known. The bZ went silent for 29 h, but the cause was the API and tunnel being down, not the car.
+- Decided: a user-triggered, rate-limited `POST /vehicles/{id}/refresh`, offered on stale data.
+- Scheduled background polling is still part of step 2 and waits for the measured cadence.
+
 ---
 
 ## 5. Cross-cutting rules for every Phase 2 PR

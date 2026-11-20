@@ -147,6 +147,14 @@ Normalized internal representation (illustrative, not a Smartcar response):
 
 The UI always displays the reading's `recorded_at`. If it crosses the freshness threshold (initially 15 minutes, subject to Smartcar plan reality), the UI marks it stale and the Trip Planner asks the user to confirm starting SoC before computing a plan.
 
+**Filling webhook gaps ([ADR 0010](adr/0010-on-demand-vehicle-refresh.md)).** When webhooks were missed (API or tunnel down), the user can press "Refresh" on stale data.
+
+- `POST /api/v1/vehicles/{id}/refresh` makes one `GET /v3/vehicles/{id}/signals` call, rate-limited per vehicle (`vehicle_refreshes`).
+- The readings go through the same ingest code as the webhook (rules 3–6 above) and run the post-ingest hooks.
+- Dedup uses `poll:<recorded_at>` as the event ID, plus a cross-check against existing rows with the same `(vehicle, signal, recorded_at)` in both directions.
+- Reads (`GET .../state`) still never call Smartcar.
+- Scheduled polling is not built. It waits for the measured event cadence (phase2_plan.md F8 step 2).
+
 ## 6. Routing algorithm
 
 The MVP does not use machine learning. It uses a deterministic battery model plus a dynamic-programming search over charging stops along one road route. The full design, interfaces and hand-checked trips are in [`phase4_plan.md`](phase4_plan.md); the search is [ADR 0008](adr/0008-route-ordered-dp-charging-optimizer.md).

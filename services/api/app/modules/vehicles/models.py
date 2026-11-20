@@ -30,6 +30,7 @@ from app.db.types import JSON_TYPE, UUID_TYPE
 
 CONNECTION_STATUSES = ("connected", "disconnected", "pending")
 TELEMETRY_SOURCES = ("smartcar", "manual", "simulated")
+REFRESH_OUTCOMES = ("pending", "ok", "failed")
 
 
 class Vehicle(Base):
@@ -173,10 +174,52 @@ class VehicleTelemetry(Base):
     )
 
 
+class VehicleRefresh(Base):
+    """One on-demand Smartcar read (ADR 0010). The per-vehicle rate limit counts these.
+
+    Holds no Smartcar IDs or readings: the readings themselves go to
+    ``vehicle_telemetry``. Rows older than ``REFRESH_LOG_RETENTION`` are pruned
+    whenever a new attempt is recorded for the vehicle.
+    """
+
+    __tablename__ = "vehicle_refreshes"
+    __table_args__ = (
+        CheckConstraint(
+            "outcome IN ('pending', 'ok', 'failed')",
+            name="vehicle_refreshes_outcome_enum",
+        ),
+        CheckConstraint("inserted >= 0", name="vehicle_refreshes_inserted_nonnegative"),
+        Index(
+            "vehicle_refreshes_vehicle_requested_idx",
+            "vehicle_id",
+            text("requested_at DESC"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID_TYPE, primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    vehicle_id: Mapped[uuid.UUID] = mapped_column(
+        UUID_TYPE, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False
+    )
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    outcome: Mapped[str] = mapped_column(
+        Text, nullable=False, default="pending", server_default="pending"
+    )
+    # vehicle_telemetry rows this refresh added (0 when Smartcar had nothing new).
+    inserted: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    # Smartcar's HTTP status when the call failed with a response; NULL otherwise.
+    upstream_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
 __all__ = [
     "CONNECTION_STATUSES",
+    "REFRESH_OUTCOMES",
     "TELEMETRY_SOURCES",
     "Vehicle",
+    "VehicleRefresh",
     "VehicleSpecs",
     "VehicleTelemetry",
 ]

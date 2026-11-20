@@ -36,12 +36,15 @@ class ApiError(Exception):
         *,
         status_code: int = status.HTTP_400_BAD_REQUEST,
         details: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
         self.status_code = status_code
         self.details = details
+        # Extra response headers, e.g. ``Retry-After`` on a 429.
+        self.headers = headers
 
     def to_envelope(self) -> ErrorEnvelope:
         return ErrorEnvelope(
@@ -60,9 +63,11 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(ApiError)
     async def _handle_api_error(_: Request, exc: ApiError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status_code, content=_envelope(
-            exc.code, exc.message, exc.details
-        ))
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=_envelope(exc.code, exc.message, exc.details),
+            headers=exc.headers,
+        )
 
     @app.exception_handler(RequestValidationError)
     async def _handle_validation(_: Request, exc: RequestValidationError) -> JSONResponse:
