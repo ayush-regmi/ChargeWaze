@@ -189,6 +189,16 @@ describe("PlanPanel", () => {
     );
   });
 
+  it("says when the plan limit is hit and when to try again", async () => {
+    planActions.planTrip.mockResolvedValue({ kind: "plan", plan: feasible() });
+    render(<Harness initial={{ kind: "rate_limited", retryAfterSeconds: 95 }} />);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Too many trip plans in a short time. Try again in 2 minutes.");
+    expect(alert).not.toHaveTextContent("Couldn't plan this trip");
+    fireEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+    await screen.findByTestId("plan-result");
+  });
+
   it("re-plans with only the changed preferences and keeps an override", async () => {
     planActions.planTrip.mockResolvedValue({ kind: "plan", plan: infeasible() });
     render(<Harness initial={{ kind: "plan", plan: feasible() }} />);

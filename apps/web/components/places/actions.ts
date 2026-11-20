@@ -3,14 +3,22 @@
 import type { components } from "@chargewise/api-client";
 
 import { createApi } from "@/lib/api";
+import { retryAfterSeconds } from "@/lib/retry-after";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 
 export type PlaceSuggestion = components["schemas"]["PlaceSuggestionOut"];
 export type Place = components["schemas"]["PlaceOut"];
 
-export type PlaceErrorCode = "unauthenticated" | "invalid" | "not_found" | "unavailable";
-export type SuggestResult = { items: PlaceSuggestion[] } | { error: PlaceErrorCode };
-export type RetrieveResult = { place: Place } | { error: PlaceErrorCode };
+export type PlaceErrorCode =
+  | "unauthenticated"
+  | "invalid"
+  | "not_found"
+  | "rate_limited"
+  | "unavailable";
+/** A failure; `retryAfterSeconds` comes with `rate_limited` (api §2 `RATE_LIMITED`). */
+export type PlaceError = { error: PlaceErrorCode; retryAfterSeconds?: number | null };
+export type SuggestResult = { items: PlaceSuggestion[] } | PlaceError;
+export type RetrieveResult = { place: Place } | PlaceError;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -22,11 +30,15 @@ async function sessionApi() {
   return session ? createApi({ accessToken: session.access_token }) : null;
 }
 
-function errorFor(status: number): PlaceErrorCode {
-  if (status === 401) return "unauthenticated";
-  if (status === 404) return "not_found";
-  if (status === 422) return "invalid";
-  return "unavailable";
+function errorFor(status: number, body: unknown): PlaceError {
+  if (status === 401) return { error: "unauthenticated" };
+  if (status === 404) return { error: "not_found" };
+  if (status === 422) return { error: "invalid" };
+  const error = (body as { error?: { code?: unknown; details?: unknown } } | undefined)?.error;
+  if (error?.code === "RATE_LIMITED") {
+    return { error: "rate_limited", retryAfterSeconds: retryAfterSeconds(error.details) };
+  }
+  return { error: "unavailable" };
 }
 
 function validNear(near: { lat: number; lon: number } | null | undefined) {
@@ -57,7 +69,7 @@ export async function suggestPlaces(input: {
   if (!api) return { error: "unauthenticated" };
   try {
     const near = validNear(input.near) ? input.near! : null;
-    const { data, response } = await api.GET("/api/v1/places/suggest", {
+    const { data, error, response } = await api.GET("/api/v1/places/suggest", {
       params: {
         query: {
           q,
@@ -66,7 +78,7 @@ export async function suggestPlaces(input: {
         },
       },
     });
-    if (!data) return { error: errorFor(response.status) };
+    if (!data) return errorFor(response.status, error);
     return { items: data.items };
   } catch {
     return { error: "unavailable" };
@@ -84,10 +96,10 @@ export async function retrievePlace(input: {
   const api = await sessionApi();
   if (!api) return { error: "unauthenticated" };
   try {
-    const { data, response } = await api.GET("/api/v1/places/{place_id}", {
+    const { data, error, response } = await api.GET("/api/v1/places/{place_id}", {
       params: { path: { place_id: input.id }, query: { session_token: input.sessionToken } },
     });
-    if (!data) return { error: errorFor(response.status) };
+    if (!data) return errorFor(response.status, error);
     return { place: data };
   } catch {
     return { error: "unavailable" };

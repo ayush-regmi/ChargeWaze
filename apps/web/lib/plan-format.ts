@@ -13,6 +13,7 @@ import { formatSoc } from "@/components/trips/plan-payload";
 
 import { haversineKm, type Point } from "./geo-format";
 import { decodePolyline, PolylineDecodeError } from "./polyline";
+import { retryAfterSeconds } from "./retry-after";
 
 export type PlanResponse = components["schemas"]["PlanResponse"];
 export type PlanStop = components["schemas"]["PlanStopOut"];
@@ -49,6 +50,8 @@ export type PlanOutcome =
   | { kind: "specs_incomplete"; missing: string[] }
   | { kind: "route_unavailable"; routeCount: number | null }
   | { kind: "preferences_invalid"; fields: string[]; maxChargeSoc: number | null }
+  /** The per-user plan limit (§3.7 "Rate limit"); seconds until the next plan, if given. */
+  | { kind: "rate_limited"; retryAfterSeconds: number | null }
   | { kind: "error"; code: PlanErrorCode };
 
 const KNOWN_CODES = new Set<PlanErrorCode>([
@@ -88,6 +91,9 @@ export function planErrorOutcome(body: unknown, status: number): PlanOutcome {
   const code = typeof error?.code === "string" ? error.code : null;
   const details = record(error?.details);
 
+  if (code === "RATE_LIMITED") {
+    return { kind: "rate_limited", retryAfterSeconds: retryAfterSeconds(details) };
+  }
   if (code === "VALIDATION_ERROR" && details) {
     switch (details.reason) {
       case "STARTING_SOC_REQUIRED":

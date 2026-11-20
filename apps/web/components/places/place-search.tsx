@@ -4,12 +4,13 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/ui/field";
+import { tryAgainText } from "@/lib/retry-after";
 
 import {
   retrievePlace,
   suggestPlaces,
   type Place,
-  type PlaceErrorCode,
+  type PlaceError,
   type PlaceSuggestion,
 } from "./actions";
 
@@ -29,7 +30,10 @@ export function newSessionToken(): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
-function errorText(code: PlaceErrorCode): string {
+function errorText({ error: code, retryAfterSeconds }: PlaceError): string {
+  if (code === "rate_limited") {
+    return `Too many searches in a short time. ${tryAgainText(retryAfterSeconds)}`;
+  }
   if (code === "unauthenticated") return "Your session has ended. Sign in again to search.";
   if (code === "not_found") return "That place couldn't be found. Try another result.";
   return "Place search isn't available right now. Please try again.";
@@ -75,7 +79,7 @@ export function PlaceSearch({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<PlaceErrorCode | null>(null);
+  const [error, setError] = useState<PlaceError | null>(null);
   const [searched, setSearched] = useState(false);
 
   const sessionRef = useRef<string | null>(null);
@@ -101,7 +105,7 @@ export function PlaceSearch({
     setSearched(true);
     if ("error" in result) {
       setItems([]);
-      setError(result.error);
+      setError(result);
       setOpen(true);
       return;
     }
@@ -153,7 +157,7 @@ export function PlaceSearch({
     if (req !== requestRef.current) return;
     setLoading(false);
     if ("error" in result) {
-      setError(result.error);
+      setError(result);
       setOpen(true);
       return;
     }
