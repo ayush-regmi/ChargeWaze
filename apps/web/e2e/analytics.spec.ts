@@ -24,11 +24,9 @@ import {
  * - 10 days ago: 8 km on 2 SoC points (low quality, needs review);
  * - 3 days ago: 39 km on 10 SoC points, a reading every 10 minutes (high).
  *
- * The readings are days old when they arrive, one webhook each. The
- * per-webhook inference then closes the second drive after its first
- * reading (P5-F3 follow-up, see phase5_plan F6 "As built"), so the spec runs
- * the documented catch-up, `POST /observed-trips/recompute` with `full`,
- * as the API user before opening the page.
+ * The readings are days old when they arrive, one webhook each, after the
+ * seed's newer reading: the per-webhook inference must still build each
+ * drive whole (the P5-F3 backlog fix), with no `recompute` call.
  *
  * Since P5-F4 every finished leg with energy has a backtest, so the
  * consumption lines and the estimated-vs-observed scatter must draw (P5-F8).
@@ -72,14 +70,10 @@ test.beforeAll(async () => {
 
   const { items } = await apiAs("/api/v1/vehicles");
   const vehicleId: string = items[0].id;
-  // Background hooks may still be running; repeat the catch-up until both legs are right.
+  // The post-ingest hooks run after each response; wait until both legs are in.
   await expect
     .poll(
       async () => {
-        await apiAs("/api/v1/observed-trips/recompute", {
-          method: "POST",
-          body: JSON.stringify({ vehicle_id: vehicleId, full: true }),
-        });
         const trips = await apiAs(
           `/api/v1/analytics/trips?vehicle_id=${vehicleId}`,
         );

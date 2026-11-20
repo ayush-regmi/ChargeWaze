@@ -530,3 +530,104 @@ def test_late_drive_before_every_leg_is_created(
     assert later_again.id == later.id
     assert later_again.review_status == "confirmed"
     assert later_again.energy_kwh == later.energy_kwh
+
+
+def _leg_rows(db: Session, vehicle: Vehicle) -> list[tuple[object, ...]]:
+    return [
+        (*numbers, leg.start_time, leg.end_time, leg.soc_end_recorded_at, leg.closed)
+        for numbers, leg in zip(_numbers(db, vehicle), legs(db, vehicle), strict=True)
+    ]
+
+
+def test_late_reading_extends_a_leg_closed_by_a_newer_reading(
+    db: Session, add_vehicle: Callable[..., Vehicle]
+) -> None:
+    vehicle = add_vehicle()
+    # 08:00 → 08:10, then a reading two hours later (a newer reading that
+    # arrived first). The 10-minute pair and the 110-minute gap make two legs,
+    # and the first is closed only because of that gap.
+    add_readings(
+        db, vehicle, [(0, 1000.0, 80, False), (10, 1010.0, 76, None), (120, 1030.0, 66, None)]
+    )
+    run(db, vehicle, full=True)
+    first, _ = legs(db, vehicle)
+    assert (first.end_time, first.closed) == (T0 + timedelta(minutes=10), True)
+
+    # The 08:20 reading fills the gap: the drive went on to 1020 km.
+    add_readings(db, vehicle, [(20, 1020.0, 72, None)])
+    summary = run(db, vehicle, since=T0 + timedelta(minutes=20))
+
+    assert summary.window_start == T0  # back to the first leg's start
+    windowed = _leg_rows(db, vehicle)
+    assert [(row[0], row[1]) for row in windowed] == [
+        (Decimal("1000.00"), Decimal("1020.00")),
+        (Decimal("1020.00"), Decimal("1030.00")),
+    ]
+    assert run(db, vehicle, full=True).legs_updated == 0
+    assert _leg_rows(db, vehicle) == windowed
+
+
+def test_late_soc_reading_becomes_the_previous_legs_end_soc(
+    db: Session, add_vehicle: Callable[..., Vehicle]
+) -> None:
+    vehicle = add_vehicle()
+    # A: 08:00 → 08:10, closed by 30 min at rest; its end SoC is the 08:40
+    # reading. B: 08:40 → 09:40, a newer drive across a gap.
+    add_readings(
+        db,
+        vehicle,
+        [
+            (0, 1000.0, 80, False),
+            (10, 1010.0, None, None),
+            (40, 1010.0, 74, None),
+            (100, 1030.0, 66, None),
+        ],
+    )
+    run(db, vehicle, full=True)
+    a, _ = legs(db, vehicle)
+    assert a.soc_end_recorded_at == T0 + timedelta(minutes=40)
+
+    # A delayed 08:35 SoC reading: more than stop_split after A's end, so it
+    # can't extend A, but it is A's nearest SoC reading after the drive.
+    add_readings(db, vehicle, [(35, None, 75, None)])
+    summary = run(db, vehicle, since=T0 + timedelta(minutes=35))
+
+    assert summary.window_start == T0
+    a, _ = legs(db, vehicle)
+    assert (a.soc_end_percent, a.soc_end_recorded_at) == (
+        Decimal("75.00"),
+        T0 + timedelta(minutes=35),
+    )
+    windowed = _leg_rows(db, vehicle)
+    assert run(db, vehicle, full=True).legs_updated == 0
+    assert _leg_rows(db, vehicle) == windowed
+
+
+def test_hooks_running_behind_the_deliveries_still_build_the_whole_drive(
+    db: Session, add_vehicle: Callable[..., Vehicle]
+) -> None:
+    vehicle = add_vehicle()
+    # A newer reading arrived first: the car is charging at 10:00. Every leg
+    # before it is then closed at its last odometer reading.
+    add_readings(db, vehicle, [(120, None, 70, True)])
+    run(db, vehicle, since=T0 + timedelta(minutes=120))
+
+    # The 08:00 drive arrives one reading per webhook, and each hook runs
+    # after the next delivery is already stored (background tasks lag).
+    add_readings(db, vehicle, [(0, 1000.0, 80, False), (10, 1010.0, 76, False)])
+    run(db, vehicle, since=T0)
+    (leg,) = legs(db, vehicle)
+    assert (leg.odometer_end_km, leg.closed) == (Decimal("1010.00"), True)
+    add_readings(db, vehicle, [(20, 1020.0, 72, False)])
+    # The 08:10 hook: ``since`` is exactly the closed leg's end.
+    summary = run(db, vehicle, since=T0 + timedelta(minutes=10))
+    assert summary.window_start == T0
+    add_readings(db, vehicle, [(30, 1030.0, 68, False)])
+    run(db, vehicle, since=T0 + timedelta(minutes=20))
+    run(db, vehicle, since=T0 + timedelta(minutes=30))
+
+    (leg,) = legs(db, vehicle)
+    assert (leg.odometer_start_km, leg.odometer_end_km) == (Decimal("1000.00"), Decimal("1030.00"))
+    windowed = _leg_rows(db, vehicle)
+    assert run(db, vehicle, full=True).legs_updated == 0
+    assert _leg_rows(db, vehicle) == windowed
