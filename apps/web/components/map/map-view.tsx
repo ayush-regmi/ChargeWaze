@@ -2,6 +2,7 @@
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
+import type * as GeoJSON from "geojson";
 import mapboxgl from "mapbox-gl";
 import { useEffect, useRef, useState } from "react";
 
