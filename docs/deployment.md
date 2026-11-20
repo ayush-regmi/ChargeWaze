@@ -287,7 +287,8 @@ In demo mode the API:
 Setup, all by hand:
 
 1. **Database and Auth.** Create a second Supabase project for the demo, as in §2. Never use the production one. Then:
-   - Under Authentication → Providers → Email, turn off **Allow new users to sign up** and turn on **Secure password change**, so a visitor can't change the shared account's password.
+   - Under Authentication → Providers → Email, turn off **Allow new users to sign up**, and keep **Secure email change** on.
+   - "Secure password change" alone does **not** protect the shared account. Supabase lets a session created in the last 24 hours change its password without reauthentication, and every visitor's session is new. The seed (step 3) locks the account instead.
    - Create the demo user under Authentication → Users → **Add user**. Use an address on a domain you don't use for anything else, and a throwaway password. Note its **User UID**.
 2. **Migrate** the demo database, from `services/api/` with the URL set explicitly:
 
@@ -300,6 +301,14 @@ Setup, all by hand:
    ```bash
    APP_PUBLIC_DEMO_MODE=true DATABASE_URL='<demo session-pooler URL>' uv run python scripts/seed_demo.py --user-id <demo User UID> --target aws-0-<region>.pooler.supabase.com/postgres
    ```
+
+   On a Supabase database the seed also installs `chargewise_demo_auth_guard`, a `BEFORE UPDATE` trigger on `auth.users` (function `public.chargewise_demo_auth_guard`). It refuses any change to the demo user's password, email or phone, so a visitor holding the shared credentials can't lock everyone else out: Supabase answers their `updateUser` with an error. The seed refuses to write anything if `--user-id` isn't an auth user or the trigger can't be created. Its output says "Auth guard installed on auth.users". To rotate the demo password yourself:
+
+   ```sql
+   DROP TRIGGER chargewise_demo_auth_guard ON auth.users;
+   ```
+
+   Then change the password in the dashboard and run the seed again, which re-creates the trigger. What the guard doesn't stop: a visitor can sign the shared account out everywhere (other visitors just click **Explore the demo** again) or enroll an MFA factor (sign-in still gives the AAL1 session the app uses).
 
    Re-running replaces the demo account's data with a fresh four weeks ending now. Run it daily if you want the demo to keep looking recent; scheduling it is up to you. The car's last reading goes stale 15 minutes after a seed, so the planner asks for a starting SoC. That's expected.
 4. **API.** Create a second Render web service from the same repository (Docker, `services/api/Dockerfile`), or a copy of the Blueprint with a different `name`. Set:

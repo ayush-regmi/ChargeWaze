@@ -29,6 +29,17 @@ be mixed into a database with real data (architecture.md §7.2):
 2. ``--target`` equals the database URL's ``host/database``.
 3. No row in ``vehicles``, ``vehicle_telemetry``, ``planned_trips`` or
    ``observed_trips`` has ``is_simulated = false``.
+4. On a Supabase database (one with ``auth.users``): ``--user-id`` is an
+   auth user, and the auth guard below can be installed.
+
+**Auth guard.** The demo account's password is public, and Supabase lets a
+session created in the last 24 hours change the password (or start an email
+change) without reauthentication, even with "Secure password change" on. A
+visitor could lock every later visitor out. So on a Supabase database the seed
+installs ``chargewise_demo_auth_guard``, a ``BEFORE UPDATE`` trigger on
+``auth.users`` that refuses any change to the demo user's password, email or
+phone (deployment.md §13.2). A plain Postgres database has no ``auth`` schema,
+and there the step is skipped.
 """
 
 from __future__ import annotations
@@ -51,6 +62,7 @@ from zoneinfo import ZoneInfo
 import httpx
 from sqlalchemy import create_engine, delete, make_url, text, update
 from sqlalchemy.engine import URL
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 API_ROOT = Path(__file__).resolve().parents[1]
@@ -124,6 +136,7 @@ class SeedSummary:
     telemetry_rows: int
     legs_created: int
     plans_matched: int
+    auth_guard: bool  # False on a database without Supabase's auth schema
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +164,72 @@ def check_no_real_data(db: Session) -> None:
             "This database has real (is_simulated = false) vehicles, telemetry or trips. "
             "Demo data never goes into a database with real data."
         )
+
+
+# ---------------------------------------------------------------------------
+# Auth guard (Supabase only)
+# ---------------------------------------------------------------------------
+
+AUTH_GUARD = "chargewise_demo_auth_guard"
+# The demo user's ID is a validated ``uuid.UUID``, so formatting it into the
+# function body is safe. ``set search_path = ''`` and ``security definer``
+# follow Supabase's documented pattern for triggers on ``auth.users``.
+_AUTH_GUARD_FUNCTION = """
+CREATE OR REPLACE FUNCTION public.{name}() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $guard$
+BEGIN
+  IF OLD.id = '{user_id}'::uuid AND (
+       NEW.encrypted_password IS DISTINCT FROM OLD.encrypted_password
+    OR NEW.email IS DISTINCT FROM OLD.email
+    OR NEW.email_change IS DISTINCT FROM OLD.email_change
+    OR NEW.phone IS DISTINCT FROM OLD.phone
+    OR NEW.phone_change IS DISTINCT FROM OLD.phone_change
+  ) THEN
+    RAISE EXCEPTION 'The Chargewise demo account''s sign-in details are locked.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN NEW;
+END
+$guard$
+"""
+
+
+def has_supabase_auth(db: Session) -> bool:
+    return db.execute(text("SELECT to_regclass('auth.users') IS NOT NULL")).scalar_one()
+
+
+def install_auth_guard(db: Session, user_id: uuid.UUID) -> bool:
+    """Lock the demo user's credentials in Supabase Auth; ``False`` without ``auth.users``.
+
+    Refuses if ``user_id`` isn't an auth user (a typo would otherwise seed an
+    account nobody can sign in to) or if the trigger can't be created, so a
+    public demo is never left with changeable shared credentials.
+    """
+
+    if not has_supabase_auth(db):
+        return False
+    exists = db.execute(
+        text("SELECT EXISTS (SELECT 1 FROM auth.users WHERE id = :id)"), {"id": user_id}
+    ).scalar_one()
+    if not exists:
+        raise SeedRefused(f"--user-id {user_id} is not a user in this project's Supabase Auth.")
+    try:
+        db.execute(
+            text(_AUTH_GUARD_FUNCTION.format(name=AUTH_GUARD, user_id=uuid.UUID(str(user_id))))
+        )
+        db.execute(text(f"DROP TRIGGER IF EXISTS {AUTH_GUARD} ON auth.users"))
+        db.execute(
+            text(
+                f"CREATE TRIGGER {AUTH_GUARD} BEFORE UPDATE ON auth.users "
+                f"FOR EACH ROW EXECUTE FUNCTION public.{AUTH_GUARD}()"
+            )
+        )
+    except DBAPIError as exc:
+        raise SeedRefused(
+            f"Couldn't install the auth guard on auth.users ({exc.orig.__class__.__name__}). "
+            "The demo account's password must not be changeable; see deployment.md §13.2."
+        ) from exc
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -410,6 +489,7 @@ def seed(
         if not path.is_file():
             raise SeedRefused(f"Missing fixture {path}; run from a full repository checkout.")
 
+    auth_guard = install_auth_guard(db, user_id)
     _reset_account(db, user_id)
     today = current.astimezone(HOME_TZ).date()
     first_day = today - timedelta(days=HISTORY_DAYS - 1)
@@ -523,6 +603,7 @@ def seed(
         telemetry_rows=written,
         legs_created=summary.legs_created,
         plans_matched=summary.plans_matched,
+        auth_guard=auth_guard,
     )
 
 
@@ -572,6 +653,12 @@ def main(
         f"Seeded demo user {summary.user_id}: vehicle {summary.vehicle_id}, "
         f"{summary.telemetry_rows} telemetry rows, {summary.legs_created} observed legs, "
         f"road-trip plan {summary.trip_id} ({summary.plans_matched} matched)."
+    )
+    print(
+        "Auth guard installed on auth.users: the demo account's password, email and "
+        "phone can't be changed."
+        if summary.auth_guard
+        else "No auth.users table (not a Supabase database): auth guard not installed."
     )
     return 0
 

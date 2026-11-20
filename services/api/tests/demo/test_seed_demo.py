@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 from sqlalchemy import make_url, select, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.modules.trips.models import PlannedTrip
@@ -166,3 +167,84 @@ def test_cli_refuses_before_connecting(capsys: pytest.CaptureFixture[str]) -> No
     )
     assert seed_demo.main(args, settings_factory=lambda: demo) == 2
     assert "--target" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# Auth guard: the shared demo password can't be changed (Codex review, PR #73)
+# ---------------------------------------------------------------------------
+
+OTHER_AUTH_USER = "5e7a0000-0000-4000-8000-000000000003"
+
+
+def _fake_supabase_auth(db: Session, *user_ids: str) -> None:
+    """The ``auth.users`` columns the guard reads, inside the test's rolled-back transaction."""
+
+    db.execute(text("CREATE SCHEMA auth"))
+    db.execute(
+        text(
+            "CREATE TABLE auth.users (id uuid PRIMARY KEY, email text, encrypted_password text,"
+            " email_change text DEFAULT '', phone text, phone_change text DEFAULT '',"
+            " last_sign_in_at timestamptz)"
+        )
+    )
+    for user_id in user_ids:
+        db.execute(
+            text(
+                "INSERT INTO auth.users (id, email, encrypted_password)"
+                " VALUES (CAST(:id AS uuid), :email, 'bcrypt-hash')"
+            ),
+            {"id": user_id, "email": f"{user_id}@example.test"},
+        )
+
+
+def _update_fails(db: Session, statement: str, **params: Any) -> bool:
+    savepoint = db.begin_nested()
+    try:
+        db.execute(text(statement), params)
+    except DBAPIError as exc:
+        savepoint.rollback()
+        assert "sign-in details are locked" in str(exc)
+        return True
+    savepoint.rollback()
+    return False
+
+
+def test_no_auth_schema_means_no_guard(db_session: Session) -> None:
+    assert _seed(db_session).auth_guard is False
+
+
+def test_seed_locks_the_demo_users_credentials(db_session: Session) -> None:
+    _fake_supabase_auth(db_session, str(DEMO_USER_ID), OTHER_AUTH_USER)
+    assert _seed(db_session).auth_guard is True
+
+    demo = {"id": str(DEMO_USER_ID)}
+    for column, value in [
+        ("encrypted_password", "visitor-chosen-hash"),
+        ("email", "visitor@example.test"),
+        ("email_change", "visitor@example.test"),
+        ("phone", "+15550100"),
+        ("phone_change", "+15550100"),
+    ]:
+        assert _update_fails(
+            db_session, f"UPDATE auth.users SET {column} = :v WHERE id = :id", v=value, **demo
+        ), column
+
+    # Sign-ins still record themselves, and other users are untouched.
+    assert not _update_fails(
+        db_session, "UPDATE auth.users SET last_sign_in_at = now() WHERE id = :id", **demo
+    )
+    assert not _update_fails(
+        db_session,
+        "UPDATE auth.users SET encrypted_password = 'new' WHERE id = :id",
+        id=OTHER_AUTH_USER,
+    )
+
+    # A re-run replaces the trigger rather than failing on it.
+    assert _seed(db_session).auth_guard is True
+
+
+def test_seed_refuses_a_user_id_missing_from_supabase_auth(db_session: Session) -> None:
+    _fake_supabase_auth(db_session, OTHER_AUTH_USER)
+    with pytest.raises(seed_demo.SeedRefused, match="not a user in this project's Supabase Auth"):
+        _seed(db_session)
+    assert db_session.get(Profile, DEMO_USER_ID) is None
