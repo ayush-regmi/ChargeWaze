@@ -13,6 +13,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+import httpx
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -47,17 +48,29 @@ def run(
     retention: ModuleType,
     db: Session,
     settings: Settings,
-    smartcar_client: SmartcarClient,
-    supabase_client: SupabaseAdminClient,
+    smartcar: FakeSmartcar,
+    supabase: FakeSupabase,
 ) -> Callable[..., dict[str, int]]:
-    def _run(*, dry_run: bool = False, **kwargs: Any) -> dict[str, int]:
+    # The script closes its clients after each run, so each run gets new ones
+    # over the same fakes.
+    def smartcar_factory() -> SmartcarClient:
+        return SmartcarClient.from_settings(
+            settings, transport=httpx.MockTransport(smartcar.handler)
+        )
+
+    def supabase_factory() -> SupabaseAdminClient:
+        return SupabaseAdminClient.from_settings(
+            settings, transport=httpx.MockTransport(supabase.handler)
+        )
+
+    def _run(*, dry_run: bool = False, now: datetime = NOW, **kwargs: Any) -> dict[str, int]:
         result: dict[str, int] = retention.run(
             db,
             settings=settings,
-            now=NOW,
+            now=now,
             dry_run=dry_run,
-            smartcar_factory=lambda: smartcar_client,
-            supabase_factory=lambda: supabase_client,
+            smartcar_factory=smartcar_factory,
+            supabase_factory=supabase_factory,
             **kwargs,
         )
         db.expire_all()
@@ -311,6 +324,53 @@ def test_failed_auth_deletion_keeps_the_tombstone_however_old(
     row = _row(db, user_id)
     assert row is not None
     assert row.auth_user_deleted_at is None
+
+
+def test_a_late_auth_deletion_keeps_the_tombstone_for_a_full_window(
+    run: Callable[..., dict[str, int]], db: Session, supabase: FakeSupabase
+) -> None:
+    """Regression (PR #69 review): age counts from the auth-user deletion.
+
+    The auth deletion failed for longer than the tombstone window, so the
+    user could keep refreshing tokens. The run that finally deletes the auth
+    user must keep the tombstone: a token issued just before is still valid.
+    """
+
+    supabase.status = 503
+    user_id = _tombstone(db, age_days=30, auth_deleted=False)
+    run(now=NOW - timedelta(days=1))
+    row = _row(db, user_id)
+    assert row is not None and row.auth_user_deleted_at is None
+
+    supabase.status = 200
+    counts = run()
+    assert counts["auth_users_deleted"] == 1
+    assert counts["tombstones_removed"] == 0
+    row = _row(db, user_id)
+    assert row is not None and row.auth_user_deleted_at == NOW
+
+    # Still inside the window: kept.
+    assert run(now=NOW + timedelta(days=6))["tombstones_removed"] == 0
+    assert _row(db, user_id) is not None
+    # One window after the auth deletion: removed.
+    assert run(now=NOW + timedelta(days=7, minutes=1))["tombstones_removed"] == 1
+    assert _row(db, user_id) is None
+
+
+def test_tombstone_age_ignores_the_request_time(
+    run: Callable[..., dict[str, int]], db: Session
+) -> None:
+    user_id = uuid.uuid4()
+    db.add(
+        AccountDeletion(
+            user_id=user_id,
+            requested_at=NOW - timedelta(days=60),
+            auth_user_deleted_at=NOW - timedelta(days=3),
+        )
+    )
+    db.commit()
+    assert run()["tombstones_removed"] == 0
+    assert _row(db, user_id) is not None
 
 
 def test_finished_tombstones_are_removed_only_after_the_window(

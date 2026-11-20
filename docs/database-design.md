@@ -500,7 +500,7 @@ What it is for:
 
 - **No resurrection.** `get_or_create_profile` refuses a user with a row here (`401`), so a Supabase access token that is still valid can't lazily recreate the profile through `/me`, Connect, the planner or favorites.
 - **Owed work.** The retention job retries the revocations (until `PRIVACY_REVOCATION_GIVE_UP_DAYS`, 30) and the auth-user deletion (until it succeeds).
-- **Removal.** The job deletes the row once nothing is owed and it is older than `PRIVACY_TOMBSTONE_DAYS` (7). That must stay longer than the Supabase JWT expiry.
+- **Removal.** The job deletes the row once nothing is owed and `auth_user_deleted_at` is older than `PRIVACY_TOMBSTONE_DAYS` (7), which must stay longer than the Supabase JWT expiry. The age counts from the auth-user deletion, not from `requested_at`: until then the user can still refresh tokens, so a token issued just before the deletion stays valid for one more token lifetime.
 
 RLS enabled with no policies.
 

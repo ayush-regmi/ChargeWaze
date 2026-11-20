@@ -10,7 +10,9 @@ Deletes, in short transactions:
 Then works through the account-deletion backlog: retries Smartcar
 revocations (until PRIVACY_REVOCATION_GIVE_UP_DAYS) and Supabase auth-user
 deletions that failed during ``DELETE /me``, and removes tombstones with
-nothing owed that are older than PRIVACY_TOMBSTONE_DAYS (7).
+nothing owed whose auth user was deleted more than PRIVACY_TOMBSTONE_DAYS (7)
+ago (counted from the auth-user deletion, so a token issued just before it has
+expired by then).
 
 Prints one line of counts; no IDs. Exit code 0, or 1 if deletion work is
 still owed after the run (so a scheduler can alert on it).

@@ -2,6 +2,9 @@
 
 Deletion (``DELETE /api/v1/me``, api §3.1b) runs in one transaction:
 
+0. Take the per-account advisory lock (``lock_account``), which Connect
+   completion also takes, so no vehicle can be stored meanwhile without
+   being revoked here.
 1. Insert the ``account_deletions`` tombstone. From then on
    ``get_or_create_profile`` refuses this user, so an access token that is
    still valid can't lazily recreate the profile (``/me``, Connect, the
@@ -15,8 +18,11 @@ Deletion (``DELETE /api/v1/me``, api §3.1b) runs in one transaction:
    API isn't configured, it stays owed on the tombstone.
 
 ``scripts/retention.py`` retries owed work (``process_deletion_backlog``) and
-removes a tombstone once nothing is owed and it is older than the longest
-access-token lifetime.
+removes a tombstone once nothing is owed and the auth user has been gone for
+longer than the longest access-token lifetime. The age counts from
+``auth_user_deleted_at``, not from the request: until Supabase confirms the
+deletion the user can keep refreshing tokens, so a token issued just before
+it is valid for one more token lifetime.
 
 Logging rule (arch §9): counts and outcomes only, never user or Smartcar IDs.
 """
@@ -36,7 +42,7 @@ from app.integrations.smartcar.client import SmartcarClient
 from app.integrations.supabase.admin import AuthUserDeletion, SupabaseAdminClient
 from app.modules.users.models import Profile
 from app.modules.users.privacy_models import AccountDeletion, ConsentRecord
-from app.modules.users.service import get_or_create_profile
+from app.modules.users.service import get_or_create_profile, lock_account
 from app.modules.vehicles.account_deletion import (
     lock_and_revoke_user_vehicles,
     retry_revocations,
@@ -76,6 +82,9 @@ def delete_account(
     """
 
     current = now or datetime.now(UTC)
+    # Before reading anything: Connect takes the same lock, so its vehicles
+    # are either committed (and revoked below) or it waits for the tombstone.
+    lock_account(db, user_id=user_id)
     db.execute(
         pg_insert(AccountDeletion)
         .values(user_id=user_id, requested_at=current)
@@ -147,6 +156,9 @@ def process_deletion_backlog(
 ) -> DeletionBacklogSummary:
     """Retry owed revocations and auth-user deletions; remove finished tombstones.
 
+    A tombstone is removed once no revocation is owed and the auth user was
+    deleted more than ``tombstone_days`` ago (never on the run that deletes it).
+
     Flushes; the caller commits. Rows another run holds are skipped
     (``SKIP LOCKED``), so two overlapping runs never call Smartcar twice.
     """
@@ -190,8 +202,14 @@ def process_deletion_backlog(
             row.attempts += 1
             row.last_attempt_at = now
 
-        finished = not pending and row.auth_user_deleted_at is not None
-        if finished and row.requested_at < now - timedelta(days=tombstone_days):
+        # Age from the auth-user deletion: a token issued just before it
+        # stays valid for one token lifetime, and the tombstone must outlive it.
+        auth_gone_at = row.auth_user_deleted_at
+        if (
+            not pending
+            and auth_gone_at is not None
+            and auth_gone_at < now - timedelta(days=tombstone_days)
+        ):
             db.delete(row)
             summary.tombstones_removed += 1
     db.flush()

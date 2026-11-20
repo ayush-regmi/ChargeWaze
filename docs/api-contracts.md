@@ -155,6 +155,7 @@ Deletes the caller's account (PRD §4.6, P6-F5). No body. **Response 204**, empt
 
 In one transaction, the server:
 
+0. Takes a per-account advisory lock that Connect completion (`POST /vehicles/connect/complete`, §3.3.1) also takes before reading anything. So a Connect that finishes first has its vehicles revoked and deleted here, and a Connect that finishes after sees the tombstone, revokes the connections it just authorized (best effort) and stores nothing (its result is `error`).
 1. Records a deletion tombstone ([`database-design.md`](database-design.md) §3.12). From then on, any endpoint that would create the profile answers `401 UNAUTHENTICATED` ("This account has been deleted."), so an access token that hasn't expired can't bring the account back. Read endpoints that never create a profile return empty results.
 2. Locks the caller's vehicles (the lock the webhook ingestor and refresh take) and revokes each Smartcar connection (`DELETE /v3/connections/{id}`), including revocations still owed from an earlier disconnect. A `404` from Smartcar counts as revoked.
 3. Deletes the profile. Every user-owned table cascades from it in the database: preferences, consent records, favorites, vehicles with their specs (incl. the per-vehicle baseline), telemetry and refresh log, planned trips and stops, observed trips and prediction results (db-design §6). The global `charging_stations` cache is kept.

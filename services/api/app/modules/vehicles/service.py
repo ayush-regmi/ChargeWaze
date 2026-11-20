@@ -36,7 +36,7 @@ from app.integrations.smartcar.schemas import (
     normalize_signals,
     supported_signal_codes,
 )
-from app.modules.users.service import get_or_create_profile
+from app.modules.users.service import get_or_create_profile, is_account_deleted, lock_account
 from app.modules.vehicles.models import Vehicle, VehicleSpecs
 from app.modules.vehicles.spec_catalog import lookup_spec
 
@@ -67,6 +67,10 @@ def complete_connect(
     """
 
     connected_at = now or datetime.now(UTC)
+    # Same lock as account deletion (P6-F5), taken before reading anything:
+    # a deletion either finishes first (and we see its tombstone below) or
+    # waits and then revokes the vehicles stored here.
+    lock_account(db, user_id=user_id)
     connections = smartcar.list_connections(sc_user_id)
     expected_external_id = str(user_id)
     accepted = [
@@ -83,6 +87,16 @@ def complete_connect(
         )
     if not accepted:
         return ConnectResult(outcome="error")
+
+    if is_account_deleted(db, user_id=user_id):
+        # The account was deleted while Connect was open. Don't leave the
+        # authorization it just created active on Smartcar's side.
+        _revoke_deleted_account(db, smartcar, accepted)
+        raise ApiError(
+            "UNAUTHENTICATED",
+            "This account has been deleted.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
 
     get_or_create_profile(db, user_id=user_id)
     results = tuple(
@@ -190,6 +204,18 @@ def _revoke_rejected(db: Session, smartcar: SmartcarClient, rejected: list[Conne
     revocations = [_revoke_connection(db, smartcar, c.connection_id) for c in rejected]
     logger.info(
         "smartcar_connect_owned_elsewhere_revoked",
+        extra={"counts": {r: revocations.count(r) for r in set(revocations)}},
+    )
+
+
+def _revoke_deleted_account(
+    db: Session, smartcar: SmartcarClient, accepted: list[Connection]
+) -> None:
+    """Best-effort revoke of a deleted account's fresh connections. Never raises."""
+
+    revocations = [_revoke_connection(db, smartcar, c.connection_id) for c in accepted]
+    logger.warning(
+        "smartcar_connect_account_deleted",
         extra={"counts": {r: revocations.count(r) for r in set(revocations)}},
     )
 

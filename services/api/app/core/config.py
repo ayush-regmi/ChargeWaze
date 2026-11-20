@@ -149,8 +149,9 @@ class Settings(BaseSettings):
     privacy_telemetry_retention_days: int = Field(default=730, ge=30)
     # vehicle_refreshes rows older than this (matches the on-write prune).
     privacy_refresh_log_days: int = Field(default=30, ge=1)
-    # account_deletions rows are kept at least this long, and longer while work
-    # is owed. Must exceed the Supabase access-token lifetime (JWT expiry).
+    # account_deletions rows are kept this long after the Supabase auth user is
+    # deleted, and while any work is owed. Must exceed the access-token
+    # lifetime (Supabase JWT expiry).
     privacy_tombstone_days: int = Field(default=7, ge=1)
     # Stop retrying a Smartcar revocation this long after the deletion.
     privacy_revocation_give_up_days: int = Field(default=30, ge=1)
