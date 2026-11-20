@@ -9,6 +9,7 @@ How Chargewise runs in production, and the one-time setup the project lead does 
 | Database + Auth | Supabase (separate production project) | Alembic migrations in `services/api/alembic/` |
 | Errors | Sentry (two projects, from P6-F1) | `app/core/observability.py`, `apps/web/sentry.*.config.ts` |
 | Pipeline | GitHub Actions | [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml), `docker-build` job in [`ci.yml`](../.github/workflows/ci.yml) |
+| Monitoring | JSON logs, `GET /metrics`, smoke workflow (from P6-F4) | `app/core/monitoring.py`, [`.github/workflows/smoke.yml`](../.github/workflows/smoke.yml) (§12) |
 
 **Scope:** production only. The preview/staging environment in architecture §7.1 is deferred (no second Supabase project yet, and Render preview environments are a paid feature). Vercel's Git deployments, including PR previews, are switched off in `apps/web/vercel.json`.
 
@@ -63,6 +64,7 @@ Row level security is turned on by the migrations themselves (guidelines → Sec
    | `MAPBOX_SECRET_TOKEN` | Mapbox secret token (server side only) |
    | `AFDC_API_KEY` | NLR developer key |
    | `SENTRY_DSN_BACKEND` | DSN of the Sentry **backend** project (§7). Leave empty to keep Sentry off. |
+   | `MONITORING_METRICS_TOKEN` | A random string (`openssl rand -hex 32`) that guards `GET /metrics` (§12). Same value as the GitHub secret. Leave empty to hide the endpoint. |
 
    The Blueprint sets `APP_ENV=production`, `APP_PUBLIC_DEMO_MODE=false`, `SMARTCAR_MODE=live` and `SUPABASE_JWT_AUDIENCE=authenticated`. It also generates random values for `SMARTCAR_STATE_SECRET` and `STATIONS_CURSOR_SECRET`. Every other setting uses its default from `app/core/config.py`. `SMARTCAR_REFRESH_MIN_INTERVAL_MINUTES` (15) and `SMARTCAR_REFRESH_MAX_PER_DAY` (8) bound the user-triggered Refresh ([ADR 0010](adr/0010-on-demand-vehicle-refresh.md)). Lower the daily cap if the Smartcar plan's monthly per-vehicle allowance is below about 250.
 3. Render deploys once when the Blueprint is created. That's fine: `/health` doesn't touch the database. The first real deploy (§8) runs the migrations.
@@ -117,6 +119,7 @@ Repository → Settings → **Environments → New environment** → `production
   | `VERCEL_TOKEN` | §4 step 4 |
   | `VERCEL_ORG_ID` | §4 step 3 (Team/Org ID) |
   | `VERCEL_PROJECT_ID` | §4 step 3 (`prj_…`) |
+  | `MONITORING_METRICS_TOKEN` | Optional. Same value as on Render (§3). Lets the smoke workflow check the alert thresholds (§12). |
 
 - **Environment variables** (not secret):
 
@@ -193,5 +196,65 @@ Changing a `NEXT_PUBLIC_*` value only takes effect after the next web build: re-
 
 - Committed: none. `render.yaml` lists key names only (`sync: false` or generated), and `.dockerignore` keeps `.env*` out of the image.
 - Server-only (Render, GitHub): Smartcar client secret and management token, Mapbox secret token, AFDC key, database URL, Render API key, Vercel token.
+- Server-only (Render, GitHub), from P6-F4: `MONITORING_METRICS_TOKEN`.
 - Build-time only (Vercel, Sensitive): `SENTRY_AUTH_TOKEN`.
 - Public (Vercel, `NEXT_PUBLIC_*`): API base URL, Supabase URL and anon key, Mapbox public token, web Sentry DSN, auth toggles.
+
+## 12. Monitoring and alerts (from P6-F4)
+
+Architecture §9 asks for structured logs, request metrics and error reporting. They are all built into the API, with no extra service to pay for.
+
+### 12.1 What the API records
+
+- **Logs.** The API writes one JSON object per line to stdout. Render shows these under the service's **Logs** tab; the free plan keeps them for a limited time only. Each API request gets an `http_request` line with `method`, `route` (the template, e.g. `/api/v1/trips/{trip_id}`), `status` and `duration_ms`. Query strings, request bodies, user and vehicle IDs and coordinates are never logged: extra fields go through the same scrubber as Sentry. `/health` and `/metrics` aren't logged. Useful searches:
+  - `planner_slow`: a `/routes/plan` call took longer than `MONITORING_PLANNER_SLOW_MS` (default 10 s).
+  - `smartcar_webhook_` (`_rejected`, `_ingest_failed`, `_not_accepted`, `_ignored`): webhook outcomes, by Smartcar event ID.
+  - `rate_limited`: a user hit the plan or search limit (`bucket` says which).
+- **`GET /metrics`.** A JSON snapshot since the process started: per-route counts, status classes, p50/p95/max latency over the last 500 requests, plus two summaries:
+  - `planner`: latency of `POST /routes/plan`. This is time inside the API; Render's cold start comes before it and isn't included.
+  - `webhooks`: `deliveries`, `succeeded`, `failed` and `success_rate` for Smartcar webhooks. A delivery succeeded when it got a 2xx; `400` and `5xx` are failures. `401` (missing or wrong signature) is counted separately as `signature_rejected` and left out of the rate, since those aren't Smartcar deliveries.
+
+  It answers `404` unless `MONITORING_METRICS_TOKEN` is set on Render, and then only with that bearer token:
+
+  ```bash
+  curl -s -H "Authorization: Bearer $MONITORING_METRICS_TOKEN" https://<api-domain>/metrics
+  ```
+
+  **The counters reset on every restart.** On the free plan the service sleeps after 15 idle minutes (§3), so a snapshot only covers the time since the last cold start. That's why the thresholds below need a minimum sample before they can fail.
+- **Rate limits.** `POST /routes/plan` and `GET /places/suggest` have a per-user limit and answer `429 RATE_LIMITED` with `Retry-After` when it's used up ([`api-contracts.md`](api-contracts.md) §3.7, §3.13). The defaults (`RATE_LIMIT_*` in `app/core/config.py`) are 10 plans at once refilled at 30 per hour, and 30 searches at once refilled at 60 per minute. To change one, set the variable on Render's **Environment** tab. The buckets live in memory, one set per instance. They reset on every deploy or restart, including each free-plan spin-down, so a user can get a fresh burst after one. A second instance would give each user a second allowance, so running more than one instance needs a shared store (a Postgres table) first.
+
+### 12.2 Smoke workflow
+
+[`.github/workflows/smoke.yml`](../.github/workflows/smoke.yml) checks production from outside. It runs after every successful **Deploy (production)**, every 6 hours, and by hand (**Actions → Smoke (production) → Run workflow**). It uses the `production` environment's `API_BASE_URL`, `WEB_URL` and, if set, `MONITORING_METRICS_TOKEN`. Without `API_BASE_URL` it ends with a notice.
+
+| Check | Fails when |
+|---|---|
+| API health | `/health` doesn't answer `env: production` within 4 attempts of 90 s each. That allows for the ~1 min cold start. |
+| Auth and error envelope | `GET /api/v1/me` without a token isn't `401 UNAUTHENTICATED`. |
+| Webhook URL | An unsigned `POST /api/v1/webhooks/smartcar` isn't `401 WEBHOOK_SIGNATURE_INVALID`. Nothing is stored for it. |
+| Web app | `WEB_URL` doesn't answer 200 (skipped when `WEB_URL` is empty). |
+| Webhook success rate | Below 95 % with at least 20 deliveries since the last restart. |
+| Planner latency | p95 above 15 s with at least 5 plans since the last restart. |
+
+The thresholds are `env` values at the top of the job. The scheduled run wakes the API, so the metric checks usually see few requests; they matter most right after a deploy and during active use.
+
+If you turned on **required reviewers** for the `production` environment (§5), each smoke run also waits for your approval. Leave reviewers off, or approve the runs.
+
+GitHub turns off scheduled workflows in a repository with no activity for 60 days. Re-enable it under **Actions → Smoke (production)**.
+
+### 12.3 Alerts: where they go
+
+No pager. Three channels, set up once:
+
+1. **Failed smoke runs (uptime, webhook rate, planner latency).** GitHub notifies you when a workflow run fails. Under your GitHub **Settings → Notifications → Actions**, choose email and "Only notify for failed workflows". For a scheduled run, GitHub notifies the user who last edited the `cron` line in `smoke.yml`.
+2. **Errors (Sentry, §7).** Unhandled exceptions, and every log line at ERROR such as `smartcar_webhook_ingest_failed`, become Sentry events. In the **backend** project, under **Alerts → Create Alert → Issues**, create:
+   - "A new issue is created" → email (the default rule; keep it).
+   - "The issue is seen more than 10 times in 1 hour" → email, so a webhook ingest failure loop or a crashing endpoint pages you once, not per event.
+   - In the **web** project, keep the default new-issue alert.
+3. **Render.** In Render's notification settings (workspace or service), have failed deploys and service failures emailed. The deploy workflow fails too, but this also covers a crash loop after a deploy has gone live.
+
+### 12.4 Turning it off
+
+- `MONITORING_METRICS_TOKEN` empty: `/metrics` answers 404; the smoke workflow skips the threshold check.
+- `RATE_LIMIT_ENABLED=false` on Render: no per-user limits.
+- Disable the smoke workflow under **Actions → Smoke (production) → ⋯ → Disable workflow**.

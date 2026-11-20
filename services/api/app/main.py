@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
+from app.core.monitoring import install_monitoring
 from app.core.observability import init_sentry
 
 API_PREFIX = "/api/v1"
@@ -47,6 +48,8 @@ def create_app() -> FastAPI:
     )
 
     register_error_handlers(app)
+    # P6-F4: JSON logs, request metrics middleware (outermost) and GET /metrics.
+    install_monitoring(app, settings)
 
     # ---- Health ----
     @app.get("/health", tags=["health"])

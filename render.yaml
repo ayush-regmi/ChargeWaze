@@ -61,3 +61,6 @@ services:
       # ---- Observability (P6-F1) ----
       - key: SENTRY_DSN_BACKEND
         sync: false
+      # ---- Monitoring (P6-F4): guards GET /metrics; empty hides it ----
+      - key: MONITORING_METRICS_TOKEN
+        sync: false
