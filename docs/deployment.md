@@ -195,7 +195,8 @@ Changing a `NEXT_PUBLIC_*` value only takes effect after the next web build: re-
 ## 11. Secrets checklist
 
 - Committed: none. `render.yaml` lists key names only (`sync: false` or generated), and `.dockerignore` keeps `.env*` out of the image.
-- Server-only (Render, GitHub): Smartcar client secret and management token, Mapbox secret token, AFDC key, database URL, Render API key, Vercel token, metrics token.
+- Server-only (Render, GitHub): Smartcar client secret and management token, Mapbox secret token, AFDC key, database URL, Render API key, Vercel token.
+- Server-only (Render, GitHub), from P6-F4: `MONITORING_METRICS_TOKEN`.
 - Build-time only (Vercel, Sensitive): `SENTRY_AUTH_TOKEN`.
 - Public (Vercel, `NEXT_PUBLIC_*`): API base URL, Supabase URL and anon key, Mapbox public token, web Sentry DSN, auth toggles.
 
@@ -220,7 +221,7 @@ Architecture §9 asks for structured logs, request metrics and error reporting. 
   ```
 
   **The counters reset on every restart.** On the free plan the service sleeps after 15 idle minutes (§3), so a snapshot only covers the time since the last cold start. That's why the thresholds below need a minimum sample before they can fail.
-- **Rate limits.** `POST /routes/plan` and `GET /places/suggest` have a per-user limit and answer `429 RATE_LIMITED` with `Retry-After` when it's used up ([`api-contracts.md`](api-contracts.md) §3.7, §3.13). The defaults (`RATE_LIMIT_*` in `app/core/config.py`) are 10 plans at once refilled at 30 per hour, and 30 searches at once refilled at 60 per minute. To change one, set the variable on Render's **Environment** tab. The buckets live in memory, one set per instance; if the service ever runs more than one instance, move them to Postgres.
+- **Rate limits.** `POST /routes/plan` and `GET /places/suggest` have a per-user limit and answer `429 RATE_LIMITED` with `Retry-After` when it's used up ([`api-contracts.md`](api-contracts.md) §3.7, §3.13). The defaults (`RATE_LIMIT_*` in `app/core/config.py`) are 10 plans at once refilled at 30 per hour, and 30 searches at once refilled at 60 per minute. To change one, set the variable on Render's **Environment** tab. The buckets live in memory, one set per instance. They reset on every deploy or restart, including each free-plan spin-down, so a user can get a fresh burst after one. A second instance would give each user a second allowance, so running more than one instance needs a shared store (a Postgres table) first.
 
 ### 12.2 Smoke workflow
 
