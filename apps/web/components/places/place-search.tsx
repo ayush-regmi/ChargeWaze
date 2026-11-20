@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
 import { cn } from "@/lib/utils";
+import { fieldClass } from "@/components/ui/field";
 
 import {
   retrievePlace,
@@ -204,14 +205,14 @@ export function PlaceSearch({
         onKeyDown={onKeyDown}
         onBlur={() => setOpen(false)}
         onFocus={() => items.length > 0 && setOpen(true)}
-        className="h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-neutral-700 dark:bg-neutral-950"
+        className={`${fieldClass} w-full`}
       />
       <ul
         id={listId}
         role="listbox"
         aria-label={`${label} suggestions`}
         hidden={!showList}
-        className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-800 dark:bg-neutral-950"
+        className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border border-border bg-background py-1 shadow-lg"
       >
         {items.map((s, i) => (
           <li
@@ -227,25 +228,25 @@ export function PlaceSearch({
             onMouseEnter={() => setActive(i)}
             className={cn(
               "cursor-pointer px-3 py-2 text-sm",
-              i === active && "bg-neutral-100 dark:bg-neutral-800",
+              i === active && "bg-muted",
             )}
           >
             <span className="block font-medium">{s.name}</span>
-            <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+            <span className="block text-xs text-muted-foreground">
               {s.full_address || KIND_LABELS[s.kind]}
             </span>
           </li>
         ))}
       </ul>
       <div aria-live="polite" className="text-xs">
-        {loading ? <span className="text-neutral-500">Searching…</span> : null}
+        {loading ? <span className="text-muted-foreground">Searching…</span> : null}
         {!loading && error ? (
-          <span role="alert" className="text-red-600 dark:text-red-400">
+          <span role="alert" className="text-destructive">
             {errorText(error)}
           </span>
         ) : null}
         {!loading && !error && searched && open && items.length === 0 ? (
-          <span className="text-neutral-500">No places found.</span>
+          <span className="text-muted-foreground">No places found.</span>
         ) : null}
       </div>
     </div>

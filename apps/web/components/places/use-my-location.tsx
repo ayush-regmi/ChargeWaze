@@ -1,5 +1,6 @@
 "use client";
 
+import { LocateFixed } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -49,11 +50,12 @@ export function UseMyLocation({
 
   return (
     <div className="space-y-1">
-      <Button type="button" variant="outline" size="sm" onClick={locate} disabled={busy}>
+      <Button type="button" variant="outline" onClick={locate} disabled={busy}>
+        <LocateFixed aria-hidden />
         {busy ? "Locating…" : label}
       </Button>
       {error ? (
-        <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+        <p role="alert" className="text-xs text-destructive">
           {errorText(error)}
         </p>
       ) : null}

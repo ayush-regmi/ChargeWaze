@@ -15,7 +15,7 @@ import { PlanAssumptions } from "./plan-assumptions";
 
 function StartingCharge({ plan }: { plan: PlanResponse }) {
   return (
-    <p className="text-sm text-neutral-600 dark:text-neutral-400" data-testid="plan-starting-soc">
+    <p className="text-sm text-muted-foreground" data-testid="plan-starting-soc">
       Starting charge {formatSoc(plan.starting_soc)}
       {plan.starting_soc_source === "override" ? (
         " (entered by you)"
@@ -38,7 +38,7 @@ function InfeasibleNotice({ plan, units }: { plan: PlanResponse; units: UnitSyst
     <div
       role="alert"
       data-testid="plan-infeasible"
-      className="space-y-1.5 rounded-lg border-2 border-red-400 bg-red-50 p-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200"
+      className="space-y-1.5 rounded-lg border-2 border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
     >
       <p className="text-base font-semibold">
         Not feasible{reason ? `: ${INFEASIBLE_TITLES[reason.code] ?? reason.code}` : ""}
@@ -66,22 +66,22 @@ function StopItem({ stop, units }: { stop: PlanStop; units: UnitSystem }) {
   return (
     <li className="space-y-0.5 p-3" data-testid="plan-stop">
       <p className="font-medium">
-        <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs text-white">
+        <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
           {stop.sequence}
         </span>
         <Link
           href={`/charging/${stop.station.id}`}
-          className="text-blue-700 hover:underline dark:text-blue-400"
+          className="link"
         >
           {stop.station.name}
         </Link>
       </p>
-      <p className="text-sm text-neutral-600 dark:text-neutral-400">{details}</p>
+      <p className="text-sm text-muted-foreground">{details}</p>
       <p className="text-sm">
         <span data-testid="plan-stop-soc">{stopSocLabel(stop)}</span> · charge{" "}
         {formatMinutes(stop.charging_minutes)}
       </p>
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-muted-foreground">
         {formatDistanceText(stop.distance_along_route_km, units)} along the route · detour{" "}
         {formatMinutes(stop.detour_minutes)} (estimate)
       </p>
@@ -92,7 +92,7 @@ function StopItem({ stop, units }: { stop: PlanStop; units: UnitSystem }) {
 function Total({ label, value, strong }: { label: string; value: string | null; strong?: boolean }) {
   return (
     <div className="flex justify-between gap-3 py-0.5 text-sm">
-      <dt className="text-neutral-600 dark:text-neutral-400">{label}</dt>
+      <dt className="text-muted-foreground">{label}</dt>
       <dd className={strong ? "font-semibold" : undefined}>{value ?? "—"}</dd>
     </div>
   );
@@ -109,7 +109,7 @@ function SaveTrip({ tripId }: { tripId: string }) {
   const [pending, startTransition] = useTransition();
   if (state?.ok) {
     return (
-      <p role="status" className="text-sm text-green-700 dark:text-green-400">
+      <p role="status" className="text-sm text-success">
         Saved.{" "}
         <Link href={`/trips/${tripId}`} className="font-medium underline-offset-2 hover:underline">
           View trip
@@ -128,7 +128,7 @@ function SaveTrip({ tripId }: { tripId: string }) {
         {pending ? "Saving…" : "Save trip"}
       </Button>
       {state && !state.ok ? (
-        <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+        <p role="alert" className="text-sm text-destructive">
           {SAVE_ERRORS[state.error]}
         </p>
       ) : null}
@@ -150,8 +150,8 @@ export function PlanResult({ plan, units }: { plan: PlanResponse; units: UnitSys
         <InfeasibleNotice plan={plan} units={units} />
       ) : (
         <>
-          <div className="space-y-1 rounded-lg border border-green-300 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950/40">
-            <p className="font-semibold text-green-900 dark:text-green-200">
+          <div className="space-y-1 rounded-lg border border-success/30 bg-success/10 p-3">
+            <p className="font-semibold text-success">
               {plan.stops.length === 0
                 ? "No charging needed"
                 : `${plan.stops.length} charging ${plan.stops.length === 1 ? "stop" : "stops"}`}
@@ -169,7 +169,7 @@ export function PlanResult({ plan, units }: { plan: PlanResponse; units: UnitSys
           {plan.stops.length > 0 ? (
             <ol
               aria-label="Charging stops"
-              className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800"
+              className="divide-y divide-border rounded-lg border border-border"
             >
               {plan.stops.map((s) => (
                 <StopItem key={s.sequence} stop={s} units={units} />

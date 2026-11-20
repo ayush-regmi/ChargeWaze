@@ -66,12 +66,12 @@ export function ObservationReviewButtons({
             {pending === "reject" ? "Rejecting…" : "Reject"}
           </Button>
         ) : null}
-        <span aria-live="polite" className="text-xs text-neutral-600 dark:text-neutral-400">
+        <span aria-live="polite" className="text-xs text-muted-foreground">
           {status !== initial ? `${REVIEW_LABELS[status]}.` : ""}
         </span>
       </div>
       {error ? (
-        <p role="alert" className="text-xs text-red-700 dark:text-red-400">
+        <p role="alert" className="text-xs text-destructive">
           {error}
         </p>
       ) : null}

@@ -19,7 +19,7 @@ const NOT_REPORTED = "Not reported";
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[9rem_1fr] gap-3 py-2 text-sm">
-      <dt className="text-neutral-600 dark:text-neutral-400">{label}</dt>
+      <dt className="text-muted-foreground">{label}</dt>
       <dd>{children}</dd>
     </div>
   );
@@ -48,7 +48,7 @@ export function StationDetail({ station }: { station: Station }) {
       {station.is_stale ? (
         <p
           role="status"
-          className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
+          className="rounded-md bg-warning/10 px-3 py-2 text-sm text-warning"
         >
           This information may be out of date: the station provider couldn&apos;t be reached, so
           this is the last copy Chargewise saved.
@@ -60,10 +60,10 @@ export function StationDetail({ station }: { station: Station }) {
           Connectors
         </h2>
         {station.connectors.length === 0 ? (
-          <p className="text-sm text-neutral-500">Connector types not reported.</p>
+          <p className="text-sm text-muted-foreground">Connector types not reported.</p>
         ) : (
           <table className="w-full text-left text-sm">
-            <thead className="text-xs text-neutral-500">
+            <thead className="text-xs text-muted-foreground">
               <tr>
                 <th scope="col" className="py-1 font-medium">
                   Type
@@ -78,7 +78,7 @@ export function StationDetail({ station }: { station: Station }) {
             </thead>
             <tbody>
               {station.connectors.map((c) => (
-                <tr key={c.type} className="border-t border-neutral-200 dark:border-neutral-800">
+                <tr key={c.type} className="border-t border-border">
                   <td className="py-1.5">{connectorLabel(c.type)}</td>
                   <td className="py-1.5">{c.count ?? "Unknown"}</td>
                   <td className="py-1.5">{formatKw(c.power_kw) ?? "Unknown"}</td>
@@ -89,7 +89,7 @@ export function StationDetail({ station }: { station: Station }) {
         )}
       </section>
 
-      <dl className="divide-y divide-neutral-200 dark:divide-neutral-800">
+      <dl className="divide-y divide-border">
         <Row label="Network">{station.network ?? NOT_REPORTED}</Row>
         <Row label="Operator">{station.operator ?? NOT_REPORTED}</Row>
         <Row label="Address">
@@ -109,7 +109,7 @@ export function StationDetail({ station }: { station: Station }) {
           {accessLabel(station.access)}
           {station.restricted_access ? " (restricted)" : null}
           {station.access_detail ? (
-            <span className="block text-xs text-neutral-500">{station.access_detail}</span>
+            <span className="block text-xs text-muted-foreground">{station.access_detail}</span>
           ) : null}
         </Row>
         <Row label="Status">{statusLabel(station.status)}</Row>
@@ -132,7 +132,7 @@ export function StationDetail({ station }: { station: Station }) {
             href={links.google}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-blue-700 hover:underline dark:text-blue-400"
+            className="font-medium link"
           >
             Open in Google Maps
           </a>
@@ -140,7 +140,7 @@ export function StationDetail({ station }: { station: Station }) {
             href={links.apple}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-blue-700 hover:underline dark:text-blue-400"
+            className="font-medium link"
           >
             Open in Apple Maps
           </a>

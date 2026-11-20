@@ -37,7 +37,7 @@ function Tabs({ view }: { view: View }) {
     { key: "observed", label: "Observed drives", href: observedHref("all") },
   ];
   return (
-    <nav aria-label="Trip history" className="flex gap-4 border-b border-neutral-200 text-sm dark:border-neutral-800">
+    <nav aria-label="Trip history" className="flex gap-4 border-b border-border text-sm">
       {tabs.map((t) => (
         <Link
           key={t.key}
@@ -45,8 +45,8 @@ function Tabs({ view }: { view: View }) {
           aria-current={view === t.key ? "page" : undefined}
           className={
             view === t.key
-              ? "-mb-px border-b-2 border-neutral-900 pb-2 font-medium dark:border-neutral-100"
-              : "pb-2 text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
+              ? "-mb-px border-b-2 border-primary pb-2 font-medium"
+              : "pb-2 text-muted-foreground hover:text-foreground"
           }
         >
           {t.label}
@@ -59,7 +59,7 @@ function Tabs({ view }: { view: View }) {
 export default function SavedTripsPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <section className="mx-auto max-w-3xl space-y-6">
-      <Suspense fallback={<p className="text-sm text-neutral-500">Loading trips…</p>}>
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Loading trips…</p>}>
         <TripHistory searchParams={searchParams} />
       </Suspense>
     </section>
@@ -79,7 +79,7 @@ async function TripHistory({ searchParams }: { searchParams: SearchParams }) {
         <h1 className="text-2xl font-semibold tracking-tight">
           {view === "saved" ? "Saved trips" : "Observed drives"}
         </h1>
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        <p className="text-sm text-muted-foreground">
           {view === "saved"
             ? "Plans you saved, newest first. Each one shows the plan as it was made."
             : "Drives recorded from your car, newest first. Check the ones marked for review."}
@@ -100,9 +100,9 @@ async function TripHistory({ searchParams }: { searchParams: SearchParams }) {
 
 function ExpiredPage({ href }: { href: string }) {
   return (
-    <p role="alert" className="text-sm text-neutral-700 dark:text-neutral-300">
+    <p role="alert" className="text-sm text-foreground">
       That page link has expired.{" "}
-      <Link href={href} className="text-blue-700 hover:underline dark:text-blue-400">
+      <Link href={href} className="link">
         Go to the first page
       </Link>
       .
@@ -130,7 +130,7 @@ async function SavedTrips({ cursor }: { cursor: string | null }) {
   if (list?.response.status === 422 && cursor) return <ExpiredPage href="/trips/saved" />;
   if (!list?.data) {
     return (
-      <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+      <p role="alert" className="text-sm text-destructive">
         Couldn&apos;t load your saved trips. Please refresh to try again.
       </p>
     );
@@ -174,7 +174,7 @@ async function ObservedDrives({
   if (list?.response.status === 422 && cursor) return <ExpiredPage href={observedHref(filter)} />;
   if (!list?.data) {
     return (
-      <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+      <p role="alert" className="text-sm text-destructive">
         Couldn&apos;t load your drives. Please refresh to try again.
       </p>
     );

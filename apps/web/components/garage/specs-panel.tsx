@@ -31,20 +31,20 @@ export function SpecsPanel({
   const connectors = specs?.connectors ?? [];
   const curve = specs?.charging_curve ?? [];
   return (
-    <div className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="space-y-3 rounded-lg border border-border bg-background p-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-medium">Specs</h2>
         {action}
       </div>
       <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <dt className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+          <dt className="text-xs font-medium text-muted-foreground">
             Usable battery capacity
           </dt>
           <dd className="mt-1 text-sm">{capacity != null ? `${capacity} kWh` : "Not set"}</dd>
         </div>
         <div>
-          <dt className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+          <dt className="text-xs font-medium text-muted-foreground">
             Connectors
           </dt>
           <dd className="mt-1 text-sm">
@@ -52,13 +52,13 @@ export function SpecsPanel({
           </dd>
         </div>
         <div>
-          <dt className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+          <dt className="text-xs font-medium text-muted-foreground">
             Consumption
           </dt>
           <dd className="mt-1 text-sm">
             {consumption ?? "Not set"}
             {consumptionNote ? (
-              <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+              <span className="block text-xs text-muted-foreground">
                 {consumptionNote}
               </span>
             ) : null}
@@ -66,13 +66,13 @@ export function SpecsPanel({
         </div>
       </dl>
       <div>
-        <h3 className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+        <h3 className="text-xs font-medium text-muted-foreground">
           Charging curve
         </h3>
         {curve.length > 0 ? (
           <table className="mt-2 text-sm">
             <thead>
-              <tr className="text-left text-neutral-500 dark:text-neutral-400">
+              <tr className="text-left text-muted-foreground">
                 <th className="pr-6 font-normal">Battery</th>
                 <th className="font-normal">Max power</th>
               </tr>
@@ -91,13 +91,13 @@ export function SpecsPanel({
         )}
       </div>
       {capacity == null ? (
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        <p className="text-sm text-muted-foreground">
           Smartcar doesn&apos;t report battery capacity for this vehicle. Add it with
           Edit specs so trip planning can estimate range.
         </p>
       ) : null}
       {consumption == null ? (
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        <p className="text-sm text-muted-foreground">
           There&apos;s no consumption estimate for this vehicle. Add one with Edit specs so trips
           can be planned.
         </p>

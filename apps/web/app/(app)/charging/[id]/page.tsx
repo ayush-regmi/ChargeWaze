@@ -20,7 +20,7 @@ type Props = {
 export default function StationPage(props: Props) {
   return (
     <section className="mx-auto max-w-3xl space-y-6">
-      <Suspense fallback={<p className="text-sm text-neutral-500">Loading station…</p>}>
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Loading station…</p>}>
         <Station {...props} />
       </Suspense>
     </section>
@@ -61,7 +61,7 @@ async function Station({ params, searchParams }: Props) {
       <div className="flex items-start justify-between gap-3">
         <Link
           href={back}
-          className="text-sm text-neutral-600 hover:underline dark:text-neutral-400"
+          className="text-sm text-muted-foreground underline-offset-[3px] hover:text-foreground hover:underline"
         >
           ← Back to Charging
         </Link>
@@ -77,7 +77,7 @@ async function Station({ params, searchParams }: Props) {
       {data ? (
         <StationDetail station={data} />
       ) : (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-destructive">
           Couldn&apos;t load this station. Please refresh to try again.
         </p>
       )}

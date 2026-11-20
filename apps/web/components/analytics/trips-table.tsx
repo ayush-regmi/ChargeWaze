@@ -18,9 +18,9 @@ import {
 } from "./format";
 
 const BADGE_STYLES = {
-  high: "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300",
-  medium: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
-  low: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300",
+  high: "bg-success/10 text-success",
+  medium: "bg-info/10 text-info",
+  low: "bg-warning/10 text-warning",
 } as const;
 
 const TAG = "whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium";
@@ -56,7 +56,7 @@ export function QualityBadge({
       <span
         id={tipId}
         role="tooltip"
-        className="invisible absolute right-0 z-10 mt-1 w-64 rounded-md border border-neutral-200 bg-white p-2 text-left text-xs font-normal text-neutral-700 shadow-md group-focus-within:visible group-hover:visible dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+        className="invisible absolute right-0 z-10 mt-1 w-64 rounded-md border border-border bg-background p-2 text-left text-xs font-normal text-foreground shadow-md group-focus-within:visible group-hover:visible"
       >
         <ul className="list-disc space-y-0.5 pl-4">
           {text.map((t) => (
@@ -80,7 +80,7 @@ function DriveTime({ trip, tz }: { trip: AnalyticsTrip; tz: string }) {
       <div>
         Ended <ZonedTime iso={trip.end_time} tz={tz} />
       </div>
-      <div className="text-xs text-neutral-500 dark:text-neutral-400">
+      <div className="text-xs text-muted-foreground">
         {bounded ? (
           <>
             Started between <ZonedTime iso={trip.start_time} tz={tz} /> and{" "}
@@ -95,7 +95,7 @@ function DriveTime({ trip, tz }: { trip: AnalyticsTrip; tz: string }) {
       {trip.planned_trip_id ? (
         <Link
           href={`/trips/${trip.planned_trip_id}`}
-          className="text-xs text-blue-700 hover:underline dark:text-blue-400"
+          className="text-xs link"
         >
           Plan: {trip.plan_origin_label ?? "Unnamed start"} →{" "}
           {trip.plan_destination_label ?? "Unnamed destination"}
@@ -111,34 +111,34 @@ function Status({ trip }: { trip: AnalyticsTrip }) {
       {trip.review_status === "needs_review" ? (
         <Link
           href={reviewHref(trip)}
-          className={`${TAG} bg-amber-100 text-amber-900 underline-offset-2 hover:underline dark:bg-amber-950 dark:text-amber-300`}
+          className={`${TAG} bg-warning/10 text-warning underline-offset-2 hover:underline`}
         >
           Needs review
         </Link>
       ) : (
         <span
-          className={`${TAG} bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300`}
+          className={`${TAG} bg-muted text-foreground`}
         >
           {reviewLabel(trip.review_status)}
         </span>
       )}
       {trip.in_progress ? (
         <span
-          className={`${TAG} bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300`}
+          className={`${TAG} bg-muted text-foreground`}
         >
           In progress
         </span>
       ) : null}
       {trip.is_simulated ? (
         <span
-          className={`${TAG} bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300`}
+          className={`${TAG} bg-warning/10 text-warning`}
         >
           Simulated
         </span>
       ) : null}
       {!trip.included_in_aggregates ? (
         <span
-          className={`${TAG} border border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-400`}
+          className={`${TAG} border border-border text-muted-foreground`}
         >
           Not in totals
         </span>
@@ -177,7 +177,7 @@ export function TripsTable({
   tz: string;
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border [contain:inline-size] border-neutral-200 dark:border-neutral-800">
+    <div className="overflow-x-auto rounded-lg border [contain:inline-size] border-border">
       <table
         className="w-full min-w-[56rem] text-left text-sm"
         data-testid="analytics-trips-table"
@@ -185,7 +185,7 @@ export function TripsTable({
         <caption className="sr-only">
           Observed drives, newest first. Times in {tz}.
         </caption>
-        <thead className="bg-neutral-50 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400">
+        <thead className="bg-muted/50 text-xs text-muted-foreground">
           <tr>
             <th scope="col" className="px-3 py-2 font-medium">
               Drive{" "}
@@ -219,7 +219,7 @@ export function TripsTable({
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+        <tbody className="divide-y divide-border">
           {trips.map((trip) => (
             <tr key={trip.id} data-trip-id={trip.id} className="align-top">
               <td className="px-3 py-2">

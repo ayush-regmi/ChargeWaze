@@ -66,7 +66,7 @@ test.describe("with a fresh battery reading", () => {
     await result.getByRole("button", { name: "Save trip" }).click();
     await expect(result.getByRole("status")).toContainText("Saved.");
 
-    await page.getByRole("link", { name: "Saved trips →" }).click();
+    await page.getByRole("link", { name: "Saved trips" }).click();
     await expect(page).toHaveURL(/\/trips\/saved$/);
     await page.getByRole("link", { name: /Tesla Supercharger → Toronto/ }).first().click();
     await expect(page).toHaveURL(/\/trips\/[0-9a-f-]{36}$/);

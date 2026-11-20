@@ -27,7 +27,7 @@ const MISSING = "—";
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[11rem_1fr] gap-3 py-1.5 text-sm">
-      <dt className="text-neutral-600 dark:text-neutral-400">{label}</dt>
+      <dt className="text-muted-foreground">{label}</dt>
       <dd>{children}</dd>
     </div>
   );
@@ -53,7 +53,7 @@ function InfeasibleNotice({ plan, units }: { plan: StoredPlan; units: UnitSystem
   return (
     <div
       role="alert"
-      className="space-y-1 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200"
+      className="space-y-1 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
     >
       <p className="font-semibold">
         This trip can&apos;t be driven as planned
@@ -85,13 +85,13 @@ function StopItem({ stop, units }: { stop: PlanStop; units: UnitSystem }) {
   return (
     <li className="space-y-1 p-4">
       <p className="font-medium">
-        <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs text-white">
+        <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
           {stop.sequence}
         </span>
         {stop.station.id ? (
           <Link
             href={`/charging/${stop.station.id}`}
-            className="text-blue-700 hover:underline dark:text-blue-400"
+            className="link"
           >
             {name}
           </Link>
@@ -100,13 +100,13 @@ function StopItem({ stop, units }: { stop: PlanStop; units: UnitSystem }) {
         )}
       </p>
       {details.length > 0 ? (
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">{details.join(" · ")}</p>
+        <p className="text-sm text-muted-foreground">{details.join(" · ")}</p>
       ) : null}
       <p className="text-sm">
         Arrive {arrival} → leave {departure} · charge{" "}
         {formatMinutes(stop.charging_minutes) ?? MISSING}
       </p>
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-muted-foreground">
         At {formatDistanceText(stop.distance_along_route_km, units) ?? MISSING} along the route ·
         detour {formatMinutes(stop.detour_minutes) ?? MISSING} (estimate)
       </p>
@@ -131,7 +131,7 @@ export function TripDetail({ trip, units }: { trip: TripDetailData; units: UnitS
           <h1 id="trip-title" className="text-2xl font-semibold tracking-tight">
             {title}
           </h1>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <PlanStatusBadge planStatus={trip.plan_status} />
             <span>
               Planned <LocalTime iso={trip.created_at} />
@@ -143,7 +143,7 @@ export function TripDetail({ trip, units }: { trip: TripDetailData; units: UnitS
       </header>
 
       {!plan ? (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-destructive">
           This trip&apos;s stored plan couldn&apos;t be read.
         </p>
       ) : (
@@ -156,14 +156,14 @@ export function TripDetail({ trip, units }: { trip: TripDetailData; units: UnitS
               <DataAttribution />
             </div>
           ) : (
-            <p className="text-sm text-neutral-500">No route map: this plan has no route.</p>
+            <p className="text-sm text-muted-foreground">No route map: this plan has no route.</p>
           )}
 
           <section aria-labelledby="summary-title" className="space-y-2">
             <h2 id="summary-title" className="text-sm font-medium">
               Summary
             </h2>
-            <dl className="divide-y divide-neutral-100 dark:divide-neutral-900">
+            <dl className="divide-y divide-border">
               <Row label="Distance">
                 {formatDistanceText(plan.route?.distance_km, units) ?? MISSING}
               </Row>
@@ -202,11 +202,11 @@ export function TripDetail({ trip, units }: { trip: TripDetailData; units: UnitS
                 Charging stops
               </h2>
               {plan.stops.length === 0 ? (
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                <p className="text-sm text-muted-foreground">
                   No charging needed on this trip.
                 </p>
               ) : (
-                <ol className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+                <ol className="divide-y divide-border rounded-lg border border-border">
                   {plan.stops.map((s) => (
                     <StopItem key={s.sequence} stop={s} units={units} />
                   ))}
@@ -216,7 +216,7 @@ export function TripDetail({ trip, units }: { trip: TripDetailData; units: UnitS
           ) : null}
 
           {plan.assumptions ? (
-            <details className="rounded-lg border border-neutral-200 p-4 text-sm dark:border-neutral-800">
+            <details className="rounded-lg border border-border p-4 text-sm">
               <summary className="cursor-pointer font-medium">How this was calculated</summary>
               <dl className="mt-2">
                 <Row label="Usable battery">
@@ -257,7 +257,7 @@ export function TripDetail({ trip, units }: { trip: TripDetailData; units: UnitS
                   </Row>
                 ) : null}
               </dl>
-              <p className="mt-2 text-xs text-neutral-500">
+              <p className="mt-2 text-xs text-muted-foreground">
                 Speed, temperature and elevation aren&apos;t modelled. Detours are estimates.
                 This is the plan as it was saved; it isn&apos;t recalculated.
               </p>

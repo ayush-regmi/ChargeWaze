@@ -1,24 +1,17 @@
 import Link from "next/link";
 
+import { Logo } from "@/components/brand/logo";
+
 /**
- * App top bar: brand on the left, placeholder user affordance on the right.
- * Sign-out and user avatar are wired in Slice 2.
+ * Mobile-only top bar. On medium screens and up the brand sits at the top of
+ * the sidebar instead.
  */
 export function TopBar() {
   return (
-    <header className="flex h-14 items-center justify-between border-b border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-950">
-      <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-        <span
-          aria-hidden
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600 text-white"
-        >
-          CW
-        </span>
-        <span>Chargewise</span>
+    <header className="sticky top-0 z-30 flex h-12 items-center border-b border-border bg-background/85 px-4 backdrop-blur-md md:hidden">
+      <Link href="/dashboard" aria-label="Chargewise home">
+        <Logo />
       </Link>
-      <span className="text-xs text-neutral-500 dark:text-neutral-400">
-        specification phase
-      </span>
     </header>
   );
 }

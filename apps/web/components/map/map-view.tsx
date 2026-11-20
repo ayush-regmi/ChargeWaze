@@ -12,7 +12,23 @@ import { decodePolyline, toLngLat, PolylineDecodeError } from "@/lib/polyline";
 import { mapboxPublicToken } from "./token";
 import type { MapPoint, MapRoute, MapSegment, MapStation, MapViewProps } from "./types";
 
-const STYLE_URL = "mapbox://styles/mapbox/streets-v12";
+// Monochrome base maps, so the route and station colors are the only color
+// on the map (app/globals.css). Picked once at start from the OS theme.
+const STYLE_URL = {
+  light: "mapbox://styles/mapbox/light-v11",
+  dark: "mapbox://styles/mapbox/dark-v11",
+} as const;
+const INK = {
+  light: { text: "#111827", halo: "#ffffff" },
+  dark: { text: "#f5f5f5", halo: "#0a0a0a" },
+} as const;
+
+function colorScheme(): "light" | "dark" {
+  return typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
 const ROUTES_SOURCE = "cw-routes";
 const STATIONS_SOURCE = "cw-stations";
 const CENTER_SOURCE = "cw-center";
@@ -142,12 +158,14 @@ export function MapView({
     const container = containerRef.current;
     const token = mapboxPublicToken();
     if (!container || !token) return;
+    const scheme = colorScheme();
+    const ink = INK[scheme];
     let map: mapboxgl.Map;
     try {
       map = new mapboxgl.Map({
         container,
         accessToken: token,
-        style: STYLE_URL,
+        style: STYLE_URL[scheme],
         center: [-98.5, 39.8],
         zoom: 3,
         attributionControl: true,
@@ -194,8 +212,8 @@ export function MapView({
         source: CENTER_SOURCE,
         paint: {
           "circle-radius": 7,
-          "circle-color": "#111827",
-          "circle-stroke-color": "#ffffff",
+          "circle-color": ink.text,
+          "circle-stroke-color": ink.halo,
           "circle-stroke-width": 2,
         },
       });
@@ -219,7 +237,7 @@ export function MapView({
               "#0ea5e9",
             ],
           ],
-          "circle-stroke-color": ["case", ["get", "selected"], "#111827", "#ffffff"],
+          "circle-stroke-color": ["case", ["get", "selected"], ink.text, ink.halo],
           "circle-stroke-width": ["case", ["get", "selected"], 3, 1.5],
         },
       });
@@ -236,7 +254,7 @@ export function MapView({
           "text-anchor": "top",
           "text-allow-overlap": true,
         },
-        paint: { "text-color": "#111827", "text-halo-color": "#ffffff", "text-halo-width": 1.5 },
+        paint: { "text-color": ink.text, "text-halo-color": ink.halo, "text-halo-width": 1.5 },
       });
 
       map.on("click", STATION_LAYER, (e) => {

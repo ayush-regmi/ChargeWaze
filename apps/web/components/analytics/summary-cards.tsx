@@ -23,13 +23,13 @@ function Card({
   detail?: string;
 }) {
   return (
-    <div className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-      <dt className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+    <div className="rounded-lg border border-border p-4">
+      <dt className="text-xs font-medium text-muted-foreground">
         {label}
       </dt>
       <dd className="mt-1 text-lg font-semibold tabular-nums">{value}</dd>
       {detail ? (
-        <dd className="text-xs text-neutral-500 dark:text-neutral-400">
+        <dd className="text-xs text-muted-foreground">
           {detail}
         </dd>
       ) : null}

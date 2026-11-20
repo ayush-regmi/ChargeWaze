@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS } from "@/lib/nav";
+import { isActive, NAV_ITEMS, type NavItem } from "@/lib/nav";
 
 /**
  * Desktop sidebar. Rendered inside `app/(app)/layout.tsx`.
@@ -19,34 +19,41 @@ export function SidebarNav() {
  * item is highlighted until it streams in.
  */
 export function SidebarNavLinks({ pathname }: { pathname: string | null }) {
+  const main = NAV_ITEMS.filter((item) => !item.secondary);
+  const secondary = NAV_ITEMS.filter((item) => item.secondary);
   return (
-    <nav aria-label="Primary" className="flex flex-col gap-1 p-4">
-      {NAV_ITEMS.map((item) => {
-        const active =
-          pathname !== null &&
-          (pathname === item.href || pathname.startsWith(`${item.href}/`));
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-              active
-                ? "bg-emerald-600/10 text-emerald-700 dark:text-emerald-300"
-                : "text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800",
-            )}
-          >
-            <span
-              aria-hidden
-              className="inline-flex h-6 w-6 items-center justify-center rounded-sm border border-current text-xs"
-            >
-              {item.icon}
-            </span>
-            <span>{item.label}</span>
-          </Link>
-        );
-      })}
+    <nav aria-label="Primary" className="flex flex-1 flex-col justify-between gap-1 p-3">
+      <ul className="flex flex-col gap-0.5">
+        {main.map((item) => (
+          <SidebarLink key={item.href} item={item} active={isActive(pathname, item.href)} />
+        ))}
+      </ul>
+      <ul className="flex flex-col gap-0.5">
+        {secondary.map((item) => (
+          <SidebarLink key={item.href} item={item} active={isActive(pathname, item.href)} />
+        ))}
+      </ul>
     </nav>
+  );
+}
+
+function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
+  const Icon = item.icon;
+  return (
+    <li>
+      <Link
+        href={item.href}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors",
+          active
+            ? "bg-accent font-medium text-foreground"
+            : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+        )}
+      >
+        <Icon aria-hidden className="size-4 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
+        <span>{item.label}</span>
+      </Link>
+    </li>
   );
 }

@@ -15,8 +15,8 @@ export const PLOT = {
   bottom: HEIGHT - MARGIN.bottom,
 } as const;
 
-const AXIS_TEXT = "fill-neutral-500 text-[10px] dark:fill-neutral-400";
-const GRID = "stroke-neutral-200 dark:stroke-neutral-800";
+const AXIS_TEXT = "fill-muted-foreground text-[10px]";
+const GRID = "stroke-border";
 
 /** Horizontal grid lines with value labels on the left, and the y-axis title. */
 export function YAxis({
@@ -120,7 +120,7 @@ export function XAxisCategories({
         x2={PLOT.right}
         y1={PLOT.bottom}
         y2={PLOT.bottom}
-        className="stroke-neutral-300 dark:stroke-neutral-700"
+        className="stroke-border"
       />
       {labels.map((label, i) =>
         i % every === 0 ? (

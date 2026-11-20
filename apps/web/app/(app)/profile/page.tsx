@@ -10,7 +10,7 @@ import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 export default function ProfilePage() {
   return (
     <Suspense
-      fallback={<p className="text-sm text-neutral-500">Loading profile…</p>}
+      fallback={<p className="text-sm text-muted-foreground">Loading profile…</p>}
     >
       <ProfileDetails />
     </Suspense>
@@ -36,7 +36,7 @@ async function ProfileDetails() {
     return (
       <section className="mx-auto max-w-2xl space-y-4">
         <h1 className="text-2xl font-semibold">Profile</h1>
-        <p className="text-sm text-red-600">Backend request failed: {detail}</p>
+        <p className="text-sm text-destructive">Backend request failed: {detail}</p>
       </section>
     );
   }
@@ -47,11 +47,11 @@ async function ProfileDetails() {
     <section className="mx-auto max-w-2xl space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold">Profile</h1>
-        <p className="text-neutral-600 dark:text-neutral-400">
+        <p className="text-muted-foreground">
           Your account and the defaults the trip planner uses.
         </p>
       </div>
-      <dl className="grid grid-cols-1 gap-4 rounded-lg border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:grid-cols-2">
+      <dl className="grid grid-cols-1 gap-4 rounded-lg border border-border bg-background p-6 sm:grid-cols-2">
         <Field label="Display name" value={me.display_name ?? "\u2014"} />
         <Field label="Email" value={me.email ?? "\u2014"} />
         <Field label="Profile id" value={me.id} mono />
@@ -74,7 +74,7 @@ function Field({
 }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+      <dt className="text-xs font-medium text-muted-foreground">
         {label}
       </dt>
       <dd

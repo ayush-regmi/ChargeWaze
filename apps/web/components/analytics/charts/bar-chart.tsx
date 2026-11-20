@@ -48,7 +48,7 @@ export function BarChart({
               width={barWidth}
               height={Math.max(0, PLOT.bottom - top)}
               rx={2}
-              className="fill-emerald-600 dark:fill-emerald-500"
+              className="fill-chart-1"
             >
               <title>{`${b.label}: ${format(b.value)}`}</title>
             </rect>

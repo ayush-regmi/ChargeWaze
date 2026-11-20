@@ -5,6 +5,7 @@ import { useId, useState, useTransition } from "react";
 import { updatePreferences } from "@/app/(app)/profile/actions";
 import { Button } from "@/components/ui/button";
 import type { UnitSystem } from "@/lib/units";
+import { fieldClass } from "@/components/ui/field";
 
 import {
   MAX_DETOUR_MINUTES,
@@ -51,7 +52,7 @@ export function PreferencesEditor({ preferences }: { preferences: Preferences })
   return (
     <section
       aria-label="Preferences"
-      className="space-y-4 rounded-lg border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+      className="space-y-4 rounded-lg border border-border bg-background p-6"
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-medium">Preferences</h2>
@@ -81,7 +82,7 @@ export function PreferencesEditor({ preferences }: { preferences: Preferences })
         />
       </dl>
       {saved ? (
-        <p role="status" className="text-sm text-emerald-700 dark:text-emerald-400">
+        <p role="status" className="text-sm text-foreground">
           Preferences saved.
         </p>
       ) : null}
@@ -92,7 +93,7 @@ export function PreferencesEditor({ preferences }: { preferences: Preferences })
 function Field({ label, value, wide }: { label: string; value: string; wide?: boolean }) {
   return (
     <div className={wide ? "sm:col-span-2" : undefined}>
-      <dt className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+      <dt className="text-xs font-medium text-muted-foreground">
         {label}
       </dt>
       <dd className="mt-1 text-sm">{value}</dd>
@@ -100,10 +101,9 @@ function Field({ label, value, wide }: { label: string; value: string; wide?: bo
   );
 }
 
-const inputClass =
-  "w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-950 aria-[invalid=true]:border-red-500";
-const helpClass = "text-xs text-neutral-500 dark:text-neutral-400";
-const errorClass = "text-xs text-red-700 dark:text-red-400";
+const inputClass = `${fieldClass} w-full`;
+const helpClass = "text-xs text-muted-foreground";
+const errorClass = "text-xs text-destructive";
 
 function PreferencesForm({
   preferences,
@@ -167,7 +167,7 @@ function PreferencesForm({
       onSubmit={onSubmit}
       noValidate
       aria-label="Edit preferences"
-      className="space-y-4 rounded-lg border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+      className="space-y-4 rounded-lg border border-border bg-background p-6"
     >
       <h2 className="text-sm font-medium">Edit preferences</h2>
 
@@ -223,7 +223,7 @@ function PreferencesForm({
             {values.networks.map((name, i) => (
               <li
                 key={`${name}-${i}`}
-                className="flex items-center gap-1 rounded-md bg-neutral-100 py-0.5 pl-2 text-sm dark:bg-neutral-800"
+                className="flex items-center gap-1 rounded-md bg-muted py-0.5 pl-2 text-sm"
               >
                 {name}
                 <Button
@@ -269,7 +269,7 @@ function PreferencesForm({
       </fieldset>
 
       {serverError ? (
-        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+        <p role="alert" className="text-sm text-destructive">
           {serverError}
         </p>
       ) : null}

@@ -84,33 +84,33 @@ export function RouteList({
               data-route-index={route.index}
               onClick={() => onSelect(route.index)}
               className={cn(
-                "w-full space-y-1 rounded-lg border bg-white p-3 text-left shadow-sm dark:bg-neutral-900",
+                "w-full space-y-1 rounded-lg border bg-background p-3 text-left",
                 selected
-                  ? "border-blue-500 ring-2 ring-blue-500/30"
-                  : "border-neutral-200 hover:border-neutral-300 dark:border-neutral-800",
+                  ? "border-foreground ring-2 ring-foreground/10"
+                  : "border-border hover:border-foreground/20",
               )}
             >
               <span className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold">{routeLabel(route.index)}</span>
                 {route.index === shortest ? (
-                  <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  <span className="rounded-md bg-success/10 px-1.5 py-0.5 text-xs font-medium text-success">
                     Shortest
                   </span>
                 ) : null}
               </span>
-              <span className="block text-sm text-neutral-700 dark:text-neutral-300">
+              <span className="block text-sm text-foreground">
                 {formatDistanceText(route.distance_m / 1000, units)} ·{" "}
                 {formatDuration(route.duration_s)}
               </span>
               {route.summary || crossings ? (
-                <span className="block text-xs text-neutral-500 dark:text-neutral-400">
+                <span className="block text-xs text-muted-foreground">
                   {route.summary ? `via ${route.summary}` : null}
                   {route.summary && crossings ? " · " : null}
                   {crossings}
                 </span>
               ) : null}
               <span
-                className="block text-xs font-medium text-neutral-700 dark:text-neutral-300"
+                className="block text-xs font-medium text-foreground"
                 data-testid="route-chargers"
               >
                 {chargersText(summaries[route.index], { hasVehicle, corridorText })}

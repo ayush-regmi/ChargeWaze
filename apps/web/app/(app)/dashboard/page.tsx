@@ -8,8 +8,8 @@ import { pickDashboardVehicle } from "@/lib/vehicles";
 
 export default function DashboardPage() {
   return (
-    <section className="mx-auto max-w-3xl space-y-6">
-      <Suspense fallback={<p className="text-sm text-neutral-500">Loading dashboard…</p>}>
+    <section className="mx-auto max-w-5xl space-y-6">
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Loading dashboard…</p>}>
         <Dashboard />
       </Suspense>
     </section>
@@ -41,7 +41,7 @@ async function Dashboard() {
 
 function LoadError() {
   return (
-    <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+    <p role="alert" className="text-sm text-destructive">
       Couldn&apos;t load your vehicle. Please refresh to try again.
     </p>
   );

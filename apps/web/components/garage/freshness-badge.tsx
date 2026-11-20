@@ -11,11 +11,11 @@ const LABELS = {
 
 const TONES = {
   awaiting:
-    "bg-sky-50 text-sky-800 ring-sky-200 dark:bg-sky-950 dark:text-sky-200 dark:ring-sky-800",
+    "bg-info/10 text-info ring-info/30",
   stale:
-    "bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:ring-amber-800",
+    "bg-warning/10 text-warning ring-warning/30",
   fresh:
-    "bg-emerald-50 text-emerald-800 ring-emerald-200 dark:bg-emerald-950 dark:text-emerald-200 dark:ring-emerald-800",
+    "bg-success/10 text-success ring-success/30",
 } as const;
 
 /** Last-update line for a vehicle: when data last arrived and whether it's stale. */
@@ -26,7 +26,7 @@ export function FreshnessBadge({
 }) {
   const kind = freshness(vehicle);
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
       <span
         data-freshness={kind}
         className={cn("rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset", TONES[kind])}

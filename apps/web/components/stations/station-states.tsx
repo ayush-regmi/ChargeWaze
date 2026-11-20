@@ -25,9 +25,9 @@ export function StationsError({
   return (
     <div
       role="alert"
-      className="space-y-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm dark:border-red-900 dark:bg-red-950/40"
+      className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm"
     >
-      <p className="text-red-700 dark:text-red-300">{ERROR_TEXT[code]}</p>
+      <p className="text-destructive">{ERROR_TEXT[code]}</p>
       <div className="flex gap-2">
         <Button type="button" size="sm" variant="outline" onClick={onRetry}>
           Try again
@@ -44,7 +44,7 @@ export function StationsError({
 
 export function StationsEmpty({ children }: { children?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-400">
+    <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
       {children ?? "No stations match these filters. Try a larger radius or fewer filters."}
     </div>
   );
@@ -52,7 +52,7 @@ export function StationsEmpty({ children }: { children?: ReactNode }) {
 
 export function StationsLoading() {
   return (
-    <p role="status" className="text-sm text-neutral-500">
+    <p role="status" className="text-sm text-muted-foreground">
       Loading stations…
     </p>
   );

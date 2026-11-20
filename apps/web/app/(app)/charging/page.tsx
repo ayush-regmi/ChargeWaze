@@ -26,7 +26,7 @@ export default function ChargingPage({ searchParams }: { searchParams: SearchPar
     <section className="mx-auto max-w-6xl space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Charging Stations</h1>
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        <p className="text-sm text-muted-foreground">
           Find chargers near a place. Live availability is shown only when the provider reports
           it.
         </p>

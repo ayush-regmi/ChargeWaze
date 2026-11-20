@@ -33,8 +33,8 @@ function Compare({
   testId: string;
 }) {
   return (
-    <tr data-testid={testId} className="border-t border-neutral-100 dark:border-neutral-900">
-      <th scope="row" className="py-1.5 pr-3 text-left font-normal text-neutral-600 dark:text-neutral-400">
+    <tr data-testid={testId} className="border-t border-border">
+      <th scope="row" className="py-1.5 pr-3 text-left font-normal text-muted-foreground">
         {label}
       </th>
       <td className="py-1.5 pr-3">{planned}</td>
@@ -88,23 +88,23 @@ export function ObservationPanel({
     <section
       aria-labelledby="observation-title"
       data-testid="observation-panel"
-      className="space-y-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800"
+      className="space-y-4 rounded-lg border border-border p-4"
     >
       <div className="flex flex-wrap items-center gap-2">
         <h2 id="observation-title" className="text-sm font-medium">
           Planned vs actual
         </h2>
-        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
           Completed
         </span>
-        <span className="text-xs text-neutral-500">
+        <span className="text-xs text-muted-foreground">
           {observation.legs.length === 1 ? "1 drive" : `${observation.legs.length} drives`} matched
         </span>
       </div>
 
       <table className="w-full text-sm" data-testid="observation-totals">
         <thead>
-          <tr className="text-left text-xs text-neutral-500">
+          <tr className="text-left text-xs text-muted-foreground">
             <th scope="col" className="pb-1 font-normal">
               <span className="sr-only">Measure</span>
             </th>
@@ -145,16 +145,16 @@ export function ObservationPanel({
         </tbody>
       </table>
       {energyMissing ? (
-        <p className="text-xs text-neutral-600 dark:text-neutral-400" data-testid="energy-missing-note">
+        <p className="text-xs text-muted-foreground" data-testid="energy-missing-note">
           At least one drive has no usable battery reading, so the energy actually used isn&apos;t
           known and no error is shown.
         </p>
       ) : null}
 
       <div className="space-y-2">
-        <h3 className="text-xs font-medium text-neutral-600 dark:text-neutral-400">By leg</h3>
+        <h3 className="text-xs font-medium text-muted-foreground">By leg</h3>
         {pairs ? (
-          <ol className="divide-y divide-neutral-100 text-sm dark:divide-neutral-900" data-testid="observation-legs">
+          <ol className="divide-y divide-border text-sm" data-testid="observation-legs">
             {pairs.map(({ planned, observed, arrival_soc_error_points }) => (
               <li key={observed.id} className="space-y-1 py-2" data-testid="observation-leg">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -174,7 +174,7 @@ export function ObservationPanel({
                     ? ` (arrival ${formatPoints(arrival_soc_error_points)})`
                     : ""}
                 </p>
-                <p className="text-xs text-neutral-500">
+                <p className="text-xs text-muted-foreground">
                   {formatKwh(observed.energy_kwh) ?? "Energy not measured"} ·{" "}
                   <DriveEnd endTime={observed.end_time} />
                 </p>
@@ -183,11 +183,11 @@ export function ObservationPanel({
           </ol>
         ) : (
           <>
-            <p className="text-xs text-neutral-600 dark:text-neutral-400" data-testid="legs-unpaired">
+            <p className="text-xs text-muted-foreground" data-testid="legs-unpaired">
               The drives don&apos;t line up one-to-one with the planned legs, so they&apos;re listed
               on their own.
             </p>
-            <ol className="divide-y divide-neutral-100 text-sm dark:divide-neutral-900" data-testid="observation-legs">
+            <ol className="divide-y divide-border text-sm" data-testid="observation-legs">
               {observation.legs.map((leg, i) => (
                 <li key={leg.id} className="space-y-1 py-2" data-testid="observation-leg">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -200,7 +200,7 @@ export function ObservationPanel({
                     {formatPercent(leg.soc_end_percent) ?? MISSING} ·{" "}
                     {formatKwh(leg.energy_kwh) ?? "energy not measured"}
                   </p>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-muted-foreground">
                     <DriveEnd endTime={leg.end_time} />
                   </p>
                 </li>
@@ -208,7 +208,7 @@ export function ObservationPanel({
             </ol>
           </>
         )}
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted-foreground">
           Planned leg distances are measured along the route and don&apos;t include detours to
           chargers.
           {observation.model_version ? ` Predictions: ${observation.model_version}.` : ""}
@@ -219,7 +219,7 @@ export function ObservationPanel({
         <p className="text-sm">
           <Link
             href="/trips/saved?view=observed&review=needs_review"
-            className="text-blue-700 hover:underline dark:text-blue-400"
+            className="link"
           >
             Some of these drives need review →
           </Link>

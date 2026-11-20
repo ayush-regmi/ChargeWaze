@@ -24,7 +24,7 @@ export function ChartDataTable({
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((v) => !v)}
-        className="text-xs font-medium text-blue-700 hover:underline dark:text-blue-400"
+        className="text-xs font-medium link"
       >
         {open ? "Hide data" : "Show data"}
       </button>
@@ -32,7 +32,7 @@ export function ChartDataTable({
         <table className="w-full text-left text-xs">
           <caption className="sr-only">{caption}</caption>
           <thead>
-            <tr className="border-b border-neutral-200 dark:border-neutral-800">
+            <tr className="border-b border-border">
               {columns.map((c) => (
                 <th key={c} scope="col" className="py-1 pr-3 font-medium">
                   {c}
@@ -44,7 +44,7 @@ export function ChartDataTable({
             {rows.map((row, i) => (
               <tr
                 key={i}
-                className="border-b border-neutral-100 dark:border-neutral-900"
+                className="border-b border-border"
               >
                 {row.map((cell, j) =>
                   j === 0 ? (

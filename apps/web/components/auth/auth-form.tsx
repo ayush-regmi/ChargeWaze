@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { safeNextPath } from "@/lib/safe-next";
 import { createClient } from "@/lib/supabase/browser";
+import { buttonVariants } from "@/components/ui/button";
+import { fieldClass, labelClass } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 
 type Mode = "sign-in" | "sign-up";
@@ -81,24 +83,20 @@ export function AuthForm({
 
   return (
     <div className="space-y-4">
-      <form onSubmit={onSubmit} className="space-y-3">
-        <label className="block text-sm">
-          <span className="mb-1 block text-neutral-700 dark:text-neutral-300">
-            Email
-          </span>
+      <form onSubmit={onSubmit} className="space-y-4">
+        <label className="block space-y-1.5">
+          <span className={cn("block", labelClass)}>Email</span>
           <input
             type="email"
             autoComplete="email"
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-neutral-700 dark:bg-neutral-950"
+            className={cn(fieldClass, "w-full")}
           />
         </label>
-        <label className="block text-sm">
-          <span className="mb-1 block text-neutral-700 dark:text-neutral-300">
-            Password
-          </span>
+        <label className="block space-y-1.5">
+          <span className={cn("block", labelClass)}>Password</span>
           <input
             type="password"
             autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
@@ -106,34 +104,31 @@ export function AuthForm({
             required
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-neutral-700 dark:bg-neutral-950"
+            className={cn(fieldClass, "w-full")}
           />
         </label>
         <button
           type="submit"
           disabled={submitting}
-          className={cn(
-            "flex w-full items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm",
-            "hover:bg-emerald-700 disabled:opacity-60",
-          )}
+          className={cn(buttonVariants(), "w-full")}
         >
-          {submitting ? "Working..." : mode === "sign-in" ? "Sign in" : "Sign up"}
+          {submitting ? "Working…" : mode === "sign-in" ? "Sign in" : "Sign up"}
         </button>
       </form>
 
       {(googleEnabled || appleEnabled) && (
         <>
-          <div className="flex items-center gap-2 text-xs text-neutral-500">
-            <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
             or continue with
-            <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
+            <span className="h-px flex-1 bg-border" />
           </div>
           <div className="grid grid-cols-1 gap-2">
             {googleEnabled && (
               <button
                 type="button"
                 onClick={() => onOAuth("google")}
-                className="flex items-center justify-center gap-2 rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-50 hover:text-emerald-700 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:hover:bg-neutral-50 dark:hover:text-emerald-700"
+                className={cn(buttonVariants({ variant: "outline" }), "w-full")}
               >
                 Continue with Google
               </button>
@@ -142,7 +137,7 @@ export function AuthForm({
               <button
                 type="button"
                 onClick={() => onOAuth("apple")}
-                className="flex items-center justify-center gap-2 rounded-md border border-neutral-300 bg-black px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-neutral-800"
+                className={cn(buttonVariants({ variant: "outline" }), "w-full")}
               >
                 Continue with Apple
               </button>
@@ -152,12 +147,12 @@ export function AuthForm({
       )}
 
       {error && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       )}
       {info && (
-        <p role="status" className="text-sm text-emerald-700 dark:text-emerald-300">
+        <p role="status" className="text-sm text-success">
           {info}
         </p>
       )}

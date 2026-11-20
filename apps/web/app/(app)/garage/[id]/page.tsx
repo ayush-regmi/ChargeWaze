@@ -19,11 +19,11 @@ export default function VehiclePage({ params }: { params: Promise<{ id: string }
     <section className="mx-auto max-w-3xl space-y-6">
       <Link
         href="/garage"
-        className="text-sm text-neutral-600 hover:underline dark:text-neutral-400"
+        className="text-sm text-muted-foreground underline-offset-[3px] hover:text-foreground hover:underline"
       >
         ← Back to Garage
       </Link>
-      <Suspense fallback={<p className="text-sm text-neutral-500">Loading vehicle…</p>}>
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Loading vehicle…</p>}>
         <VehicleDetails params={params} />
       </Suspense>
     </section>
@@ -45,7 +45,7 @@ async function VehicleDetails({ params }: { params: Promise<{ id: string }> }) {
   if (response.status === 404) notFound();
   if (!data) {
     return (
-      <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+      <p role="alert" className="text-sm text-destructive">
         Couldn&apos;t load this vehicle. Please refresh to try again.
       </p>
     );
@@ -59,7 +59,7 @@ async function VehicleDetails({ params }: { params: Promise<{ id: string }> }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          <p className="text-sm capitalize text-neutral-600 dark:text-neutral-400">
+          <p className="text-sm capitalize text-muted-foreground">
             {data.connection_status}
             {data.connection_status === "connected" && data.connected_at ? (
               <span className="normal-case">

@@ -14,7 +14,7 @@ const SOURCE_LABELS: Record<string, string> = {
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[9rem_1fr] gap-3 py-1 text-sm">
-      <dt className="text-neutral-600 dark:text-neutral-400">{label}</dt>
+      <dt className="text-muted-foreground">{label}</dt>
       <dd>{children}</dd>
     </div>
   );
@@ -30,7 +30,7 @@ export function PlanAssumptions({ plan, units }: { plan: PlanResponse; units: Un
   const c = plan.candidates;
   return (
     <details
-      className="rounded-lg border border-neutral-200 p-3 text-sm dark:border-neutral-800"
+      className="rounded-lg border border-border p-3 text-sm"
       data-testid="plan-assumptions"
     >
       <summary className="cursor-pointer font-medium">How this was calculated</summary>
@@ -68,7 +68,7 @@ export function PlanAssumptions({ plan, units }: { plan: PlanResponse; units: Un
           )}
         </Row>
       </dl>
-      <p className="mt-2 text-xs text-neutral-500">
+      <p className="mt-2 text-xs text-muted-foreground">
         Speed, temperature, elevation and charger availability aren&apos;t modelled. Detours are
         estimates. Unknown-power chargers are never used.
       </p>
