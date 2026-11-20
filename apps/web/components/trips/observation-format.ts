@@ -3,9 +3,8 @@
  * §3.18 and §3.18e): parsing, time windows, quality reasons and the
  * planned-vs-observed leg pairing. Pure functions, no React.
  *
- * `observation` on `GET /trips/{id}` is typed as a free-form object until
- * P5-F4's typed models land, so it is read defensively: anything that isn't
- * the contract shape is treated as `null` ("no match yet"), never guessed.
+ * `observation` on `GET /trips/{id}` is the typed `TripObservation` from the
+ * generated client (P5-F4), so the API's validation is the shape check here.
  */
 
 import type { components } from "@chargewise/api-client";
@@ -16,110 +15,20 @@ export type ObservedTrip = components["schemas"]["ObservedTripOut"];
 export type QualityFlag = ObservedTrip["quality_flag"];
 export type ReviewStatus = ObservedTrip["review_status"];
 
-export type ObservationLeg = {
-  id: string;
-  plan_leg_index: number;
-  start_time: string;
-  end_time: string;
-  distance_km: number;
-  soc_start_percent: number | null;
-  soc_end_percent: number | null;
-  energy_kwh: number | null;
-  quality_flag: QualityFlag | null;
-  review_status: ReviewStatus | null;
-};
-
-export type TripObservation = {
-  matched_at: string | null;
-  legs: ObservationLeg[];
-  observed_distance_km: number | null;
-  planned_distance_km: number | null;
-  predicted_energy_kwh: number | null;
-  observed_energy_kwh: number | null;
-  error_kwh: number | null;
-  observed_start_soc: number | null;
-  predicted_arrival_soc: number | null;
-  observed_arrival_soc: number | null;
-  arrival_soc_error_points: number | null;
-  model_version: string | null;
-};
-
-type Obj = Record<string, unknown>;
-
-function obj(v: unknown): Obj | null {
-  return typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Obj) : null;
-}
-
-function num(v: unknown): number | null {
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
-}
-
-function str(v: unknown): string | null {
-  return typeof v === "string" && v.length > 0 ? v : null;
-}
-
-function isoTime(v: unknown): string | null {
-  const s = str(v);
-  return s && !Number.isNaN(new Date(s).getTime()) ? s : null;
-}
-
-const QUALITY_FLAGS: readonly QualityFlag[] = ["high", "medium", "low"];
-const REVIEW_STATUSES: readonly ReviewStatus[] = ["auto", "needs_review", "confirmed", "rejected"];
-
-function oneOf<T extends string>(v: unknown, allowed: readonly T[]): T | null {
-  return typeof v === "string" && (allowed as readonly string[]).includes(v) ? (v as T) : null;
-}
-
-function leg(v: unknown, i: number): ObservationLeg | null {
-  const o = obj(v);
-  if (!o) return null;
-  const id = str(o.id);
-  const start = isoTime(o.start_time);
-  const end = isoTime(o.end_time);
-  const distance = num(o.distance_km);
-  if (!id || !start || !end || distance === null) return null;
-  return {
-    id,
-    plan_leg_index: num(o.plan_leg_index) ?? i + 1,
-    start_time: start,
-    end_time: end,
-    distance_km: distance,
-    soc_start_percent: num(o.soc_start_percent),
-    soc_end_percent: num(o.soc_end_percent),
-    energy_kwh: num(o.energy_kwh),
-    quality_flag: oneOf(o.quality_flag, QUALITY_FLAGS),
-    review_status: oneOf(o.review_status, REVIEW_STATUSES),
-  };
-}
+export type TripObservation = components["schemas"]["TripObservation"];
+export type ObservationLeg = components["schemas"]["TripObservationLeg"];
 
 /**
- * Read `trip.observation` (§3.18e). Returns null for `null`, for anything
- * that isn't an object, and for an observation without readable legs.
+ * Read `trip.observation` (§3.18e). Null when the plan isn't matched yet or
+ * the observation has no legs; otherwise a copy with the legs in plan order
+ * (`plan_leg_index`), which the leg pairing relies on.
  */
-export function parseObservation(raw: unknown): TripObservation | null {
-  const o = obj(raw);
-  if (!o || !Array.isArray(o.legs) || o.legs.length === 0) return null;
-  const legs: ObservationLeg[] = [];
-  for (const [i, item] of o.legs.entries()) {
-    const parsed = leg(item, i);
-    if (!parsed) return null;
-    legs.push(parsed);
-  }
-  legs.sort((a, b) => a.plan_leg_index - b.plan_leg_index);
-  return {
-    matched_at: isoTime(o.matched_at),
-    legs,
-    observed_distance_km: num(o.observed_distance_km),
-    planned_distance_km: num(o.planned_distance_km),
-    predicted_energy_kwh: num(o.predicted_energy_kwh),
-    observed_energy_kwh: num(o.observed_energy_kwh),
-    error_kwh: num(o.error_kwh),
-    observed_start_soc: num(o.observed_start_soc),
-    predicted_arrival_soc: num(o.predicted_arrival_soc),
-    observed_arrival_soc: num(o.observed_arrival_soc),
-    arrival_soc_error_points: num(o.arrival_soc_error_points),
-    model_version: str(o.model_version),
-  };
+export function parseObservation(
+  observation: TripObservation | null | undefined,
+): TripObservation | null {
+  if (!observation || observation.legs.length === 0) return null;
+  const legs = [...observation.legs].sort((a, b) => a.plan_leg_index - b.plan_leg_index);
+  return { ...observation, legs };
 }
 
 // ---- Times ---------------------------------------------------------------

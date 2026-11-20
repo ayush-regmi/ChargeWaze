@@ -366,6 +366,17 @@ Replaces the placeholder `app/(app)/analytics/page.tsx`. No chart library (D5): 
 
 Real-car check: a few real drives (and one charging session) produce legs with no manual step, after P2-R2's cadence is recorded. Record the observed cadence and the resulting quality mix (how many high/medium/low) in the roadmap risk table; if most legs are low because of the cadence, open a follow-up to tune D8 or the split. Fill in the §6 mapping table and update the roadmap status. Playwright analytics flow (F6) green.
 
+**As built (P5-F8, 2026-11-19):** no API, schema or dependency change. Files:
+- **Typed observation (P5-F7 follow-up).** `components/trips/observation-format.ts`: `TripObservation` and `ObservationLeg` are now the generated `components["schemas"]["TripObservation"]` / `["TripObservationLeg"]`. `parseObservation` no longer checks fields by hand. It returns `null` for a missing observation or one with no legs, and otherwise a copy with the legs sorted by `plan_leg_index`. The F7 tests use the typed fixture; the malformed-input cases are gone because the type now rules them out. `observation-panel.tsx` and the trip page needed no change.
+- **Pipeline test** `services/api/tests/trips/test_phase5_closeout.py` (7 tests). It replays §5 example 3 as signed `VEHICLE_STATE` webhooks through the real router: legs, plan match, plan score, backtests, `GET /trips/{id}` `observation`, `/analytics/consumption` (MAE 0.485) and CSV = JSON. It runs in two modes: **live** (the hook's clock follows the readings, so the last leg is in progress while driving) and **late** (the whole drive arrives a day later). The file also has a check that a plan made after the drive never claims it.
+- **Known bug, reproduced (P5-F3 follow-up, not fixed here):** a backlog that arrives *after a newer reading* is truncated. The newer reading closes the first leg at its second reading, and later deliveries never extend it (example 3: 22.10 km stored instead of 222.40). This is the case P5-F6's spec hit, because the E2E seed's "now" reading comes before the drive's readings. `test_backlog_behind_a_newer_reading_builds_the_same_legs` is a **strict xfail**, so it fails once the bug is fixed. `test_full_recompute_repairs_a_truncated_backlog` checks the documented catch-up. Live delivery, which is what a connected car does, isn't affected (`[live]` passes).
+- **Playwright** `e2e/planned-vs-actual.spec.ts` (2). It plans Frederick → Toronto through `POST /routes/plan` on the provider stub, with `departure_time` two days ago and a starting charge of 90 %, then saves the plan. It then sends webhooks for one drive per planned leg: a reading every 15 min, a charging session at each stop, and the planned distance (route + detours) in total. After the catch-up it checks:
+  - the panel: "N drives matched", the energy row (predicted, observed and error from the API), the starting charge, each leg paired with "High quality";
+  - "Completed" on Saved trips.
+- **`e2e/analytics.spec.ts`**: estimates are now required (P5-F4 merged). The consumption line chart must render (the "nothing to compare" text is absent), and the scatter must show both drives, the low-quality one hollow. The webhook signing and `apiAs` moved into `e2e/telemetry-webhooks.ts`, which isn't a spec and isn't in the E2E-harness lane. `observed-trips.spec.ts` (F7's file) keeps its own copy.
+- **Real-car check: not done.** No real-car data was available to this session, and it doesn't query the hosted database. The observed cadence and the high/medium/low mix are [M-11](manual-test-log.md#m-11--real-drives-produce-observed-legs-p5-f8) in the manual-test log (after M-02), and from there go in the roadmap risk table. No numbers are recorded here.
+- **§6** is filled in (below). Roadmap Phase 5: code complete, waiting on M-11.
+
 ---
 
 ## 4. Interfaces
@@ -682,22 +693,20 @@ Result: one leg 16:00 → 16:15, **13.00 km**, SoC 90 → 87, `energy_kwh = null
 
 ## 6. Acceptance mapping
 
-F8 fills in the "Test" column with real test names.
+F8 fills in the "Test" column with real test names. Every test listed passed on `feature/phase5-closeout` on 2026-11-19 (pytest 1429 passed + 1 expected xfail, Vitest 450 passed, Playwright 15 passed). Backend paths are under `services/api/tests/`, web paths under `apps/web/`.
 
 | Requirement | Planned test (feature) | Test |
 |---|---|---|
-| PRD 4.5: view completed or confirmed trips | F3 `GET /observed-trips`; F7 list | |
-| PRD 4.5: estimated vs observed per trip | F4 backtests; F5 `/analytics/trips`; F6 scatter | |
-| PRD 4.5: Wh/mi or kWh/100 km | F6 unit conversion | |
-| PRD 4.5: CSV export | F5 CSV = JSON; F6 download | |
-| PRD 4.5: driving separate from charging | F2 example 3 | |
-| PRD 4.5: quality flag on each trip | F2 examples 1–5; F6/F7 badges | |
-| PRD 4.5 / §7: simulated excluded by default | F2 example 5; F5 `include_simulated`; F6 banner | |
-| Roadmap: real trips without manual intervention | F3 webhook → hook → leg; F8 real car | |
-| Roadmap: prediction vs observation error | F4 example 3; F5 MAE | |
-| Ownership (404) on every observed/analytics route | F3, F5 | |
-
----
+| PRD 4.5: view completed or confirmed trips | F3 `GET /observed-trips`; F7 list | `trips/test_observed_api.py::test_list_newest_first_with_contract_fields`, `::test_list_filters_and_cursor`, `::test_confirm_is_idempotent_and_freezes`; `tests/observation-list.test.tsx` "shows each drive with its bounded start, quality, reasons and review buttons"; `e2e/observed-trips.spec.ts` "lists inferred drives for review and confirms or rejects them" |
+| PRD 4.5: estimated vs observed per trip | F4 backtests; F5 `/analytics/trips`; F6 scatter | `trips/test_matching.py::test_example3_end_to_end_match_and_scores`, `::test_backtests_for_every_finished_leg_with_energy`; `analytics/test_analytics_api.py::test_trip_row_fields`; `tests/analytics-components.test.tsx` "draws a y = x line and hollow points for low quality"; `e2e/analytics.spec.ts` "shows trends, quality badges and a CSV that matches the table" (scatter with both drives, F8) |
+| PRD 4.5: Wh/mi or kWh/100 km | F6 unit conversion | `tests/analytics-lib.test.ts` "converts kWh/km to Wh/mi and kWh/100 km"; `tests/analytics-components.test.tsx` "converts to the user's units and skips in-progress drives in the scatter" |
+| PRD 4.5: CSV export | F5 CSV = JSON; F6 download | `analytics/test_analytics_api.py::test_csv_rows_equal_json_rows`, `::test_csv_escapes_formula_labels_but_not_numbers`, `::test_export_cap`; `trips/test_phase5_closeout.py::test_trip_page_and_analytics_show_the_result` (CSV = JSON on webhook-built legs); `e2e/analytics.spec.ts` "shows trends, quality badges and a CSV that matches the table" |
+| PRD 4.5: driving separate from charging | F2 example 3 | `trips/test_inference.py::test_example3_charging_is_never_driving_energy`, `::test_charging_session_always_splits_even_with_no_odometer_reading_during_it`; `trips/test_phase5_closeout.py::test_webhooks_alone_produce_legs_a_match_and_backtests` (the DC stop is outside both legs) |
+| PRD 4.5: quality flag on each trip | F2 examples 1–5; F6/F7 badges | `trips/test_inference.py::test_worked_example_matches_exactly` (all five); `tests/analytics-components.test.tsx` "shows a quality badge with the reasons as its description"; `tests/observation-panel.test.tsx` "compares the plan with the matched drives (§5 example 3)"; `e2e/analytics.spec.ts` (badge + tooltip); `e2e/planned-vs-actual.spec.ts` (badge per leg) |
+| PRD 4.5 / §7: simulated excluded by default | F2 example 5; F5 `include_simulated`; F6 banner | `trips/test_inference.py::test_simulated_rows_are_dropped_and_counted_both_ways`; `trips/test_observed_service.py::test_simulated_vehicle_gets_simulated_legs_and_drops_real_rows`; `analytics/test_analytics_api.py::test_simulated_legs_are_excluded_by_default_and_counted`; `tests/analytics-components.test.tsx` "says how many simulated trips were left out", "shows a banner when simulated data is included" |
+| Roadmap: real trips without manual intervention | F3 webhook → hook → leg; F8 real car | `test_ingest_hooks.py::test_webhook_creates_legs_with_no_other_call`; `trips/test_phase5_closeout.py::test_webhooks_alone_produce_legs_a_match_and_backtests[live]` and `[late]` (signed webhooks only, through matching and backtests). Real car: **open**, [M-11](manual-test-log.md#m-11--real-drives-produce-observed-legs-p5-f8) (needs M-02). Known gap: `::test_backlog_behind_a_newer_reading_builds_the_same_legs` (strict xfail, see F8 "As built") |
+| Roadmap: prediction vs observation error | F4 example 3; F5 MAE | `trips/test_matching.py::test_example3_score`, `::test_example3_end_to_end_match_and_scores`; `analytics/test_analytics_api.py::test_example_3_day_bucket_and_plan_accuracy` (MAE 0.485 kWh); `trips/test_phase5_closeout.py::test_trip_page_and_analytics_show_the_result`; `e2e/planned-vs-actual.spec.ts` "the trip page compares the plan with the drives that carried it out" |
+| Ownership (404) on every observed/analytics route | F3, F5 | `trips/test_observed_api.py::test_every_route_is_404_for_another_user`, `::test_get_one_and_ownership`; `analytics/test_analytics_api.py::test_another_users_vehicle_is_not_found`; `trips/test_matching.py::test_plan_on_another_vehicle_never_matches` |
 
 ## 7. Open questions and follow-ups
 

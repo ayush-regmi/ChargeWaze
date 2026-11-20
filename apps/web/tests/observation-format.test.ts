@@ -138,23 +138,19 @@ describe("parseObservation", () => {
     expect(o.legs[0]!.quality_flag).toBe("high");
   });
 
-  it.each([null, undefined, "x", [], {}, { legs: [] }, { legs: [{ id: "x" }] }])(
-    "treats %j as no observation",
-    (raw) => {
-      expect(parseObservation(raw)).toBeNull();
-    },
-  );
-
-  it("keeps unknown enum values out instead of guessing", () => {
-    const raw = exampleObservation();
-    (raw.legs as Record<string, unknown>[])[0]!.quality_flag = "great";
-    expect(parseObservation(raw)!.legs[0]!.quality_flag).toBeNull();
+  it.each([null, undefined])("treats %j as no match yet", (raw) => {
+    expect(parseObservation(raw)).toBeNull();
   });
 
-  it("orders legs by plan_leg_index", () => {
+  it("treats an observation without legs as no match yet", () => {
+    expect(parseObservation({ ...exampleObservation(), legs: [] })).toBeNull();
+  });
+
+  it("orders legs by plan_leg_index without changing the input", () => {
     const raw = exampleObservation();
-    (raw.legs as unknown[]).reverse();
+    raw.legs.reverse();
     expect(parseObservation(raw)!.legs.map((l) => l.plan_leg_index)).toEqual([1, 2]);
+    expect(raw.legs.map((l) => l.plan_leg_index)).toEqual([2, 1]);
   });
 });
 
@@ -180,7 +176,7 @@ describe("pairLegs", () => {
 
   it("returns null when the counts don't line up", () => {
     const raw = exampleObservation();
-    (raw.legs as unknown[]).pop();
+    raw.legs.pop();
     expect(pairLegs(parseStoredPlan(examplePlan()), parseObservation(raw)!)).toBeNull();
     expect(pairLegs(null, parseObservation(exampleObservation())!)).toBeNull();
   });
