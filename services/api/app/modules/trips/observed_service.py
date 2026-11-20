@@ -305,7 +305,13 @@ def infer_for_vehicle(
     if vehicle is None:
         raise _vehicle_not_found()
 
-    window_start = _window_start(db, vehicle_id=vehicle_id, since=since, full=full)
+    window_start = _window_start(
+        db,
+        vehicle_id=vehicle_id,
+        since=since,
+        full=full,
+        stop_split=timedelta(minutes=engine_settings.stop_split_minutes),
+    )
     context_start = _context_start(db, vehicle_id=vehicle_id, window_start=window_start)
     readings = [
         _engine_reading(r) for r in list_readings(db, vehicle_id=vehicle_id, since=context_start)
@@ -433,7 +439,12 @@ def _match_and_score_vehicle(
 
 
 def _window_start(
-    db: Session, *, vehicle_id: uuid.UUID, since: datetime | None, full: bool
+    db: Session,
+    *,
+    vehicle_id: uuid.UUID,
+    since: datetime | None,
+    full: bool,
+    stop_split: timedelta,
 ) -> datetime | None:
     """Where re-inference starts (phase5_plan.md §3 F3); ``None`` = all history."""
 
@@ -445,6 +456,7 @@ def _window_start(
             ObservedTrip.end_time,
             ObservedTrip.closed,
             ObservedTrip.review_status,
+            ObservedTrip.soc_end_recorded_at,
         ).where(ObservedTrip.vehicle_id == vehicle_id)
     ).all()
     closed_ends = [leg.end_time for leg in legs if leg.closed]
@@ -453,17 +465,61 @@ def _window_start(
         # leg must be able to grow from its own start, so rebuild everything.
         return None
     anchor: datetime = max(closed_ends)
-    if since is None or since >= anchor:
+    if since is None:
         return anchor
-    # Late telemetry: rebuild from the earliest non-frozen leg it can touch,
-    # and never start after ``since`` itself: readings older than every leg
-    # (a delayed earlier drive) must be inside the window to become a leg.
+    # Rebuild from the earliest non-frozen leg a reading at ``since`` can
+    # touch, and never start after ``since`` itself: readings older than every
+    # leg (a delayed earlier drive) must be inside the window to become a leg.
+    # "Closed" is not "final": a leg can be closed by a newer reading (a gap
+    # after it, or a charging session that starts later) that arrived before
+    # the readings in between. So a leg ending at or after ``since`` is always
+    # reached, even when it ends exactly at ``since`` (a hook that ran late and
+    # already saw this delivery's reading), and so is the leg just before it.
     reaching = [
-        leg.start_time
-        for leg in legs
-        if leg.review_status not in FROZEN_REVIEW_STATUSES and leg.end_time >= since
+        since,
+        *(
+            leg.start_time
+            for leg in legs
+            if leg.review_status not in FROZEN_REVIEW_STATUSES and leg.end_time >= since
+        ),
     ]
-    start: datetime = min([*reaching, since])
+    previous = _leg_reachable_from_before(legs, since=since, stop_split=stop_split)
+    if previous is not None:
+        reaching.append(previous)
+    if since >= max(leg.end_time for leg in legs):
+        # In-order delivery: everything after the anchor is rebuilt as before.
+        reaching.append(anchor)
+    start: datetime = min(reaching)
+    return start
+
+
+def _leg_reachable_from_before(
+    legs: Sequence[Any], *, since: datetime, stop_split: timedelta
+) -> datetime | None:
+    """Start of the last leg ending before ``since``, if a reading at ``since`` can change it.
+
+    A late reading can extend that leg (it is within ``stop_split`` of the
+    leg's end, so the engine continues the leg instead of closing it), or
+    become its end SoC (it is before the next leg starts, which bounds the
+    end SoC, and earlier than the SoC reading the leg uses now). Frozen legs
+    are never rewritten, so they don't count. ``None`` if nothing qualifies.
+    """
+
+    before = [leg for leg in legs if leg.end_time < since]
+    if not before:
+        return None
+    leg = max(before, key=lambda row: row.end_time)
+    if leg.review_status in FROZEN_REVIEW_STATUSES:
+        return None
+    next_start = min(
+        (other.start_time for other in legs if other.start_time >= leg.end_time),
+        default=None,
+    )
+    extends = since - leg.end_time <= stop_split
+    new_end_soc = (next_start is None or since <= next_start) and (
+        leg.soc_end_recorded_at is None or since < leg.soc_end_recorded_at
+    )
+    start: datetime | None = leg.start_time if extends or new_end_soc else None
     return start
 
 

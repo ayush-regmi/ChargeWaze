@@ -321,14 +321,6 @@ def test_plan_created_after_the_drive_is_not_matched(
     assert trip is not None and trip.status == "planned"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "P5-F3 follow-up: a backlog delivered after a newer reading is truncated; "
-        "the first leg is closed at its second reading and never extended. "
-        "`full` recompute rebuilds it."
-    ),
-)
 def test_backlog_behind_a_newer_reading_builds_the_same_legs(
     webhook_api: TestClient,
     db: Session,
@@ -347,15 +339,20 @@ def test_backlog_behind_a_newer_reading_builds_the_same_legs(
         Decimal("222.40"),
         Decimal("183.60"),
     ]
+    # Every column, not just the distance, is what a full recompute writes.
+    full = observed_service.run_for_vehicle(
+        db, vehicle_id=vehicle.id, user_id=vehicle.user_id, full=True, now=LATE_NOW
+    )
+    assert (full.legs_created, full.legs_updated, full.legs_deleted) == (0, 0, 0)
 
 
-def test_full_recompute_repairs_a_truncated_backlog(
+def test_full_recompute_after_a_backlog_keeps_the_legs_and_the_match(
     webhook_api: TestClient,
     db: Session,
     add_vehicle: Callable[..., Vehicle],
     clock: type[_Clock],
 ) -> None:
-    """The documented catch-up (`infer_trips.py --full`, recompute `full`) for the case above."""
+    """After the backlog above, the catch-up (recompute `full`) has nothing left to fix."""
 
     vehicle = add_vehicle()
     plan_id = add_plan(db, vehicle)
@@ -364,11 +361,16 @@ def test_full_recompute_repairs_a_truncated_backlog(
     for _, body in deliveries(vehicle):
         post(webhook_api, body)
 
-    observed_service.run_for_vehicle(
+    # The webhooks alone matched the plan; no catch-up was needed.
+    leg1, leg2 = legs(db, vehicle)
+    assert (leg1.distance_km, leg2.distance_km) == (Decimal("222.40"), Decimal("183.60"))
+    assert {leg1.planned_trip_id, leg2.planned_trip_id} == {plan_id}
+
+    summary = observed_service.run_for_vehicle(
         db, vehicle_id=vehicle.id, user_id=vehicle.user_id, full=True, now=LATE_NOW
     )
     db.commit()
 
+    assert (summary.legs_created, summary.legs_updated, summary.legs_deleted) == (0, 0, 0)
     leg1, leg2 = legs(db, vehicle)
-    assert (leg1.distance_km, leg2.distance_km) == (Decimal("222.40"), Decimal("183.60"))
     assert {leg1.planned_trip_id, leg2.planned_trip_id} == {plan_id}

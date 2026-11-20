@@ -22,10 +22,9 @@ import {
  *    leg, a charging session at each stop, a reading every 15 minutes, and
  *    the planned distance in total. The post-ingest hook infers the legs and
  *    matches them to the plan (ADR 0009). No rows are written directly.
- *    The readings arrive two days late, after the seed's newer reading, which
- *    is the P5-F3 truncation case (`test_phase5_closeout.py`, xfail); so the
- *    spec runs the documented catch-up, recompute with `full`, as
- *    `analytics.spec.ts` does. Drop it when that bug is fixed.
+ *    The readings arrive two days late, after the seed's newer reading (the
+ *    P5-F3 backlog case, `test_phase5_closeout.py`); the per-webhook
+ *    inference builds the legs whole, with no `recompute` call.
  * 3. The trip page shows the panel, leg by leg; Saved trips says Completed.
  */
 
@@ -149,14 +148,10 @@ test.beforeAll(async ({}, testInfo) => {
 
   for (const r of drivePlan(plan, departure + 2 * MINUTE)) await deliver(r);
 
-  // Background hooks may still be running; repeat the catch-up until matched.
+  // The post-ingest hooks run after each response; wait until the plan is matched.
   await expect
     .poll(
       async () => {
-        await apiAs("/api/v1/observed-trips/recompute", {
-          method: "POST",
-          body: JSON.stringify({ vehicle_id: vehicleId, full: true }),
-        });
         const trip = await apiAs(`/api/v1/trips/${tripId}`);
         return {
           status: trip.status,
