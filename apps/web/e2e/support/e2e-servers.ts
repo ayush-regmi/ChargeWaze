@@ -24,6 +24,11 @@ export const API_ENV: Record<string, string> = {
   SUPABASE_JWKS_URL: "",
   SUPABASE_JWT_SECRET: E2E_JWT_SECRET,
   SUPABASE_JWT_AUDIENCE: "authenticated",
+  // Account deletion (P6-F5) calls the Supabase admin API with these. Blank,
+  // so a real service-role key in services/api/.env is never used: the
+  // auth-user deletion just stays owed in the test database.
+  SUPABASE_URL: "",
+  SUPABASE_SERVICE_ROLE_KEY: "",
   SMARTCAR_CLIENT_ID: "",
   SMARTCAR_CLIENT_SECRET: "",
   SMARTCAR_STATE_SECRET: "e2e-only-state-secret",

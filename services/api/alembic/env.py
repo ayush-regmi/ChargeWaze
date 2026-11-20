@@ -21,6 +21,7 @@ from app.modules.stations import models as _stations_models  # noqa: F401
 from app.modules.trips import models as _trips_models  # noqa: F401
 from app.modules.trips import observed_models as _observed_trips_models  # noqa: F401
 from app.modules.users import models as _users_models  # noqa: F401
+from app.modules.users import privacy_models as _privacy_models  # noqa: F401
 from app.modules.vehicles import models as _vehicles_models  # noqa: F401
 
 config = context.config

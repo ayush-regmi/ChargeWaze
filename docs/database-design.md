@@ -1,6 +1,6 @@
 # Chargewise — Database Design
 
-Status: **Draft (specification phase)** · Last updated: 2026-11-17
+Status: **Draft (specification phase)** · Last updated: 2026-11-19
 
 Postgres schema for the modular monolith. Owned by the backend only; the frontend never connects to the database directly. Managed with SQLAlchemy models and Alembic migrations under [`services/api/alembic/`](../services/api/alembic/).
 
@@ -32,6 +32,7 @@ erDiagram
     planned_trips ||--o| prediction_results : scored_by
     observed_trips ||--o| prediction_results : backtested_in
     planned_trips ||--o{ observed_trips : matched_to
+    profiles ||--o{ consent_records : answered
 
     profiles {
         uuid id PK
@@ -156,7 +157,26 @@ erDiagram
         numeric arrival_soc_error_points
         boolean is_simulated
     }
+    consent_records {
+        uuid id PK
+        uuid user_id FK
+        text kind
+        text version
+        boolean granted
+        timestamptz recorded_at
+        text source
+    }
+    account_deletions {
+        uuid user_id PK
+        timestamptz requested_at
+        timestamptz auth_user_deleted_at
+        jsonb pending_smartcar_connection_ids
+        int attempts
+        timestamptz last_attempt_at
+    }
 ```
+
+`account_deletions` has no relationship: it outlives the profile on purpose (§3.12).
 
 ## 3. Tables
 
@@ -284,7 +304,7 @@ Log of on-demand Smartcar reads (`POST /vehicles/{id}/refresh`, ADR 0010). The p
 
 Indexes: `INDEX (vehicle_id, requested_at DESC)`.
 
-Retention: rows older than 30 days are deleted for a vehicle whenever a new attempt is recorded for it. No job is needed. RLS is enabled with no policies, as for the other server-only tables.
+Retention: rows older than 30 days are deleted for a vehicle whenever a new attempt is recorded for it; the nightly retention job (§6) also prunes vehicles that are never refreshed again. RLS is enabled with no policies, as for the other server-only tables.
 
 ### 3.6 `charging_stations`
 
@@ -447,6 +467,43 @@ RLS enabled.
 
 **Retention (P6-F5):** only unsaved, unmatched plans expire (`saved_at IS NULL AND status = 'planned'`), so matched plans and their `'plan'` rows are kept.
 
+### 3.11 `consent_records`
+
+Append-only audit of a user's answers to the privacy notice (PRD §4.6 "consent state is stored and auditable", P6-F5). A change is a new row, never an update; the latest row per `(user_id, kind)` is the current answer (api §3.1c).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` PK | `gen_random_uuid()`. |
+| `user_id` | `uuid` FK → `profiles.id` ON DELETE CASCADE NOT NULL | Deleted with the account. |
+| `kind` | `text` NOT NULL | `'privacy_notice'` (`CHECK`). New kinds need a migration. |
+| `version` | `text` NOT NULL | The notice version answered (`PRIVACY_NOTICE_VERSION`). 1–32 chars (`CHECK`). |
+| `granted` | `boolean` NOT NULL | `true` accepted, `false` declined or withdrawn. |
+| `recorded_at` | `timestamptz` NOT NULL | Default `now()`. |
+| `source` | `text` NOT NULL | `'web'` (`CHECK`). |
+
+Indexes: `(user_id, kind, recorded_at DESC)`. RLS enabled with no policies.
+
+### 3.12 `account_deletions`
+
+One row per deleted account (P6-F5, api §3.1b). Written in the same transaction that deletes the profile; **no foreign key**, so it survives the cascade.
+
+| Column | Type | Notes |
+|---|---|---|
+| `user_id` | `uuid` PK | The deleted Supabase user ID. Links to nothing once the auth user is gone. |
+| `requested_at` | `timestamptz` NOT NULL | Default `now()`. |
+| `auth_user_deleted_at` | `timestamptz` NULL | Set once Supabase confirms the auth-user deletion (or answers 404). `NULL` = still owed. |
+| `pending_smartcar_connection_ids` | `jsonb` NOT NULL | Array (`CHECK`) of Smartcar connection IDs whose revocation failed. Default `[]`. The only Smartcar identifiers kept after deletion, and only until revoked. |
+| `attempts` | `int` NOT NULL | Retention-job retries. Default 0. |
+| `last_attempt_at` | `timestamptz` NULL | |
+
+What it is for:
+
+- **No resurrection.** `get_or_create_profile` refuses a user with a row here (`401`), so a Supabase access token that is still valid can't lazily recreate the profile through `/me`, Connect, the planner or favorites.
+- **Owed work.** The retention job retries the revocations (until `PRIVACY_REVOCATION_GIVE_UP_DAYS`, 30) and the auth-user deletion (until it succeeds).
+- **Removal.** The job deletes the row once nothing is owed and `auth_user_deleted_at` is older than `PRIVACY_TOMBSTONE_DAYS` (7), which must stay longer than the Supabase JWT expiry. The age counts from the auth-user deletion, not from `requested_at`: until then the user can still refresh tokens, so a token issued just before the deletion stays valid for one more token lifetime.
+
+RLS enabled with no policies.
+
 ## 4. Provenance and unit discipline
 
 - `source`, `recorded_at`, `received_at` live on every externally derived row.
@@ -464,9 +521,14 @@ The public demo depends on being able to seed convincing plans without touching 
 ## 6. Location and privacy
 
 - Location columns (`vehicles.latest_state.location`, `charging_stations.lat/lon`; `observed_trips` has no location columns, phase5_plan D7) are classified sensitive.
-- Account deletion removes `profiles` and cascades to `user_preferences`, `vehicles` (and through them `vehicle_specs`, `vehicle_telemetry`, `planned_trips`, `planned_stops`, `observed_trips`, `prediction_results`).
-- `charging_stations` is global cache data and is not removed on account deletion.
-- Telemetry retention policy: keep 24 months by default; user-configurable in Phase 6. Rows older than retention are deleted by a nightly job (not yet scheduled).
+- Account deletion (`DELETE /api/v1/me`, api §3.1b) removes `profiles`, which cascades in the database to `user_preferences`, `consent_records`, `favorite_stations`, `vehicles` and through them `vehicle_specs` (incl. the per-vehicle baseline), `vehicle_telemetry`, `vehicle_refreshes`, `planned_trips`, `planned_stops`, `observed_trips` and `prediction_results`. Nothing is anonymized and kept: every row is deleted. `tests/privacy/test_account_deletion.py` checks from the Postgres catalog that every table with a `user_id`, and every table reachable from `profiles`, is on this list.
+- Retained after deletion: the `account_deletions` tombstone (§3.12; the user ID and any unrevoked Smartcar connection IDs, removed by the retention job), and `charging_stations`, which is global cache data.
+- Before the profile is deleted, the user's Smartcar connections are revoked and the vehicle rows locked. A webhook that arrives later finds no vehicle and is dropped; post-ingest hooks and refreshes for the deleted vehicle write nothing.
+- **Retention job** (`services/api/scripts/retention.py`, run nightly; `--dry-run` counts only). It deletes:
+  - unsaved, unmatched plans after 30 days (`PRIVACY_UNSAVED_TRIP_DAYS`);
+  - `vehicle_telemetry` whose provider `recorded_at` is older than 24 months (`PRIVACY_TELEMETRY_RETENTION_DAYS`, 730), in batches per vehicle;
+  - `vehicle_refreshes` older than 30 days (`PRIVACY_REFRESH_LOG_DAYS`).
+  It then works through the deletion backlog (§3.12). The windows are server-wide; per-user retention isn't built.
 - No raw lat/lon is included in Sentry breadcrumbs or logs. Coordinates are rounded to 2 decimal places in log output.
 
 ## 7. Migration policy

@@ -45,6 +45,7 @@ from alembic.config import Config as AlembicConfig  # noqa: E402
 from alembic import command  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
 from app.modules.users.models import Profile, UserPreferences  # noqa: E402
+from app.modules.users.privacy_models import AccountDeletion  # noqa: E402
 from app.modules.vehicles.models import Vehicle, VehicleSpecs  # noqa: E402
 from app.modules.vehicles.spec_catalog import lookup_spec  # noqa: E402
 
@@ -94,6 +95,9 @@ def seed(api_url: str, *, stale_soc: bool = False) -> int:
     engine = create_engine(_database_url())
     with Session(engine) as db, db.begin():
         db.execute(delete(Vehicle).where(Vehicle.user_id == E2E_USER_ID))
+        # The account-deletion spec leaves a tombstone that would refuse the
+        # E2E user's next profile (P6-F5); a reset starts from a live account.
+        db.execute(delete(AccountDeletion).where(AccountDeletion.user_id == E2E_USER_ID))
         if db.get(Profile, E2E_USER_ID) is None:
             db.add(Profile(id=E2E_USER_ID, display_name="E2E Driver"))
             db.flush()
