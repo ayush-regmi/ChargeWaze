@@ -42,7 +42,7 @@ Reserved codes (grow this list as the API grows):
 | `SMARTCAR_UNREACHABLE` | 502/504 | Smartcar failed or timed out. |
 | `SMARTCAR_ERROR` | 502 | Smartcar rejected the request; Smartcar's error code is in `details`. Includes Smartcar's monthly per-vehicle cap (`BILLING`/`VEHICLE_REQUEST_LIMIT`). |
 | `SMARTCAR_RATE_LIMITED` | 429 | Smartcar throttled the request (`429` of type `RATE_LIMIT`, per vehicle or app-wide). `details.retry_after_seconds` and a `Retry-After` header when Smartcar said how long to wait. |
-| `RATE_LIMITED` | 429 | Chargewise's own per-vehicle refresh limit (§3.5a). `details.retry_after_seconds`, `details.next_refresh_at` and a `Retry-After` header. |
+| `RATE_LIMITED` | 429 | One of Chargewise's own limits: the per-vehicle refresh limit (§3.5a; `details.next_refresh_at`) or the per-user limit on `/routes/plan` and `/places/suggest` (§3.7, §3.13; `details.limit` is `plan` or `suggest`). Always `details.retry_after_seconds` and a `Retry-After` header. |
 | `VEHICLE_NOT_CONNECTED` | 409 | The action needs a connected, real (non-simulated) vehicle (§3.5a). |
 | `SMARTCAR_NOT_CONFIGURED` | 503 | Smartcar credentials, application ID or state secret are not set on the server. |
 | `MAPBOX_UNREACHABLE` | 502/504 | Mapbox failed or timed out. |
@@ -613,8 +613,11 @@ Infeasibility codes ([`architecture.md`](architecture.md#66-infeasibility) §6.6
   - `VEHICLE_SPECS_INCOMPLETE`: the vehicle lacks a value the model needs, from its specs and from the catalog. `details.missing` lists any of `usable_capacity_kwh`, `connectors`, `charging_curve`, `baseline_kwh_per_km`.
   - `ROUTE_INDEX_UNAVAILABLE`: `route_index` is beyond the routes Mapbox returned. `details.route_count` says how many there were.
   - No `details.reason`, `details.fields` set: `reserve_soc` isn't below `preferred_charge_to` after merging, or isn't below the vehicle's highest chargeable SoC (the last point of its charging curve; `details.max_charge_soc`).
+- `RATE_LIMITED` (429): the caller used up their plan allowance (see "Rate limit" below). `details.limit` is `plan`; `details.retry_after_seconds` and the `Retry-After` header say when the next plan is allowed.
 - `MAPBOX_NOT_CONFIGURED`, `MAPBOX_UNREACHABLE`, `MAPBOX_ERROR`; `STATIONS_NOT_CONFIGURED`, `STATIONS_UNREACHABLE`.
 - Nothing is stored when the request fails.
+
+**Rate limit (P6-F4).** Each plan costs a Mapbox Directions call and AFDC calls, so each user gets a token bucket: `RATE_LIMIT_PLAN_BURST` plans at once (default 10), refilled at `RATE_LIMIT_PLAN_PER_HOUR` (default 30 per hour, one every 2 minutes). Every authenticated request spends a token, including one that then fails validation; a request without a valid JWT is refused (401) before it reaches the bucket. The buckets are kept per API process (one instance in production), so a restart refills them.
 
 ### 3.8 `GET /api/v1/trips`
 
@@ -931,7 +934,9 @@ Query params:
 - No matches → `200` with `items: []`.
 - Nothing is stored. Search text and coordinates are never logged (D13).
 
-**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (short/long `q`, `session_token` not a UUID, `lat`/`lon` out of range or only one given, `limit` out of range); `MAPBOX_NOT_CONFIGURED` (503); `MAPBOX_UNREACHABLE` (502/504); `MAPBOX_ERROR` (502).
+**Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` (short/long `q`, `session_token` not a UUID, `lat`/`lon` out of range or only one given, `limit` out of range); `RATE_LIMITED` (429, `details.limit` is `suggest`, with `details.retry_after_seconds` and a `Retry-After` header); `MAPBOX_NOT_CONFIGURED` (503); `MAPBOX_UNREACHABLE` (502/504); `MAPBOX_ERROR` (502).
+
+**Rate limit (P6-F4).** A token bucket per user, as for §3.7: `RATE_LIMIT_SUGGEST_BURST` requests at once (default 30), refilled at `RATE_LIMIT_SUGGEST_PER_MINUTE` (default 60 per minute). That is well above a debounced search box; it stops scripted loops. `GET /places/{id}` is not limited.
 
 ### 3.14 `GET /api/v1/places/{id}`
 
@@ -1252,5 +1257,5 @@ From Phase 5, `observation` in §3.9 is `null` until a plan is matched to the le
 ## 6. Open contract questions
 
 - Should `/routes/plan` return multiple candidate plans (shortest-time vs fewest-stops), or always one best plan with explicit trade-off hints? Decide during Phase 4 design.
-- Server-side rate limits for `/routes/plan` to control Mapbox and AFDC spend — pick a bucket strategy in Phase 6.
+- ~~Server-side rate limits for `/routes/plan` to control Mapbox and AFDC spend — pick a bucket strategy in Phase 6.~~ **Decided (P6-F4):** an in-memory token bucket per user on `/routes/plan` and `/places/suggest`, answering `RATE_LIMITED` (429) with `Retry-After` (§3.7, §3.13). Per process is enough on one Render instance; with several instances the buckets move to Postgres.
 - Whether `/api/v1/trips` should expose a `POST` for manually confirmed observed trips, or whether that stays an internal ingestion path. Decide during Phase 5.

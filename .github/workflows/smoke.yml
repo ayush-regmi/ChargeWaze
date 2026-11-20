@@ -1,0 +1,154 @@
+name: Smoke (production)
+
+# P6-F4. Checks the live production deploy from outside:
+#   1. API /health answers with env=production (tolerates a Render cold start)
+#   2. a protected endpoint refuses an anonymous call with the error envelope
+#   3. the Smartcar webhook URL is reachable and refuses an unsigned delivery
+#   4. the web app's home page answers (when WEB_URL is set)
+#   5. alert thresholds on GET /metrics (when MONITORING_METRICS_TOKEN is set)
+# A failed run is the alert: GitHub notifies on failed workflow runs
+# (docs/deployment.md "Monitoring and alerts"). Until API_BASE_URL exists in
+# the `production` environment, the run ends with a notice instead of failing.
+
+on:
+  workflow_run:
+    workflows: ["Deploy (production)"]
+    types: [completed]
+    branches: [main]
+  schedule:
+    # Every 6 hours. Each run wakes the free Render instance (~1 min cold start).
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-production
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Production smoke checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: ${{ vars.WEB_URL }}
+    # After a deploy only when it succeeded; a skipped deploy (no secrets)
+    # still ends as "success", and the preflight below handles that case.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    env:
+      API_BASE_URL: ${{ vars.API_BASE_URL }}
+      WEB_URL: ${{ vars.WEB_URL }}
+      # Alert thresholds for the /metrics check. Counters reset whenever the
+      # free instance spins down, so each check needs a minimum sample first.
+      MIN_WEBHOOK_SUCCESS_RATE: "0.95"
+      MIN_WEBHOOK_DELIVERIES: "20"
+      MAX_PLANNER_P95_MS: "15000"
+      MIN_PLANS: "5"
+
+    steps:
+      - name: Check production smoke config
+        id: preflight
+        run: |
+          if [ -z "$API_BASE_URL" ]; then
+            echo "::notice::Production smoke skipped; API_BASE_URL is not set in the 'production' environment (see docs/deployment.md)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 1. Render's free plan sleeps after 15 idle minutes; the first request
+      # waits about a minute while it starts, so allow several long attempts.
+      - name: API health
+        if: steps.preflight.outputs.ready == 'true'
+        run: |
+          url="${API_BASE_URL%/}/health"
+          for attempt in 1 2 3 4; do
+            if body=$(curl -fsS --max-time 90 "$url"); then
+              echo "$body"
+              if [ "$(echo "$body" | jq -r '.env')" = "production" ]; then exit 0; fi
+              echo "::error::/health answered but env is not production."
+              exit 1
+            fi
+            echo "attempt $attempt failed; retrying"
+            sleep 15
+          done
+          echo "::error::$url did not answer after 4 attempts."
+          exit 1
+
+      # 2. Routing, auth and the error envelope (api-contracts §1.1).
+      - name: Protected endpoint refuses anonymous calls
+        if: steps.preflight.outputs.ready == 'true'
+        run: |
+          body=$(curl -sS --max-time 30 -o - -w '\n%{http_code}' "${API_BASE_URL%/}/api/v1/me")
+          status=$(echo "$body" | tail -n1)
+          code=$(echo "$body" | sed '$d' | jq -r '.error.code')
+          echo "GET /api/v1/me -> $status $code"
+          if [ "$status" != "401" ] || [ "$code" != "UNAUTHENTICATED" ]; then
+            echo "::error::Expected 401 UNAUTHENTICATED from /api/v1/me."
+            exit 1
+          fi
+
+      # 3. The webhook URL Smartcar delivers to must be reachable. An unsigned
+      # body is refused before anything is parsed or stored, and 401s are left
+      # out of the webhook success rate.
+      - name: Webhook endpoint refuses unsigned deliveries
+        if: steps.preflight.outputs.ready == 'true'
+        run: |
+          body=$(curl -sS --max-time 30 -o - -w '\n%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -d '{}' \
+            "${API_BASE_URL%/}/api/v1/webhooks/smartcar")
+          status=$(echo "$body" | tail -n1)
+          code=$(echo "$body" | sed '$d' | jq -r '.error.code')
+          echo "POST /api/v1/webhooks/smartcar (unsigned) -> $status $code"
+          if [ "$status" != "401" ] || [ "$code" != "WEBHOOK_SIGNATURE_INVALID" ]; then
+            echo "::error::Expected 401 WEBHOOK_SIGNATURE_INVALID from the webhook endpoint."
+            exit 1
+          fi
+
+      # 4. The web app (Vercel) serves its home page.
+      - name: Web app answers
+        if: steps.preflight.outputs.ready == 'true' && env.WEB_URL != ''
+        run: |
+          status=$(curl -sS -L --max-time 60 -o /dev/null -w '%{http_code}' "${WEB_URL%/}/")
+          echo "GET $WEB_URL -> $status"
+          if [ "$status" != "200" ]; then
+            echo "::error::Web app answered $status."
+            exit 1
+          fi
+
+      # 5. Alert thresholds. Skipped without the token (GET /metrics is then 404).
+      - name: Metrics thresholds
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          MONITORING_METRICS_TOKEN: ${{ secrets.MONITORING_METRICS_TOKEN }}
+        run: |
+          if [ -z "$MONITORING_METRICS_TOKEN" ]; then
+            echo "::notice::Metrics check skipped; MONITORING_METRICS_TOKEN is not set in the 'production' environment."
+            exit 0
+          fi
+          snap=$(curl -fsS --max-time 30 -H "Authorization: Bearer $MONITORING_METRICS_TOKEN" \
+            "${API_BASE_URL%/}/metrics")
+          # Aggregates only: route templates, counts and latencies, no IDs.
+          summary=$(echo "$snap" | jq '{started_at, uptime_seconds, planner, webhooks}')
+          echo "$summary"
+          { echo '### Production metrics'; echo '```json'; echo "$summary"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=0
+          if ! echo "$snap" | jq -e \
+              --argjson min "$MIN_WEBHOOK_SUCCESS_RATE" --argjson n "$MIN_WEBHOOK_DELIVERIES" \
+              '.webhooks.deliveries < $n or .webhooks.success_rate >= $min' > /dev/null; then
+            echo "::error::Smartcar webhook success rate $(echo "$snap" | jq '.webhooks.success_rate') is below $MIN_WEBHOOK_SUCCESS_RATE."
+            failed=1
+          fi
+          if ! echo "$snap" | jq -e \
+              --argjson max "$MAX_PLANNER_P95_MS" --argjson n "$MIN_PLANS" \
+              '.planner.count < $n or .planner.p95_ms <= $max' > /dev/null; then
+            echo "::error::Planner p95 $(echo "$snap" | jq '.planner.p95_ms') ms is above $MAX_PLANNER_P95_MS ms."
+            failed=1
+          fi
+          exit $failed

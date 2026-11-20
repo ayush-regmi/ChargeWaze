@@ -21,6 +21,7 @@ from app.integrations.mapbox.client import (
     get_mapbox_client,
 )
 from app.modules.auth.dependencies import AuthenticatedUser, get_current_user
+from app.modules.auth.rate_limit import rate_limit
 from app.modules.places.schemas import (
     PLACE_ID_MAX_LENGTH,
     QUERY_MAX_LENGTH,
@@ -50,7 +51,11 @@ SessionToken = Annotated[
 ]
 
 
-@router.get("/suggest", response_model=PlaceSuggestionList)
+@router.get(
+    "/suggest",
+    response_model=PlaceSuggestionList,
+    dependencies=[Depends(rate_limit("suggest"))],
+)
 def suggest_places(
     q: Annotated[str, Query(description="Search text."), AfterValidator(_trimmed_query)],
     session_token: SessionToken,

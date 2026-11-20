@@ -162,6 +162,18 @@ class Settings(BaseSettings):
     sentry_environment: str = ""
     # Share of requests traced for performance. 0 sends errors only.
     sentry_traces_sample_rate: float = Field(default=0.0, ge=0, le=1)
+    # P6-F4 monitoring (app/core/monitoring.py). GET /metrics answers only to
+    # ``Authorization: Bearer <token>``; empty hides it (404).
+    monitoring_metrics_token: str = ""
+    # A /routes/plan slower than this logs a ``planner_slow`` warning.
+    monitoring_planner_slow_ms: float = Field(default=10_000.0, gt=0)
+    # P6-F4 per-user rate limits (token buckets, kept per API process; see
+    # app/modules/auth/rate_limit.py). ``burst`` requests at once, then refills.
+    rate_limit_enabled: bool = True
+    rate_limit_plan_burst: int = Field(default=10, ge=1)
+    rate_limit_plan_per_hour: float = Field(default=30.0, gt=0)
+    rate_limit_suggest_burst: int = Field(default=30, ge=1)
+    rate_limit_suggest_per_minute: float = Field(default=60.0, gt=0)
 
     @property
     def cors_origins(self) -> list[str]:

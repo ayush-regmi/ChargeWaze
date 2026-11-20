@@ -18,6 +18,7 @@ from app.db.session import get_db
 from app.integrations.mapbox.client import MapboxClient, get_mapbox_client
 from app.integrations.stations import StationProvider, get_station_provider
 from app.modules.auth.dependencies import AuthenticatedUser, get_current_user
+from app.modules.auth.rate_limit import rate_limit
 from app.modules.routing import planner_service
 from app.modules.routing.schemas import (
     DirectionsRequest,
@@ -55,7 +56,7 @@ def get_directions(
     )
 
 
-@router.post("/plan", response_model=PlanResponse)
+@router.post("/plan", response_model=PlanResponse, dependencies=[Depends(rate_limit("plan"))])
 def plan_route(
     body: PlanRequest,
     user: AuthenticatedUser = Depends(get_current_user),
