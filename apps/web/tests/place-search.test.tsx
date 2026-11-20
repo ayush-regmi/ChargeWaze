@@ -1,4 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PlaceSearch, SUGGEST_DEBOUNCE_MS } from "@/components/places/place-search";
@@ -198,5 +200,36 @@ describe("PlaceSearch", () => {
     await type(input, "zzzzzz");
     await flushDebounce();
     expect(screen.getByText("No places found.")).toBeInTheDocument();
+  });
+
+  it("searches for text typed before hydration (E2E planner flake)", async () => {
+    // Server HTML, typed into before React attaches: the input event goes
+    // nowhere, and hydration keeps the typed value without an onChange.
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(<PlaceSearch label="From" onSelect={() => {}} />);
+    document.body.appendChild(container);
+    const input = container.querySelector("input")!;
+    input.value = "Toronto";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    await act(async () => {
+      root = hydrateRoot(container, <PlaceSearch label="From" onSelect={() => {}} />);
+    });
+    await flushDebounce();
+
+    expect(suggestPlaces).toHaveBeenCalledTimes(1);
+    expect(suggestPlaces).toHaveBeenCalledWith(expect.objectContaining({ q: "Toronto" }));
+    expect(screen.getByRole("option", { name: /Toronto Junction/ })).toBeInTheDocument();
+    expect(input).toHaveValue("Toronto");
+
+    act(() => root!.unmount());
+    container.remove();
+  });
+
+  it("doesn't search on mount when nothing was typed", async () => {
+    setup({ initialValue: "Toronto" });
+    await flushDebounce();
+    expect(suggestPlaces).not.toHaveBeenCalled();
   });
 });

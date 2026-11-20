@@ -127,6 +127,19 @@ export function PlaceSearch({
     timerRef.current = setTimeout(() => void runSuggest(q), SUGGEST_DEBOUNCE_MS);
   };
 
+  // Text typed into the server-rendered input before hydration (slow JS, or a
+  // test that types as soon as the page loads) stays in the field, but React
+  // never saw an input event for it: hydration keeps the typed value and
+  // starts its change tracking from it, so no later onChange would fire and
+  // the search would never run. Pick that text up once, after hydration.
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const typed = inputRef.current?.value;
+    if (typed !== undefined && typed !== value) onChange(typed);
+    // Mount only: later typing goes through onChange as usual.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const choose = async (s: PlaceSuggestion) => {
     // A suggest still waiting on the debounce would start after this pick and
     // win the request-id check, dropping the pick. Cancel it.
@@ -189,6 +202,7 @@ export function PlaceSearch({
         {label}
       </label>
       <input
+        ref={inputRef}
         id={inputId}
         type="text"
         role="combobox"
