@@ -2,7 +2,12 @@ import { safeNextPath } from "@/lib/safe-next";
 
 export const GARAGE_PATH = "/garage";
 
-export type ConnectFlag = "success" | "already_connected" | "denied" | "error";
+export type ConnectFlag =
+  | "success"
+  | "already_connected"
+  | "owned_elsewhere"
+  | "denied"
+  | "error";
 
 /**
  * Where to send the browser after Smartcar Connect: ``path`` (re-validated,

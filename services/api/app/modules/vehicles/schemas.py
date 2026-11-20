@@ -38,7 +38,7 @@ class ConnectResponse(BaseModel):
     expires_at: datetime
 
 
-ConnectFlag = Literal["success", "already_connected", "denied", "error"]
+ConnectFlag = Literal["success", "already_connected", "owned_elsewhere", "denied", "error"]
 
 
 class ConnectCompleteRequest(BaseModel):
