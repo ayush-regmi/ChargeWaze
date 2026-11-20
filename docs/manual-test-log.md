@@ -6,7 +6,7 @@ Checks that automated tests can't cover: they need the real Toyota bZ, real Mapb
 - **Where results go:** a check's result row here, plus wherever its "Record in" says (PR, roadmap, phase plan). Screenshots go in the named PR or close-out PR, not in the repo.
 - **Status values:** `open`, `blocked (<what>)`, `pass`, `fail (<issue/PR>)`.
 
-Last updated 2026-11-19 (P4-F9 close-out: M-07 unblocked, M-10 added).
+Last updated 2026-11-19 (P5-F8 close-out: M-11 added).
 
 ---
 
@@ -24,6 +24,7 @@ Last updated 2026-11-19 (P4-F9 close-out: M-07 unblocked, M-10 added).
 | M-08 | Real DC charging session logged for the bZ curve | Real car, DC charger | phase4_plan §7 item 2 (not blocking) | open |
 | M-09 | Clean up local per-session databases | Docker | Nothing | open |
 | M-10 | Real-key Frederick → Toronto **plan** with charging stops, latency and screenshot (P4-F9) | Mapbox public + secret, AFDC, connected vehicle | Phase 4 "complete" (roadmap) | open |
+| M-11 | Real drives and a charge produce observed legs with no manual step; record the quality mix (P5-F8) | Real car, a few days, M-02 first | Phase 5 "complete" (roadmap) | open |
 
 Upcoming checks that close-out features will add (listed so they aren't a surprise): see [Upcoming](#upcoming).
 
@@ -137,6 +138,39 @@ Record in: a new follow-up issue with the log attached; the curve gets replaced 
 | Date | Charger | Start → end SoC | Minutes | kWh | Temp | Notes |
 |---|---|---|---|---|---|---|
 | | | | | | | |
+
+### M-11 · Real drives produce observed legs (P5-F8)
+
+Source: [`phase5_plan.md`](phase5_plan.md) F8 and §6 ("real trips without manual intervention"). Do it after M-02, over the same days if you like. Automated evidence that webhooks alone are enough is `tests/trips/test_phase5_closeout.py`; this check confirms it with the real car and records how good the legs are.
+
+Steps:
+1. With the bZ connected (and the API receiving webhooks), drive normally for a few days: some short drives, at least one longer one, and one charging session. Don't press anything in the app or run any script.
+2. Optionally, plan one of the drives first on `/trips` and save it, then drive it within 2 h.
+3. Check the legs (Supabase SQL editor):
+
+```sql
+select start_time, start_time_latest, end_time, distance_km, energy_kwh,
+       quality_flag, quality_reasons, review_status, planned_trip_id is not null as matched
+from observed_trips
+where vehicle_id = '<id>'
+order by start_time;
+```
+
+```sql
+select quality_flag, count(*) from observed_trips
+where vehicle_id = '<id>' and not is_simulated
+group by quality_flag;
+```
+
+4. Open `/trips/saved?view=observed` and `/analytics`. The drives are listed with quality badges, and the CSV matches the table. If you planned one in step 2, its trip page shows "Planned vs actual".
+
+Expected: one leg per drive (a charge splits a drive), with no manual step. The distances match the odometer. Most legs are `medium` or better if M-02 found events every ≤15 min while driving. A key-off-only feed gives mostly `low` (§5 example 2).
+
+Record in: this row; the cadence and the quality mix in the roadmap risk table (§5). If most legs are `low` because of the cadence, open a follow-up to tune phase5_plan D8 or `stop_split_minutes` (phase5_plan §7 item 1).
+
+| Dates | Drives / charges | Legs created | High / medium / low | Matched plan | Notes |
+|---|---|---|---|---|---|
+| | | | | | |
 
 ---
 
@@ -331,6 +365,5 @@ Checks that later close-outs will need; they'll move into the summary when their
 |---|---|
 | P3-F8 favorites | Favorite a station, sign out and back in: still favorited (Playwright covers it; a quick real-data look is enough). |
 | P4-F8 | Set a per-vehicle baseline on the real bZ and re-plan; numbers change as expected. |
-| P5-F8 close-out | A few real drives and one charge produce observed-trip legs with no manual step; record the high/medium/low quality mix (needs M-02 first). |
 | P6-F3 / F4 | Deployed app smoke test: sign in, Garage, Charging, Trip Planner on the production URL; alerts fire. |
 | P6-F5 | Delete a test account end to end; its rows are gone. |

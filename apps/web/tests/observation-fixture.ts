@@ -1,4 +1,4 @@
-import type { ObservedTrip } from "@/components/trips/observation-format";
+import type { ObservedTrip, TripObservation } from "@/components/trips/observation-format";
 
 import { feasiblePlan, TRIP_ID, VEHICLE_ID } from "./trip-fixture";
 
@@ -19,7 +19,7 @@ export function examplePlan(): Record<string, unknown> {
 }
 
 /** The §3.18e example body. */
-export function exampleObservation(): Record<string, unknown> {
+export function exampleObservation(): TripObservation {
   return {
     matched_at: "2026-11-08T13:41:00Z",
     legs: [

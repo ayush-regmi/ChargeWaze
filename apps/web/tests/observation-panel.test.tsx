@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { parseObservation } from "@/components/trips/observation-format";
+import { parseObservation, type TripObservation } from "@/components/trips/observation-format";
 import { ObservationPanel } from "@/components/trips/observation-panel";
 import { parseStoredPlan } from "@/components/trips/plan-payload";
 
@@ -12,7 +12,7 @@ vi.mock("@/components/trips/observation-actions", () => ({
   rejectObservedTrip: vi.fn(),
 }));
 
-function renderPanel(raw: Record<string, unknown>, plan = examplePlan()) {
+function renderPanel(raw: TripObservation, plan = examplePlan()) {
   return render(
     <ObservationPanel
       observation={parseObservation(raw)!}
@@ -48,7 +48,7 @@ describe("ObservationPanel", () => {
 
   it("says energy wasn't measured when a leg has no energy, without an error", () => {
     const raw = exampleObservation();
-    const legs = raw.legs as Record<string, unknown>[];
+    const legs = raw.legs;
     legs[1]!.energy_kwh = null;
     legs[1]!.soc_end_percent = null;
     legs[1]!.quality_flag = "low";
@@ -75,7 +75,7 @@ describe("ObservationPanel", () => {
 
   it("lists the drives on their own when they don't line up with the planned legs", () => {
     const raw = exampleObservation();
-    (raw.legs as unknown[]).pop();
+    raw.legs.pop();
     renderPanel(raw);
     expect(screen.getByTestId("legs-unpaired")).toBeVisible();
     const legs = screen.getAllByTestId("observation-leg");

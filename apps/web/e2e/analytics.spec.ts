@@ -1,11 +1,17 @@
-import { createHmac, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 import { expect, test } from "@playwright/test";
 
-import { E2E_USER, sessionCookie, signJwt } from "./support/e2e-auth.mjs";
-import { API_ENV, API_URL } from "./support/e2e-servers";
+import { sessionCookie } from "./support/e2e-auth.mjs";
 import { seedConnectedVehicle } from "./support/seed";
+import {
+  apiAs,
+  DAY,
+  deliver,
+  MINUTE,
+  todayNoonUtc,
+  type Reading,
+} from "./telemetry-webhooks";
 
 /**
  * Analytics (phase5_plan F6) on legs built by the real pipeline: the spec
@@ -23,101 +29,11 @@ import { seedConnectedVehicle } from "./support/seed";
  * reading (P5-F3 follow-up, see phase5_plan F6 "As built"), so the spec runs
  * the documented catch-up, `POST /observed-trips/recompute` with `full`,
  * as the API user before opening the page.
+ *
+ * Since P5-F4 every finished leg with energy has a backtest, so the
+ * consumption lines and the estimated-vs-observed scatter must draw (P5-F8).
+ * The webhook and API helpers are in `telemetry-webhooks.ts`.
  */
-
-// Must match services/api/scripts/e2e_backend.py.
-const SMARTCAR_VEHICLE_ID = "e2e-smartcar-vehicle";
-const SMARTCAR_USER_ID = "e2e-smartcar-user";
-const MINUTE = 60_000;
-const DAY = 24 * 60 * MINUTE;
-
-type Reading = { at: number; odometerKm: number; socPercent: number };
-
-function signal(code: string, body: Record<string, unknown>, at: number) {
-  return {
-    code,
-    name: code,
-    group: code.split("-")[0],
-    body,
-    meta: { oemUpdatedAt: at, retrievedAt: at },
-  };
-}
-
-/** POST one signed VEHICLE_STATE webhook carrying `r`. */
-async function deliver(r: Reading) {
-  const payload = {
-    eventId: `e2e-analytics-${randomUUID()}`,
-    eventType: "VEHICLE_STATE",
-    data: {
-      user: { id: SMARTCAR_USER_ID },
-      vehicle: {
-        id: SMARTCAR_VEHICLE_ID,
-        make: "TOYOTA",
-        model: "bZ XLE AWD",
-        year: 2026,
-      },
-      signals: [
-        signal(
-          "odometer-traveleddistance",
-          { unit: "km", value: r.odometerKm },
-          r.at,
-        ),
-        signal(
-          "tractionbattery-stateofcharge",
-          { unit: "percent", value: r.socPercent },
-          r.at,
-        ),
-        signal("charge-ischarging", { value: false }, r.at),
-      ],
-      triggers: [
-        {
-          type: "SIGNAL_UPDATED",
-          signal: { code: "odometer-traveleddistance" },
-        },
-      ],
-    },
-    meta: {
-      deliveryId: `delivery-${randomUUID()}`,
-      deliveredAt: r.at,
-      webhookId: "e2e",
-      version: "4.0",
-      mode: "LIVE",
-    },
-  };
-  const body = JSON.stringify(payload);
-  const signature = createHmac("sha256", API_ENV.SMARTCAR_MANAGEMENT_TOKEN)
-    .update(body)
-    .digest("hex");
-  const response = await fetch(`${API_URL}/api/v1/webhooks/smartcar`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "SC-Signature": signature },
-    body,
-  });
-  expect(response.status, await response.clone().text()).toBe(200);
-}
-
-/** Call the API as the E2E user (the same identity the browser session has). */
-async function apiAs(path: string, init: RequestInit = {}) {
-  const now = Math.floor(Date.now() / 1000);
-  const token = signJwt({
-    sub: E2E_USER.id,
-    email: E2E_USER.email,
-    aud: "authenticated",
-    role: "authenticated",
-    iat: now,
-    exp: now + 600,
-  });
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...init.headers,
-    },
-  });
-  expect(response.status, await response.clone().text()).toBe(200);
-  return response.json();
-}
 
 /** A drive: one reading every `stepMinutes`, then a parked reading so the leg closes. */
 function drive(
@@ -127,10 +43,11 @@ function drive(
   kmPerStep: number,
   stepMinutes: number,
 ): Reading[] {
-  const readings = socs.map((soc, i) => ({
+  const readings: Reading[] = socs.map((soc, i) => ({
     at: start + i * stepMinutes * MINUTE,
     odometerKm: odometerKm + i * kmPerStep,
     socPercent: soc,
+    charging: false,
   }));
   const last = readings[readings.length - 1];
   return [...readings, { ...last, at: last.at + 30 * MINUTE }];
@@ -146,12 +63,7 @@ test.describe.configure({ mode: "serial" });
 test.beforeAll(async () => {
   seedConnectedVehicle();
   // Midday UTC, so the drives stay on one local day in any time zone near UTC.
-  const today = Date.UTC(
-    new Date().getUTCFullYear(),
-    new Date().getUTCMonth(),
-    new Date().getUTCDate(),
-    12,
-  );
+  const today = todayNoonUtc();
   const readings = [
     ...drive(today - 10 * DAY, 24_600, [62, 60], 8, 30),
     ...drive(today - 3 * DAY, 24_608, [80, 78, 74, 70], 13, 10),
@@ -210,13 +122,20 @@ test("shows trends, quality badges and a CSV that matches the table", async ({
   await expect(
     page.getByRole("img", { name: /Distance driven per day/ }),
   ).toBeVisible();
-  // Estimates come from P5-F4's backtests; until a leg has one, the
-  // consumption chart says there is nothing to compare instead of drawing.
+  // Estimates come from P5-F4's leg backtests, so both comparisons draw.
   await expect(
-    page
-      .getByRole("img", { name: /Observed and estimated consumption per day/ })
-      .or(page.getByText("No consumption to compare in this range yet.")),
+    page.getByRole("img", { name: /Observed and estimated consumption per day/ }),
   ).toBeVisible();
+  await expect(
+    page.getByText("No consumption to compare in this range yet."),
+  ).toHaveCount(0);
+  const scatter = page.getByRole("img", {
+    name: "Estimated vs observed energy per drive, in kWh",
+  });
+  await expect(scatter).toBeVisible();
+  // Both drives have energy; the low-quality one is still plotted (hollow).
+  await expect(scatter.locator("circle")).toHaveCount(2);
+  await expect(scatter.locator('circle[data-hollow="true"]')).toHaveCount(1);
 
   await page.getByLabel("Group by").selectOption("week");
   await page.getByRole("button", { name: "Apply" }).click();
