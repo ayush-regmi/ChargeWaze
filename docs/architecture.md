@@ -266,6 +266,20 @@ The deployed app runs in two modes gated by configuration:
 
 The two modes **never** share records. Analytics and ML training sets exclude `is_simulated = true` by default.
 
+As built (P6-F2):
+- **One setting picks the mode.** `APP_PUBLIC_DEMO_MODE` chooses it per deployment, and each mode has its own database. The gate (`app/modules/auth/access.py`) runs inside `get_current_user`, so every signed-in route is covered without router changes.
+- **Live mode.** Only the Supabase user IDs in `LIVE_ALLOWED_USER_IDS` are served. Under `APP_ENV=production` an empty list fails closed.
+- **Demo mode.**
+  - The API refuses to start with Smartcar secrets.
+  - It is read-only except trip planning, because recruiters share one seeded account.
+  - It serves nothing (503) if the database holds any real vehicle, so no real row can be returned.
+- **Seed data.** `scripts/seed_demo.py` fills the demo account with a simulated 2026 Toyota bZ:
+  - About four weeks of telemetry.
+  - A Frederick → Toronto plan, made by the real planner from recorded fixtures.
+  - The legs, plan match and backtests, produced by the real Phase 5 pipeline.
+
+  It refuses to run against a database that has real rows. Setup: [`deployment.md`](deployment.md) §13.
+
 ## 8. Testing strategy
 
 | Layer | Tests |

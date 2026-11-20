@@ -4,9 +4,12 @@
  * values are dropped (the API default applies), never guessed or echoed.
  *
  * Params: `vehicle`, `from`, `to` (YYYY-MM-DD), `group_by` (day|week|month,
- * default week), `simulated=1` (include simulated data), `tz` (IANA zone from
+ * default week), `simulated=1|0` (include simulated data or not; the default
+ * is on only in the public demo), `tz` (IANA zone from
  * the browser) and `cursor` (the trips table page).
  */
+
+import { env } from "@/lib/env";
 
 import type { GroupBy } from "./format";
 
@@ -44,6 +47,17 @@ export function isValidTimeZone(value: string): boolean {
   return value.length <= 64 && TZ_RE.test(value);
 }
 
+/**
+ * `simulated=1` includes simulated data and `simulated=0` leaves it out. With
+ * neither, the public demo (P6-F2) includes it, because all its data is
+ * simulated; a live deployment leaves it out (phase5_plan D11).
+ */
+function parseSimulated(value: string | undefined): boolean {
+  if (value === "1") return true;
+  if (value === "0") return false;
+  return env.demoMode;
+}
+
 export function parseAnalyticsParams(raw: RawParams): AnalyticsParams {
   const vehicle = first(raw.vehicle);
   const from = first(raw.from);
@@ -56,7 +70,7 @@ export function parseAnalyticsParams(raw: RawParams): AnalyticsParams {
     from: from && isRealDate(from) ? from : null,
     to: to && isRealDate(to) ? to : null,
     groupBy: groupBy === "day" || groupBy === "month" ? groupBy : "week",
-    includeSimulated: first(raw.simulated) === "1",
+    includeSimulated: parseSimulated(first(raw.simulated)),
     tz: tz && isValidTimeZone(tz) ? tz : null,
     cursor: cursor && CURSOR_RE.test(cursor) ? cursor : null,
   };
@@ -70,7 +84,11 @@ export function analyticsSearch(params: Partial<AnalyticsParams>): string {
   if (params.to) q.set("to", params.to);
   if (params.groupBy && params.groupBy !== "week")
     q.set("group_by", params.groupBy);
-  if (params.includeSimulated) q.set("simulated", "1");
+  if (
+    params.includeSimulated !== undefined &&
+    params.includeSimulated !== env.demoMode
+  )
+    q.set("simulated", params.includeSimulated ? "1" : "0");
   if (params.tz) q.set("tz", params.tz);
   if (params.cursor) q.set("cursor", params.cursor);
   const s = q.toString();

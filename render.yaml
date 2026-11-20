@@ -21,6 +21,10 @@ services:
         value: production
       - key: APP_PUBLIC_DEMO_MODE
         value: "false"
+      # P6-F2: Supabase user IDs allowed in (comma-separated UUIDs). Under
+      # APP_ENV=production an empty list locks EVERYONE out, the owner too.
+      - key: LIVE_ALLOWED_USER_IDS
+        sync: false
       - key: ALLOWED_ORIGINS # the Vercel production URL, e.g. https://chargewise.vercel.app
         sync: false
       # ---- Database (Supabase session pooler, postgresql+psycopg://...) ----

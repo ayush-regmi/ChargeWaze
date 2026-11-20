@@ -16,9 +16,12 @@ import jwt
 from fastapi import Depends, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
+from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.core.errors import ApiError
+from app.db.session import get_db
+from app.modules.auth.access import enforce_access
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -127,7 +130,14 @@ def _get_verifier(request: Request) -> JwtVerifier:
 def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    settings: Settings = Depends(get_settings),
+    db: Session = Depends(get_db),
 ) -> AuthenticatedUser:
+    """The verified caller, after the demo/live gate (``access.enforce_access``).
+
+    ``db`` is the request's shared session (FastAPI caches dependencies per
+    request); it opens a connection only in demo mode.
+    """
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise ApiError(
             code="UNAUTHENTICATED",
@@ -152,6 +162,8 @@ def get_current_user(
             message="Token subject is not a UUID.",
             status_code=status.HTTP_401_UNAUTHORIZED,
         ) from exc
+
+    enforce_access(request, user_id=user_id, settings=settings, db=db)
 
     email_claim = claims.get("email")
     email = email_claim if isinstance(email_claim, str) else None

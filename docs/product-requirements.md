@@ -197,4 +197,9 @@ Carry these into the roadmap as Phase-level decisions:
 - ~~**Canadian charger data.**~~ Resolved 2026-11-16 (Phase 3 F0): AFDC includes Natural Resources Canada's stations when called with `country=all`; a Frederick, MD → Toronto, ON route returned stations on both sides of the border. No second provider is needed. See [`maps-stations-notes.md`](maps-stations-notes.md).
 - **Weather provider licensing.** Open-Meteo is free for non-commercial use. Confirm whether Chargewise remains non-commercial before relying on it long-term.
 - **Smartcar entitlements.** Confirm the plan's event frequency and request quotas are enough for the Dashboard's freshness target. May require a telemetry-polling fallback.
-- **Public demo data.** Decide the exact seeded routes and simulated vehicle for the demo mode in Phase 6.
+- ~~**Public demo data.**~~ Resolved 2026-11-20 (P6-F2):
+  - **Vehicle:** a simulated 2026 Toyota bZ XLE AWD, the v1 target car, with its catalog specs.
+  - **Seeded history:** about four weeks of weekday commutes, weekend errands and home charging, plus a Frederick, MD → Toronto, ON road trip with DC fast-charging stops and a drive back.
+  - **Seeded plan:** only the Frederick → Toronto trip, because it is the one route with recorded Mapbox and AFDC fixtures. Visitors plan other routes live.
+  - **Location:** telemetry carries none; plan endpoints are public city centres.
+  - Details are in [`deployment.md`](deployment.md) §13.

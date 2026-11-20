@@ -35,6 +35,16 @@ export const env = {
       "true"
     );
   },
+  /** Public demo deployment (P6-F2): banner, demo sign-in, simulated analytics. */
+  get demoMode() {
+    return (process.env.NEXT_PUBLIC_DEMO_MODE ?? "false").toLowerCase() === "true";
+  },
+  /** The shared demo account; public on purpose (only simulated data). */
+  get demoCredentials(): { email: string; password: string } | null {
+    const email = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? "";
+    const password = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? "";
+    return email && password ? { email, password } : null;
+  },
   get appleAuthEnabled() {
     return (
       (process.env.NEXT_PUBLIC_AUTH_APPLE_ENABLED ?? "false").toLowerCase() ===
