@@ -92,4 +92,56 @@ class MeResponse(BaseModel):
     preferences: UserPreferencesOut
 
 
-__all__ = ["MeResponse", "UserPreferencesOut", "UserPreferencesUpdate"]
+ConsentKind = Literal["privacy_notice"]
+
+
+class ConsentStatus(BaseModel):
+    """The caller's latest decision for one consent kind (api §3.1c).
+
+    ``granted`` is ``null`` until the user has answered. ``is_current`` is true
+    only when they granted the version the server shows now.
+    """
+
+    kind: ConsentKind
+    current_version: str
+    granted: bool | None = None
+    version: str | None = None
+    recorded_at: datetime | None = None
+    is_current: bool
+
+
+class RetentionOut(BaseModel):
+    """How long the retention job keeps data (``scripts/retention.py``)."""
+
+    telemetry_days: int
+    unsaved_plan_days: int
+    refresh_log_days: int
+
+
+class PrivacyResponse(BaseModel):
+    """Body of ``GET /api/v1/me/privacy`` (api §3.1c)."""
+
+    consents: list[ConsentStatus]
+    retention: RetentionOut
+
+
+class ConsentCreate(BaseModel):
+    """Body for ``POST /api/v1/me/consents`` (api §3.1d)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: ConsentKind
+    version: str = Field(min_length=1, max_length=32)
+    granted: bool
+
+
+__all__ = [
+    "ConsentCreate",
+    "ConsentKind",
+    "ConsentStatus",
+    "MeResponse",
+    "PrivacyResponse",
+    "RetentionOut",
+    "UserPreferencesOut",
+    "UserPreferencesUpdate",
+]

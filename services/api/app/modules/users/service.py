@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError
 from app.modules.users.models import Profile, UserPreferences
+from app.modules.users.privacy_models import AccountDeletion
 from app.modules.users.schemas import UserPreferencesUpdate
 
 
@@ -26,6 +27,10 @@ def get_or_create_profile(
     Supabase owns identity; Chargewise records ``profiles.id`` equal to the
     Supabase ``auth.users.id`` on the first authenticated request from a given
     user. Default ``user_preferences`` are seeded in the same transaction.
+
+    A deleted account (``account_deletions`` tombstone, P6-F5) is never
+    recreated: its access token can stay valid until it expires, so this
+    answers ``401`` instead.
     """
 
     profile = db.get(Profile, user_id)
@@ -34,6 +39,13 @@ def get_or_create_profile(
             db.add(UserPreferences(user_id=user_id))
             db.flush()
         return profile
+
+    if db.get(AccountDeletion, user_id) is not None:
+        raise ApiError(
+            "UNAUTHENTICATED",
+            "This account has been deleted.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
 
     profile = Profile(id=user_id, display_name=display_name)
     db.add(profile)

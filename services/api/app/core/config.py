@@ -139,6 +139,21 @@ class Settings(BaseSettings):
     # ---- Demo mode (Phase 6 F2) ----
 
     # ---- Privacy and retention (Phase 6 F5) ----
+    # Version of the privacy notice the Profile page shows; acknowledging it
+    # stores a consent_records row with this value. Bump it when the text changes.
+    privacy_notice_version: str = Field(default="2026-11-19", min_length=1, max_length=32)
+    # scripts/retention.py: unsaved, unmatched plans older than this are deleted
+    # (phase4_plan.md D6).
+    privacy_unsaved_trip_days: int = Field(default=30, ge=1)
+    # vehicle_telemetry rows whose provider recorded_at is older than this.
+    privacy_telemetry_retention_days: int = Field(default=730, ge=30)
+    # vehicle_refreshes rows older than this (matches the on-write prune).
+    privacy_refresh_log_days: int = Field(default=30, ge=1)
+    # account_deletions rows are kept at least this long, and longer while work
+    # is owed. Must exceed the Supabase access-token lifetime (JWT expiry).
+    privacy_tombstone_days: int = Field(default=7, ge=1)
+    # Stop retrying a Smartcar revocation this long after the deletion.
+    privacy_revocation_give_up_days: int = Field(default=30, ge=1)
 
     # ---- Observability (Phase 6 F1, F4) ----
     # Empty disables Sentry. It is also always off under APP_ENV=test / pytest.

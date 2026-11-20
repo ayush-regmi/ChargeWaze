@@ -64,6 +64,9 @@ Reserved codes (grow this list as the API grows):
 |---|---|---|
 | `GET` | `/api/v1/me` | Authenticated profile and preferences. |
 | `PATCH` | `/api/v1/me/preferences` | Partially update preferences, including the primary vehicle. |
+| `DELETE` | `/api/v1/me` | Delete the account and all of its data; disconnect its cars. |
+| `GET` | `/api/v1/me/privacy` | Consent state and data-retention windows. |
+| `POST` | `/api/v1/me/consents` | Record an answer to the privacy notice. |
 | `GET` | `/api/v1/vehicles` | List the caller's connected vehicles. |
 | `POST` | `/api/v1/vehicles/connect` | Start a Smartcar Connect flow. |
 | `POST` | `/api/v1/vehicles/connect/complete` | Finish Connect for the signed-in user. |
@@ -145,6 +148,63 @@ Partially updates the caller's preferences. Only the keys present in the body ch
 - `null` is only accepted for `primary_vehicle_id`; other keys must be omitted rather than set to `null`.
 
 **Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` for unknown keys, out-of-range values, or `reserve_soc >= preferred_charge_to`; `NOT_FOUND` if `primary_vehicle_id` doesn't exist, belongs to another user, or isn't connected.
+
+### 3.1b `DELETE /api/v1/me`
+
+Deletes the caller's account (PRD §4.6, P6-F5). No body. **Response 204**, empty. Idempotent: calling it again with a still-valid token answers `204` and only retries the steps still owed.
+
+In one transaction, the server:
+
+1. Records a deletion tombstone ([`database-design.md`](database-design.md) §3.12). From then on, any endpoint that would create the profile answers `401 UNAUTHENTICATED` ("This account has been deleted."), so an access token that hasn't expired can't bring the account back. Read endpoints that never create a profile return empty results.
+2. Locks the caller's vehicles (the lock the webhook ingestor and refresh take) and revokes each Smartcar connection (`DELETE /v3/connections/{id}`), including revocations still owed from an earlier disconnect. A `404` from Smartcar counts as revoked.
+3. Deletes the profile. Every user-owned table cascades from it in the database: preferences, consent records, favorites, vehicles with their specs (incl. the per-vehicle baseline), telemetry and refresh log, planned trips and stops, observed trips and prediction results (db-design §6). The global `charging_stations` cache is kept.
+
+After the commit it deletes the Supabase auth user (admin API, service-role key), which also ends every session.
+
+- **Failures don't block deletion.** A Smartcar revocation that fails (timeout, 5xx, not configured) and a Supabase deletion that fails or isn't configured are stored on the tombstone; the nightly retention job retries them. The user's data is already gone, and webhooks for their cars are acknowledged with `accepted: false` and dropped (§3.12), so nothing can be re-created meanwhile.
+- The response never says which external steps are still owed; logs carry counts only.
+
+**Errors:** `UNAUTHENTICATED`.
+
+### 3.1c `GET /api/v1/me/privacy`
+
+The caller's consent state and the retention windows the server enforces, for the Profile page. Never writes (it doesn't create a profile).
+
+**Response 200**
+```json
+{
+  "consents": [
+    {
+      "kind": "privacy_notice",
+      "current_version": "2026-11-19",
+      "granted": true,
+      "version": "2026-11-19",
+      "recorded_at": "2026-11-19T18:00:00Z",
+      "is_current": true
+    }
+  ],
+  "retention": { "telemetry_days": 730, "unsaved_plan_days": 30, "refresh_log_days": 30 }
+}
+```
+
+- One entry per consent kind; `privacy_notice` is the only kind for now. `current_version` is the server's `PRIVACY_NOTICE_VERSION`.
+- `granted`, `version` and `recorded_at` are the caller's latest answer, all `null` before they answer. `is_current` is `true` only when they granted the current version, so bumping the version asks everyone again.
+- `retention` comes from the `PRIVACY_*` settings used by the retention job.
+
+**Errors:** `UNAUTHENTICATED`.
+
+### 3.1d `POST /api/v1/me/consents`
+
+Records an answer. Every call appends a row (the audit trail); history is never rewritten.
+
+**Request**
+```json
+{ "kind": "privacy_notice", "version": "2026-11-19", "granted": true }
+```
+
+**Response 201** — the kind's new status, same shape as one `consents` entry in §3.1c.
+
+**Errors:** `UNAUTHENTICATED` (including for a deleted account); `VALIDATION_ERROR` for an unknown kind, unknown keys, a missing `granted`, or a `version` that isn't the current one (`details.current_version` says which is), so a stale page can't record agreement to a notice the user didn't see.
 
 ### 3.2 `GET /api/v1/vehicles`
 

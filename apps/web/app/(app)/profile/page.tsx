@@ -3,7 +3,9 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { DeleteAccount } from "@/components/profile/delete-account";
 import { PreferencesEditor } from "@/components/profile/preferences-editor";
+import { PrivacyPanel } from "@/components/profile/privacy-panel";
 import { createApi } from "@/lib/api";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 
@@ -29,7 +31,10 @@ async function ProfileDetails() {
   }
 
   const api = createApi({ accessToken: session.access_token });
-  const { data: me, error } = await api.GET("/api/v1/me");
+  const [{ data: me, error }, { data: privacy }] = await Promise.all([
+    api.GET("/api/v1/me"),
+    api.GET("/api/v1/me/privacy"),
+  ]);
 
   if (!me) {
     const detail = error ? JSON.stringify(error) : "unknown error";
@@ -58,7 +63,9 @@ async function ProfileDetails() {
         <Field label="Created at" value={createdAt} />
       </dl>
       <PreferencesEditor preferences={me.preferences} />
+      {privacy ? <PrivacyPanel privacy={privacy} /> : null}
       <SignOutButton />
+      <DeleteAccount />
     </section>
   );
 }
