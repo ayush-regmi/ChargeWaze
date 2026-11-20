@@ -67,11 +67,18 @@ class FakeSmartcar:
     signals: dict[str, Any] = field(default_factory=lambda: fixture_json("signals_bz.json"))
     connections_status: int = 200
     signals_status: int = 200
+    # ``DELETE /connections/{id}``: Smartcar answers 204; ``None`` simulates a
+    # network failure.
+    delete_status: int | None = 204
     requests: list[httpx.Request] = field(default_factory=list)
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
         path = request.url.path
+        if request.method == "DELETE":
+            if self.delete_status is None:
+                raise httpx.ConnectError("connection refused", request=request)
+            return httpx.Response(self.delete_status)
         if path.endswith("/oauth2/token"):
             return httpx.Response(200, json=fixture_json("token_response.json"))
         if path.endswith("/connections"):
@@ -473,12 +480,15 @@ def test_callback_reconnect_reactivates_same_row(
     assert vehicle.smartcar_connection_id == "sc-connection-2"
 
 
-def test_callback_refuses_vehicle_connected_to_another_user(api: TestClient, db: Session) -> None:
+def _held_by_other_user(db: Session, connection_id: str = "sc-connection-other") -> None:
+    """The same real car, already connected to OTHER_USER_ID (account A)."""
+
     _ensure_profile(db, OTHER_USER_ID)
     db.add(
         Vehicle(
             user_id=OTHER_USER_ID,
             smartcar_vehicle_id=SC_VEHICLE_ID,
+            smartcar_connection_id=connection_id,
             make="TOYOTA",
             model="bZ XLE AWD",
             year=2026,
@@ -488,9 +498,99 @@ def test_callback_refuses_vehicle_connected_to_another_user(api: TestClient, db:
     db.flush()
     _ensure_profile(db)
 
-    assert _flag(_callback(api, state=_state()))[1] == "error"
+
+def _deleted_connections(smartcar: FakeSmartcar) -> list[str]:
+    return [r.url.path.rsplit("/", 1)[-1] for r in smartcar.requests if r.method == "DELETE"]
+
+
+def test_callback_refuses_vehicle_connected_to_another_user(
+    api: TestClient, db: Session, smartcar: FakeSmartcar
+) -> None:
+    _held_by_other_user(db)
+
+    assert _flag(_callback(api, state=_state())) == ("/garage", "owned_elsewhere")
+    # The car stays with account A; nothing is stored for this user.
     owners = {v.user_id for v in _vehicles(db)}
     assert owners == {OTHER_USER_ID}
+    assert db.scalars(select(Vehicle).where(Vehicle.user_id == TEST_USER_ID)).all() == []
+    # This user's fresh authorization is revoked on Smartcar.
+    assert _deleted_connections(smartcar) == [SC_CONNECTION_ID]
+
+
+def test_callback_owned_elsewhere_keeps_redirect_after(api: TestClient, db: Session) -> None:
+    _held_by_other_user(db)
+    response = _callback(api, state=_state(redirect_after="/garage?tab=cars"))
+    assert _flag(response) == ("/garage?tab=cars", "owned_elsewhere")
+
+
+@pytest.mark.parametrize("delete_status", [500, 403, 404, None])
+def test_callback_owned_elsewhere_survives_failed_revoke(
+    api: TestClient,
+    db: Session,
+    smartcar: FakeSmartcar,
+    caplog: pytest.LogCaptureFixture,
+    delete_status: int | None,
+) -> None:
+    """A failed (or already done) delete never changes the result."""
+
+    _held_by_other_user(db)
+    smartcar.delete_status = delete_status
+
+    with caplog.at_level("DEBUG"):
+        assert _flag(_callback(api, state=_state()))[1] == "owned_elsewhere"
+    assert _deleted_connections(smartcar) == [SC_CONNECTION_ID]
+    assert {v.user_id for v in _vehicles(db)} == {OTHER_USER_ID}
+
+    [summary] = [r for r in caplog.records if r.msg == "smartcar_connect_owned_elsewhere_revoked"]
+    expected = "already_revoked" if delete_status == 404 else "failed"
+    assert summary.counts == {expected: 1}  # type: ignore[attr-defined]
+    dumped = json.dumps([r.__dict__ for r in caplog.records], default=str)
+    for secret_id in (SC_USER_ID, SC_VEHICLE_ID, SC_CONNECTION_ID):
+        assert secret_id not in dumped
+
+
+def test_callback_owned_elsewhere_never_revokes_a_stored_connection(
+    api: TestClient, db: Session, smartcar: FakeSmartcar
+) -> None:
+    """Defensive: a connection a stored vehicle still uses is never deleted."""
+
+    _held_by_other_user(db, connection_id=SC_CONNECTION_ID)
+    assert _flag(_callback(api, state=_state()))[1] == "owned_elsewhere"
+    assert _deleted_connections(smartcar) == []
+
+
+def test_callback_mixed_owned_elsewhere_and_new_is_success(
+    api: TestClient, db: Session, smartcar: FakeSmartcar
+) -> None:
+    _held_by_other_user(db)
+    smartcar.connections = [
+        _connection(),
+        _connection(vehicle_id="sc-vehicle-2", connection_id="sc-connection-2"),
+    ]
+
+    assert _flag(_callback(api, state=_state()))[1] == "success"
+    mine = db.scalars(select(Vehicle).where(Vehicle.user_id == TEST_USER_ID)).all()
+    assert [v.smartcar_vehicle_id for v in mine] == ["sc-vehicle-2"]
+    # Only the refused car's connection is revoked.
+    assert _deleted_connections(smartcar) == [SC_CONNECTION_ID]
+
+
+def test_callback_mixed_owned_elsewhere_and_duplicate_is_error(
+    api: TestClient, db: Session, smartcar: FakeSmartcar
+) -> None:
+    """Mixes with nothing added keep the old ``error`` result."""
+
+    _ensure_profile(db)
+    smartcar.connections = [_connection(vehicle_id="sc-vehicle-2", connection_id="sc-connection-2")]
+    assert _flag(_callback(api, state=_state()))[1] == "success"
+
+    _held_by_other_user(db)
+    smartcar.connections = [
+        _connection(),
+        _connection(vehicle_id="sc-vehicle-2", connection_id="sc-connection-2"),
+    ]
+    assert _flag(_callback(api, state=_state()))[1] == "error"
+    assert _deleted_connections(smartcar) == [SC_CONNECTION_ID]
 
 
 def test_callback_redirect_never_leaves_the_site(api: TestClient) -> None:

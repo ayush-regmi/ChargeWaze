@@ -211,8 +211,9 @@ The backend verifies `state` **and requires its user to be the caller**, so a Co
 |---|---|
 | `success` | At least one vehicle was added or reconnected. |
 | `already_connected` | Every authorized vehicle was already connected to this user. |
+| `owned_elsewhere` | Every authorized vehicle is already connected to another Chargewise account (one car belongs to one account at a time). Nothing is stored, and the connections this Connect just created are deleted on Smartcar, best-effort (a failed delete doesn't change the result). |
 | `denied` | The user declined or backed out of Smartcar Connect (`error=access_denied` or `error=user_manually_returned_to_application`). |
-| `error` | Bad/expired `state`, `state` belongs to another user, Smartcar unreachable, no matching connection, or the vehicle is connected to another account. |
+| `error` | Bad/expired `state`, `state` belongs to another user, Smartcar unreachable, no matching connection, or a mix of outcomes with nothing added (for example one duplicate and one car owned by another account). |
 
 **Errors:** `UNAUTHENTICATED` without a JWT; `VALIDATION_ERROR` if `state` is missing.
 

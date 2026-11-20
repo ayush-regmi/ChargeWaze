@@ -8,6 +8,10 @@ is only accepted if its ``externalId`` (which we set to the Chargewise profile
 ID in the Connect URL) matches the user inside the signed ``state``. The
 router has already checked that ``state`` belongs to the signed-in user.
 
+One real car belongs to one Chargewise user at a time. A car another account
+already holds is refused (``owned_elsewhere``) and the connection this account
+just created is deleted on Smartcar, best-effort, so nothing is left behind.
+
 Logging rule (arch §9): counts and outcomes only. Never Smartcar user, vehicle
 or connection IDs.
 """
@@ -20,6 +24,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
 
+from fastapi import status
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -37,8 +42,9 @@ from app.modules.vehicles.spec_catalog import lookup_spec
 
 logger = logging.getLogger(__name__)
 
-ConnectOutcome = Literal["success", "already_connected", "error"]
+ConnectOutcome = Literal["success", "already_connected", "owned_elsewhere", "error"]
 VehicleResult = Literal["created", "reactivated", "duplicate", "owned_elsewhere", "incomplete"]
+RevokeResult = Literal["revoked", "already_revoked", "skipped", "failed"]
 
 
 @dataclass(frozen=True)
@@ -85,10 +91,18 @@ def complete_connect(
     )
     db.flush()
 
+    # The car stays with the account that holds it. Revoke this account's
+    # fresh authorization so it doesn't stay active on Smartcar's side.
+    rejected = [c for c, r in zip(accepted, results, strict=True) if r == "owned_elsewhere"]
+    if rejected:
+        _revoke_rejected(db, smartcar, rejected)
+
     if any(r in ("created", "reactivated") for r in results):
         outcome: ConnectOutcome = "success"
     elif all(r == "duplicate" for r in results):
         outcome = "already_connected"
+    elif all(r == "owned_elsewhere" for r in results):
+        outcome = "owned_elsewhere"
     else:
         outcome = "error"
     logger.info(
@@ -165,6 +179,39 @@ def _upsert_vehicle(
     )
     db.add(vehicle)
     return "created"
+
+
+def _revoke_rejected(db: Session, smartcar: SmartcarClient, rejected: list[Connection]) -> None:
+    """Best-effort delete of connections refused as ``owned_elsewhere``.
+
+    Never raises: a failed delete must not fail the Connect redirect.
+    """
+
+    revocations = [_revoke_connection(db, smartcar, c.connection_id) for c in rejected]
+    logger.info(
+        "smartcar_connect_owned_elsewhere_revoked",
+        extra={"counts": {r: revocations.count(r) for r in set(revocations)}},
+    )
+
+
+def _revoke_connection(db: Session, smartcar: SmartcarClient, connection_id: str) -> RevokeResult:
+    # Guard: never revoke a connection a stored vehicle still uses (it would
+    # be the holding account's, not this one's).
+    in_use = db.scalar(select(Vehicle.id).where(Vehicle.smartcar_connection_id == connection_id))
+    if in_use is not None:
+        return "skipped"
+    try:
+        smartcar.delete_connection(connection_id)
+    except ApiError as exc:
+        if (exc.details or {}).get("upstream_status") == status.HTTP_404_NOT_FOUND:
+            return "already_revoked"
+        logger.warning("smartcar_connect_revoke_failed", extra={"code": exc.code})
+        return "failed"
+    except ValidationError:
+        # Smartcar answered the token request with something unexpected.
+        logger.warning("smartcar_connect_revoke_failed", extra={"code": "INVALID_RESPONSE"})
+        return "failed"
+    return "revoked"
 
 
 def _read_supported_signals(

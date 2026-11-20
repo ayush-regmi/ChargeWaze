@@ -17,6 +17,7 @@ describe("ConnectBanner", () => {
   it.each([
     ["success", /vehicle connected/i, "status"],
     ["already_connected", /already connected/i, "status"],
+    ["owned_elsewhere", /connected to another account/i, "alert"],
     ["denied", /connection cancelled/i, "status"],
     ["error", /couldn't connect your vehicle/i, "alert"],
   ])("renders the %s banner", (flag, text, role) => {
@@ -38,5 +39,6 @@ describe("ConnectBanner", () => {
     expect(connectBanner(null)).toBeNull();
     expect(connectBanner("constructor")).toBeNull();
     expect(connectBanner("success")?.title).toBe("Vehicle connected");
+    expect(connectBanner("owned_elsewhere")?.tone).toBe("error");
   });
 });
