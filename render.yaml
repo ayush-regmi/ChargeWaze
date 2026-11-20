@@ -35,6 +35,10 @@ services:
         sync: false
       - key: SUPABASE_JWKS_URL
         sync: false
+      # P6-F5: account deletion and scripts/retention.py delete the Supabase
+      # auth user through the admin API. Server-only; never in the web app.
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
       - key: SUPABASE_JWT_AUDIENCE
         value: authenticated
       # ---- Smartcar V3 ----

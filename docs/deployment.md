@@ -42,7 +42,7 @@ Use a **new** Supabase project for production, not the development one.
    - Site URL: `https://<web-domain>` (the Vercel production URL from §4).
    - Redirect URLs: add `https://<web-domain>/auth/callback`. The web app sends users to `/auth/callback?next=…`.
 4. **OAuth providers.** If Google sign-in is on (`NEXT_PUBLIC_AUTH_GOOGLE_ENABLED=true`), set it up under Authentication → Providers → Google. Use the callback URL Supabase shows there, `https://<ref>.supabase.co/auth/v1/callback`, as the authorized redirect URI in Google Cloud.
-5. Keys you'll need: Project URL `https://<ref>.supabase.co`, JWKS URL `https://<ref>.supabase.co/auth/v1/.well-known/jwks.json`, and the **anon/publishable** key for the web app. The API doesn't need the service-role key; leave it unset.
+5. Keys you'll need: Project URL `https://<ref>.supabase.co`, JWKS URL `https://<ref>.supabase.co/auth/v1/.well-known/jwks.json`, the **anon/publishable** key for the web app, and the **service-role** key (Project Settings → API) for the API. The API needs the service-role key for account deletion and `scripts/retention.py` (P6-F5): it deletes the Supabase auth user through the admin API. It is server-only: set it on Render (§3) and never in Vercel or any `NEXT_PUBLIC_*` variable.
 
 Row level security is turned on by the migrations themselves (guidelines → Security).
 
@@ -58,6 +58,7 @@ Row level security is turned on by the migrations themselves (guidelines → Sec
    | `DATABASE_URL` | Session-pooler URL from §2 |
    | `SUPABASE_URL` | `https://<ref>.supabase.co` |
    | `SUPABASE_JWKS_URL` | `https://<ref>.supabase.co/auth/v1/.well-known/jwks.json` |
+   | `SUPABASE_SERVICE_ROLE_KEY` | The production project's service-role key (§2). Server-only. Without it, `DELETE /me` still deletes the account's data, but the Supabase auth user stays owed, and `scripts/retention.py` exits 1 until it can delete it (P6-F5). |
    | `SMARTCAR_CLIENT_ID`, `SMARTCAR_CLIENT_SECRET`, `SMARTCAR_APPLICATION_ID` | Smartcar Dashboard (production app) |
    | `SMARTCAR_REDIRECT_URI` | `https://<web-domain>/garage/connect/callback` |
    | `SMARTCAR_WEBHOOK_ID` | Smartcar Dashboard → Webhooks (after §6) |
@@ -198,6 +199,7 @@ Changing a `NEXT_PUBLIC_*` value only takes effect after the next web build: re-
 - Committed: none. `render.yaml` lists key names only (`sync: false` or generated), and `.dockerignore` keeps `.env*` out of the image.
 - Server-only (Render, GitHub): Smartcar client secret and management token, Mapbox secret token, AFDC key, database URL, Render API key, Vercel token.
 - Server-only (Render, GitHub), from P6-F4: `MONITORING_METRICS_TOKEN`.
+- Server-only (Render), from P6-F5: `SUPABASE_SERVICE_ROLE_KEY`. It bypasses row level security, so it never goes in Vercel, a `NEXT_PUBLIC_*` variable or the browser bundle (the deploy workflow fails if the name shows up there).
 - Build-time only (Vercel, Sensitive): `SENTRY_AUTH_TOKEN`.
 - Public (Vercel, `NEXT_PUBLIC_*`): API base URL, Supabase URL and anon key, Mapbox public token, web Sentry DSN, auth toggles. On the demo deployment only (§13): `NEXT_PUBLIC_DEMO_MODE` and the shared demo account's `NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD`, which are public on purpose.
 - Not secret, but required on the production API: `LIVE_ALLOWED_USER_IDS` (§3).
