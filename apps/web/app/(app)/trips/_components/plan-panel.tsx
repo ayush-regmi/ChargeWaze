@@ -12,6 +12,7 @@ import {
   type PlanOutcome,
   type PlanRequestSettings,
 } from "@/lib/plan-format";
+import { tryAgainText } from "@/lib/retry-after";
 import type { TripPoint } from "@/lib/trip-url";
 import type { UnitSystem } from "@/lib/units";
 
@@ -166,6 +167,15 @@ export function PlanPanel({
       ) : outcome.kind === "route_unavailable" ? (
         <Notice tone="error">
           <p>The map provider no longer offers {routeName}. Search the trip again.</p>
+        </Notice>
+      ) : outcome.kind === "rate_limited" ? (
+        <Notice tone="error">
+          <p>
+            Too many trip plans in a short time. {tryAgainText(outcome.retryAfterSeconds)}
+          </p>
+          <Button type="button" size="sm" variant="outline" onClick={() => run(last)}>
+            Try again
+          </Button>
         </Notice>
       ) : outcome.kind === "preferences_invalid" ? (
         <Notice tone="error">

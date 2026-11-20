@@ -108,6 +108,16 @@ describe("planErrorOutcome", () => {
       code: "UNKNOWN",
     });
   });
+
+  it("reads the per-user plan limit with its retry hint", () => {
+    expect(
+      planErrorOutcome(envelope("RATE_LIMITED", { limit: "plan", retry_after_seconds: 95 }), 429),
+    ).toEqual({ kind: "rate_limited", retryAfterSeconds: 95 });
+    expect(planErrorOutcome(envelope("RATE_LIMITED"), 429)).toEqual({
+      kind: "rate_limited",
+      retryAfterSeconds: null,
+    });
+  });
 });
 
 describe("labels", () => {

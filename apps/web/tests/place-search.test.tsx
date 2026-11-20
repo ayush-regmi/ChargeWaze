@@ -182,6 +182,16 @@ describe("PlaceSearch", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Place search isn't available");
   });
 
+  it("says when the search limit is hit and when to try again", async () => {
+    suggestPlaces.mockResolvedValueOnce({ error: "rate_limited", retryAfterSeconds: 240 });
+    const { input } = setup();
+    await type(input, "Toronto");
+    await flushDebounce();
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Too many searches in a short time. Try again in 4 minutes.");
+    expect(alert).not.toHaveTextContent("isn't available");
+  });
+
   it("shows an error when the picked place can't be resolved", async () => {
     retrievePlace.mockResolvedValueOnce({ error: "not_found" });
     const { input, onSelect } = setup();
