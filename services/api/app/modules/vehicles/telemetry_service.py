@@ -99,6 +99,7 @@ def ingest_vehicle_event(
             Vehicle.smartcar_user_id == data.user.id,
         )
         .with_for_update()
+        .execution_options(populate_existing=True)
     ).scalar_one_or_none()
 
     if vehicle is None:
@@ -148,9 +149,11 @@ def ingest_polled_signals(
     the OEM timestamp, ``latest_state`` only moves forward, ``supported_signals``
     only grows. Dedup differs because a REST read has no event ID:
 
-    - ``source_event_id`` is ``poll:<recorded_at>``, so refreshing the same OEM
-      reading twice hits the ``(source, source_event_id, signal_code)`` unique
-      index and inserts nothing.
+    - ``source_event_id`` is ``poll:<vehicle_id>:<recorded_at>``, so refreshing
+      the same OEM reading twice hits the ``(source, source_event_id,
+      signal_code)`` unique index and inserts nothing. The vehicle is part of
+      the ID because that index is global: two cars reporting at the same
+      second must not collide.
     - A reading already stored from any Smartcar row (a webhook, typically)
       with the same ``(vehicle, signal_code, recorded_at)`` is skipped.
 
@@ -160,8 +163,15 @@ def ingest_polled_signals(
     """
 
     received_at = now or datetime.now(UTC)
+    # ``populate_existing``: the caller's session may already hold this vehicle
+    # from before the Smartcar call (sessions don't expire on commit). Reload
+    # it under the lock so a webhook or disconnect that landed meanwhile is
+    # seen, and its ``latest_state`` isn't overwritten with the stale copy.
     vehicle = db.execute(
-        select(Vehicle).where(Vehicle.id == vehicle_id).with_for_update()
+        select(Vehicle)
+        .where(Vehicle.id == vehicle_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     ).scalar_one_or_none()
     if vehicle is None:
         db.rollback()
@@ -174,7 +184,7 @@ def ingest_polled_signals(
         db,
         vehicle,
         normalize_signals(signals),
-        event_id_for=poll_event_id,
+        event_id_for=lambda recorded_at: poll_event_id(vehicle.id, recorded_at),
         received_at=received_at,
         fallback_recorded_at=None,
         skip_if_stored="any",
@@ -191,10 +201,16 @@ def ingest_polled_signals(
 POLL_EVENT_PREFIX = "poll:"
 
 
-def poll_event_id(recorded_at: datetime) -> str:
-    """Synthetic ``source_event_id`` for a refreshed reading (one per OEM timestamp)."""
+def poll_event_id(vehicle_id: uuid.UUID, recorded_at: datetime) -> str:
+    """Synthetic ``source_event_id`` for a refreshed reading.
 
-    return f"{POLL_EVENT_PREFIX}{_iso(recorded_at)}"
+    One per vehicle and OEM timestamp. The dedup index is
+    ``(source, source_event_id, signal_code)`` with no ``vehicle_id``, so the
+    vehicle must be in the ID or two cars reporting at the same second would
+    collide and the second car's reading would be dropped.
+    """
+
+    return f"{POLL_EVENT_PREFIX}{vehicle_id}:{_iso(recorded_at)}"
 
 
 @dataclass(frozen=True)

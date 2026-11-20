@@ -24,8 +24,9 @@ from sqlalchemy import Connection, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
+from app.core.errors import ApiError
 from app.integrations.smartcar.client import SmartcarClient, get_smartcar_client
-from app.integrations.smartcar.schemas import WebhookEvent
+from app.integrations.smartcar.schemas import SignalsResponse, WebhookEvent
 from app.modules.users.models import Profile
 from app.modules.vehicles.ingest_hooks import (
     TelemetryIngested,
@@ -33,8 +34,12 @@ from app.modules.vehicles.ingest_hooks import (
     unregister_ingest_hook,
 )
 from app.modules.vehicles.models import Vehicle, VehicleRefresh, VehicleTelemetry
-from app.modules.vehicles.refresh import RefreshLimits, next_allowed_at
-from app.modules.vehicles.telemetry_service import ingest_vehicle_event, poll_event_id
+from app.modules.vehicles.refresh import RefreshLimits, next_allowed_at, refresh_vehicle
+from app.modules.vehicles.telemetry_service import (
+    ingest_polled_signals,
+    ingest_vehicle_event,
+    poll_event_id,
+)
 from tests.conftest import TEST_USER_ID, make_token
 from tests.integrations.conftest import fixture_json
 
@@ -300,7 +305,7 @@ def test_refresh_stores_readings_and_returns_fresh_state(
     for row in rows:
         assert row.source == "smartcar"
         assert row.recorded_at == at  # the OEM timestamp, not the request time
-        assert row.source_event_id == poll_event_id(at)
+        assert row.source_event_id == poll_event_id(vehicle.id, at)
         assert row.is_simulated is False
     soc = next(r for r in rows if r.signal_code == "soc")
     assert soc.value == Decimal("64")
@@ -404,7 +409,7 @@ def test_late_webhook_skips_reading_a_refresh_already_stored(
     assert result.accepted is True
     assert result.inserted == 0
     soc_rows = [r for r in telemetry(db, vehicle) if r.signal_code == "soc"]
-    assert [r.source_event_id for r in soc_rows] == [poll_event_id(at)]
+    assert [r.source_event_id for r in soc_rows] == [poll_event_id(vehicle.id, at)]
 
 
 def test_webhook_duplicates_of_other_webhooks_are_unchanged(db: Session, vehicle: Vehicle) -> None:
@@ -695,3 +700,117 @@ def test_next_allowed_at_uses_interval_below_the_cap() -> None:
 def test_next_allowed_at_waits_for_oldest_counted_attempt_at_the_cap() -> None:
     attempts_ = [T - timedelta(hours=10), T - timedelta(hours=5), T]
     assert next_allowed_at(attempts_, limits=LIMITS) == T + timedelta(hours=14)
+
+
+# ---------------------------------------------------------------------------
+# Review fixes (PR #66): cross-vehicle poll IDs, stale identity under the lock
+
+
+def test_two_vehicles_with_the_same_oem_timestamp_both_store(db: Session, vehicle: Vehicle) -> None:
+    """The dedup index has no vehicle_id, so the synthetic poll ID must carry it."""
+
+    _profile(db, OTHER_USER_ID)
+    other = Vehicle(
+        user_id=OTHER_USER_ID,
+        smartcar_vehicle_id="sc-vehicle-other",
+        smartcar_user_id="sc-user-other",
+        make="Toyota",
+        model="bZ XLE",
+        year=2026,
+        connection_status="connected",
+        supported_signals=[],
+    )
+    db.add(other)
+    db.commit()
+    at = datetime.now(UTC).replace(microsecond=0) - timedelta(minutes=2)
+    signals = SignalsResponse.model_validate(signals_payload(at))
+
+    first = ingest_polled_signals(db, vehicle_id=vehicle.id, signals=signals)
+    second = ingest_polled_signals(db, vehicle_id=other.id, signals=signals)
+
+    assert first.inserted == 4
+    assert second.inserted == 4
+    assert {r.source_event_id for r in telemetry(db, other)} == {poll_event_id(other.id, at)}
+
+
+def _request_session(conn: Connection) -> Session:
+    """A session configured like production ``get_db`` (no expiry on commit)."""
+
+    return Session(bind=conn, join_transaction_mode="create_savepoint", expire_on_commit=False)
+
+
+def test_refresh_merges_with_state_written_while_smartcar_was_answering(
+    db_connection: Connection, vehicle: Vehicle, settings: Settings
+) -> None:
+    """A webhook landing during the Smartcar call must not be overwritten by stale state."""
+
+    request_db = _request_session(db_connection)
+    now = datetime.now(UTC).replace(microsecond=0)
+    newer, older = now - timedelta(minutes=1), now - timedelta(hours=1)
+
+    class _Smartcar:
+        def get_signals(self, sc_user_id: str, sc_vehicle_id: str) -> SignalsResponse:
+            # A webhook request, with its own session, finishes mid-refresh.
+            with _request_session(db_connection) as webhook_db:
+                event = webhook_event(newer, soc=80, event_id="evt-during-refresh")
+                ingest_vehicle_event(webhook_db, event, event.vehicle_state())
+            return SignalsResponse.model_validate(signals_payload(older, soc=50))
+
+    try:
+        outcome = refresh_vehicle(
+            request_db,
+            _Smartcar(),  # type: ignore[arg-type]
+            user_id=TEST_USER_ID,
+            vehicle_id=vehicle.id,
+            limits=RefreshLimits(min_interval=timedelta(minutes=15), max_per_day=8),
+            stale_after=timedelta(minutes=15),
+            now=now,
+        )
+    finally:
+        request_db.close()
+
+    assert outcome.state.signals.soc_percent == 80
+    with Session(bind=db_connection, join_transaction_mode="create_savepoint") as check:
+        stored = check.get(Vehicle, vehicle.id)
+        assert stored is not None and stored.latest_state is not None
+        assert stored.latest_state["signals"]["soc"]["value"] == 80
+        assert stored.latest_state["signals"]["range"]["value"] == 240
+
+
+def test_refresh_sees_a_disconnect_made_while_smartcar_was_answering(
+    db_connection: Connection, vehicle: Vehicle
+) -> None:
+    request_db = _request_session(db_connection)
+    at = datetime.now(UTC).replace(microsecond=0) - timedelta(minutes=2)
+
+    class _Smartcar:
+        def get_signals(self, sc_user_id: str, sc_vehicle_id: str) -> SignalsResponse:
+            # The user disconnects in another tab while Smartcar is answering.
+            with _request_session(db_connection) as other_db:
+                other_db.execute(
+                    update(Vehicle)
+                    .where(Vehicle.id == vehicle.id)
+                    .values(connection_status="disconnected")
+                )
+                other_db.commit()
+            return SignalsResponse.model_validate(signals_payload(at))
+
+    try:
+        with pytest.raises(ApiError) as exc:
+            refresh_vehicle(
+                request_db,
+                _Smartcar(),  # type: ignore[arg-type]
+                user_id=TEST_USER_ID,
+                vehicle_id=vehicle.id,
+                limits=RefreshLimits(min_interval=timedelta(minutes=15), max_per_day=8),
+                stale_after=timedelta(minutes=15),
+            )
+    finally:
+        request_db.close()
+
+    assert exc.value.code == "VEHICLE_NOT_CONNECTED"
+    with Session(bind=db_connection, join_transaction_mode="create_savepoint") as check:
+        rows = check.scalars(
+            select(VehicleTelemetry).where(VehicleTelemetry.vehicle_id == vehicle.id)
+        ).all()
+        assert rows == []

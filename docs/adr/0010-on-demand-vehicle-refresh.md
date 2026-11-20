@@ -30,7 +30,7 @@ We add an **on-demand, user-triggered refresh** and no scheduled polling.
   - at most `SMARTCAR_REFRESH_MAX_PER_DAY` (default 8) in any rolling 24 hours;
   - the worst case is 8 × 31 = 248 requests per vehicle per month;
   - an attempt counts once Chargewise is about to call Smartcar, whether or not the call succeeds;
-  - the vehicle row is locked while the limit is checked, so concurrent clicks serialize.
+  - the vehicle row is locked while the limit is checked, so concurrent clicks serialize. It is locked again, and reloaded, before the results are stored. A webhook or disconnect that lands during the Smartcar call is then merged or respected, not overwritten by the copy loaded before the call.
 - **Same ingest rules as webhooks.** Results go through the same code as webhook deliveries (`telemetry_service._store_signals`):
   - same normalization;
   - `recorded_at` is the OEM timestamp;
@@ -38,7 +38,7 @@ We add an **on-demand, user-triggered refresh** and no scheduled polling.
   - `supported_signals` only grows;
   - `source = 'smartcar'`.
 - **Dedup without an event ID.** A refresh has no Smartcar event ID, so it uses three rules:
-  - `source_event_id = 'poll:<recorded_at>'`. Refreshing the same OEM reading again hits the existing unique index and inserts nothing.
+  - `source_event_id = 'poll:<vehicle_id>:<recorded_at>'`. Refreshing the same OEM reading again hits the existing unique index and inserts nothing. The vehicle is in the ID because that index is global, so two cars reporting at the same second must not collide.
   - A refresh skips a reading already stored from Smartcar with the same `(vehicle, signal_code, recorded_at)`.
   - A webhook skips a reading that a refresh already stored. This covers Smartcar retrying a delivery it couldn't make while we were down. Webhook-vs-webhook behaviour is unchanged.
 - **Trip inference runs too.** New rows schedule the [ADR 0009](0009-in-process-post-ingest-hook-for-trip-inference.md) post-ingest hooks after the response, exactly as the webhook does.

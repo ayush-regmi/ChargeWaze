@@ -252,7 +252,7 @@ Append-only log of every signal reading.
 | `recorded_at` | `timestamptz` | Provider timestamp. |
 | `received_at` | `timestamptz` | Server receive time. Default `now()`. |
 | `source` | `text` | `'smartcar'`, `'manual'`, `'simulated'` (`CHECK`). |
-| `source_event_id` | `text` | Smartcar event ID for deduplication; nullable for manual. Rows from an on-demand refresh (ADR 0010) use `poll:<recorded_at ISO>`, since a REST read has no event ID. |
+| `source_event_id` | `text` | Smartcar event ID for deduplication; nullable for manual. Rows from an on-demand refresh (ADR 0010) use `poll:<vehicle_id>:<recorded_at ISO>`, since a REST read has no event ID. The vehicle is part of the ID because the unique index below doesn't include `vehicle_id`. |
 | `signal_code` | `text` | e.g. `soc`, `odometer`, `range`, `charging_status`. |
 | `value` | `numeric` | Raw numeric. For booleans use 0/1 and document in a code table. Nullable when the signal has no numeric value (kept in `raw_payload`). |
 | `unit` | `text` | e.g. `percent`, `km`, `kwh`. Nullable. |

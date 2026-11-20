@@ -151,7 +151,7 @@ The UI always displays the reading's `recorded_at`. If it crosses the freshness 
 
 - `POST /api/v1/vehicles/{id}/refresh` makes one `GET /v3/vehicles/{id}/signals` call, rate-limited per vehicle (`vehicle_refreshes`).
 - The readings go through the same ingest code as the webhook (rules 3–6 above) and run the post-ingest hooks.
-- Dedup uses `poll:<recorded_at>` as the event ID, plus a cross-check against existing rows with the same `(vehicle, signal, recorded_at)` in both directions.
+- Dedup uses `poll:<vehicle_id>:<recorded_at>` as the event ID (the unique index has no vehicle column, so the vehicle must be in the ID), plus a cross-check against existing rows with the same `(vehicle, signal, recorded_at)` in both directions.
 - Reads (`GET .../state`) still never call Smartcar.
 - Scheduled polling is not built. It waits for the measured event cadence (phase2_plan.md F8 step 2).
 
