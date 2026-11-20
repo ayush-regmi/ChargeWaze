@@ -1,4 +1,9 @@
-"""Ingesting Smartcar ``VEHICLE_STATE`` / ``VEHICLE_ERROR`` webhook events (Phase 2 F5).
+"""Ingesting Smartcar telemetry: webhook events (Phase 2 F5) and refreshes (ADR 0010).
+
+``ingest_vehicle_event`` stores a ``VEHICLE_STATE``/``VEHICLE_ERROR`` webhook;
+``ingest_polled_signals`` stores an on-demand ``GET /signals`` read. Both go
+through ``_store_signals``, so the rules below apply to both; only dedup
+differs (see ``ingest_polled_signals``).
 
 The router verifies the signature and parses the envelope; this module owns
 the business rules (``docs/architecture.md`` §5, ``phase2_plan.md`` D5/D12):
@@ -25,7 +30,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -38,6 +43,7 @@ from sqlalchemy.orm import Session
 from app.integrations.smartcar.schemas import (
     SIGNAL_MAP,
     NormalizedSignal,
+    SignalsResponse,
     VehicleStateData,
     WebhookEvent,
     normalize_signals,
@@ -93,6 +99,7 @@ def ingest_vehicle_event(
             Vehicle.smartcar_user_id == data.user.id,
         )
         .with_for_update()
+        .execution_options(populate_existing=True)
     ).scalar_one_or_none()
 
     if vehicle is None:
@@ -103,38 +110,182 @@ def ingest_vehicle_event(
         return IngestResult(accepted=False, event_id=event_id, reason="vehicle_not_connected")
 
     delivered_at = parse_timestamp(event.meta.delivered_at)
-    signals = normalize_signals(data)
+    stored = _store_signals(
+        db,
+        vehicle,
+        normalize_signals(data),
+        event_id_for=lambda _recorded_at: event_id,
+        received_at=received_at,
+        fallback_recorded_at=delivered_at,
+        # A refresh may already have stored this reading (Smartcar retries
+        # failed deliveries for days). Webhook-vs-webhook stays as before.
+        skip_if_stored="poll",
+        log_ref=event_id,
+    )
 
-    rows: list[dict[str, Any]] = []
-    by_code: dict[str, NormalizedSignal] = {}
+    db.commit()
+    logger.info(
+        "smartcar_webhook_ingested",
+        extra={
+            "event_id": event_id,
+            "event_type": event.event_type,
+            "signals": stored.candidates,
+            "inserted": len(stored.codes),
+        },
+    )
+    return stored.result(vehicle, event_id=event_id)
+
+
+def ingest_polled_signals(
+    db: Session,
+    *,
+    vehicle_id: uuid.UUID,
+    signals: SignalsResponse,
+    now: datetime | None = None,
+) -> IngestResult:
+    """Persist one on-demand ``GET /vehicles/{id}/signals`` read (ADR 0010).
+
+    Same rules as a webhook delivery: same normalization, ``recorded_at`` is
+    the OEM timestamp, ``latest_state`` only moves forward, ``supported_signals``
+    only grows. Dedup differs because a REST read has no event ID:
+
+    - ``source_event_id`` is ``poll:<vehicle_id>:<recorded_at>``, so refreshing
+      the same OEM reading twice hits the ``(source, source_event_id,
+      signal_code)`` unique index and inserts nothing. The vehicle is part of
+      the ID because that index is global: two cars reporting at the same
+      second must not collide.
+    - A reading already stored from any Smartcar row (a webhook, typically)
+      with the same ``(vehicle, signal_code, recorded_at)`` is skipped.
+
+    REST signals have no delivery time, so a signal without its own timestamp
+    (errored signals, usually) is skipped rather than given an invented one.
+    Commits. Not accepted if the vehicle was disconnected meanwhile.
+    """
+
+    received_at = now or datetime.now(UTC)
+    # ``populate_existing``: the caller's session may already hold this vehicle
+    # from before the Smartcar call (sessions don't expire on commit). Reload
+    # it under the lock so a webhook or disconnect that landed meanwhile is
+    # seen, and its ``latest_state`` isn't overwritten with the stale copy.
+    vehicle = db.execute(
+        select(Vehicle)
+        .where(Vehicle.id == vehicle_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if vehicle is None:
+        db.rollback()
+        return IngestResult(accepted=False, event_id=None, reason="unknown_vehicle")
+    if vehicle.connection_status != "connected":
+        db.rollback()
+        return IngestResult(accepted=False, event_id=None, reason="vehicle_not_connected")
+
+    stored = _store_signals(
+        db,
+        vehicle,
+        normalize_signals(signals),
+        event_id_for=lambda recorded_at: poll_event_id(vehicle.id, recorded_at),
+        received_at=received_at,
+        fallback_recorded_at=None,
+        skip_if_stored="any",
+        log_ref=None,
+    )
+    db.commit()
+    logger.info(
+        "smartcar_refresh_ingested",
+        extra={"signals": stored.candidates, "inserted": len(stored.codes)},
+    )
+    return stored.result(vehicle, event_id=None)
+
+
+POLL_EVENT_PREFIX = "poll:"
+
+
+def poll_event_id(vehicle_id: uuid.UUID, recorded_at: datetime) -> str:
+    """Synthetic ``source_event_id`` for a refreshed reading.
+
+    One per vehicle and OEM timestamp. The dedup index is
+    ``(source, source_event_id, signal_code)`` with no ``vehicle_id``, so the
+    vehicle must be in the ID or two cars reporting at the same second would
+    collide and the second car's reading would be dropped.
+    """
+
+    return f"{POLL_EVENT_PREFIX}{vehicle_id}:{_iso(recorded_at)}"
+
+
+@dataclass(frozen=True)
+class _Stored:
+    candidates: int
+    codes: list[str]
+    times: list[datetime]
+
+    def result(self, vehicle: Vehicle, *, event_id: str | None) -> IngestResult:
+        return IngestResult(
+            accepted=True,
+            event_id=event_id,
+            inserted=len(self.codes),
+            vehicle_id=vehicle.id,
+            user_id=vehicle.user_id,
+            is_simulated=vehicle.is_simulated,
+            inserted_codes=frozenset(self.codes),
+            earliest_recorded_at=min(self.times, default=None),
+        )
+
+
+def _store_signals(
+    db: Session,
+    vehicle: Vehicle,
+    signals: list[NormalizedSignal],
+    *,
+    event_id_for: Callable[[datetime], str | None],
+    received_at: datetime,
+    fallback_recorded_at: datetime | None,
+    skip_if_stored: Literal["any", "poll"],
+    log_ref: str | None,
+) -> _Stored:
+    """Insert ``signals`` for a locked ``vehicle`` and apply them to its cache.
+
+    Shared by webhook deliveries and refreshes. ``skip_if_stored`` drops a
+    reading whose ``(signal_code, recorded_at)`` is already stored for the
+    vehicle from Smartcar: from any row (``"any"``) or only from a refresh
+    (``"poll"``). The caller commits.
+    """
+
+    by_code: dict[str, tuple[NormalizedSignal, datetime]] = {}
     for signal in signals:
-        recorded_at = signal.recorded_at or delivered_at
+        recorded_at = signal.recorded_at or fallback_recorded_at
         if recorded_at is None:
             # vehicle_telemetry.recorded_at is NOT NULL and we won't invent one.
             logger.warning(
-                "smartcar_webhook_signal_skipped",
-                extra={"event_id": event_id, "reason": "no_timestamp"},
+                "smartcar_telemetry_signal_skipped",
+                extra={"event_id": log_ref, "reason": "no_timestamp"},
             )
             continue
         code = _telemetry_code(signal)
         if code in by_code:
             # One reading per code per event; the dedup key can't hold two.
             continue
-        by_code[code] = signal
-        rows.append(
-            {
-                "vehicle_id": vehicle.id,
-                "recorded_at": recorded_at,
-                "received_at": received_at,
-                "source": SOURCE,
-                "source_event_id": event_id,
-                "signal_code": code,
-                "value": signal.value,
-                "unit": signal.unit,
-                "raw_payload": _raw_payload(signal),
-                "is_simulated": vehicle.is_simulated,
-            }
-        )
+        by_code[code] = (signal, recorded_at)
+
+    candidates = len(by_code)
+    for code in _already_stored(db, vehicle.id, by_code, only_polls=skip_if_stored == "poll"):
+        del by_code[code]
+
+    rows: list[dict[str, Any]] = [
+        {
+            "vehicle_id": vehicle.id,
+            "recorded_at": recorded_at,
+            "received_at": received_at,
+            "source": SOURCE,
+            "source_event_id": event_id_for(recorded_at),
+            "signal_code": code,
+            "value": signal.value,
+            "unit": signal.unit,
+            "raw_payload": _raw_payload(signal),
+            "is_simulated": vehicle.is_simulated,
+        }
+        for code, (signal, recorded_at) in by_code.items()
+    ]
 
     inserted_codes: list[str] = []
     inserted_times: list[datetime] = []
@@ -153,12 +304,12 @@ def ingest_vehicle_event(
             inserted_times.append(row.recorded_at)
 
     if inserted_codes:
-        inserted = [by_code[code] for code in inserted_codes]
+        inserted = [by_code[code][0] for code in inserted_codes]
         new_state = apply_to_latest_state(
             vehicle.latest_state,
             inserted,
             received_at=received_at,
-            fallback_recorded_at=delivered_at,
+            fallback_recorded_at=fallback_recorded_at,
         )
         if new_state != vehicle.latest_state:
             vehicle.latest_state = new_state
@@ -168,26 +319,30 @@ def ingest_vehicle_event(
         if supported != list(vehicle.supported_signals or []):
             vehicle.supported_signals = supported
 
-    db.commit()
-    logger.info(
-        "smartcar_webhook_ingested",
-        extra={
-            "event_id": event_id,
-            "event_type": event.event_type,
-            "signals": len(rows),
-            "inserted": len(inserted_codes),
-        },
+    return _Stored(candidates=candidates, codes=inserted_codes, times=inserted_times)
+
+
+def _already_stored(
+    db: Session,
+    vehicle_id: uuid.UUID,
+    readings: Mapping[str, tuple[NormalizedSignal, datetime]],
+    *,
+    only_polls: bool,
+) -> list[str]:
+    """Codes in ``readings`` whose exact ``(code, recorded_at)`` is already stored."""
+
+    if not readings:
+        return []
+    stmt = select(VehicleTelemetry.signal_code, VehicleTelemetry.recorded_at).where(
+        VehicleTelemetry.vehicle_id == vehicle_id,
+        VehicleTelemetry.source == SOURCE,
+        VehicleTelemetry.signal_code.in_(list(readings)),
+        VehicleTelemetry.recorded_at.in_({ts for _, ts in readings.values()}),
     )
-    return IngestResult(
-        accepted=True,
-        event_id=event_id,
-        inserted=len(inserted_codes),
-        vehicle_id=vehicle.id,
-        user_id=vehicle.user_id,
-        is_simulated=vehicle.is_simulated,
-        inserted_codes=frozenset(inserted_codes),
-        earliest_recorded_at=min(inserted_times, default=None),
-    )
+    if only_polls:
+        stmt = stmt.where(VehicleTelemetry.source_event_id.startswith(POLL_EVENT_PREFIX))
+    existing = {(row.signal_code, row.recorded_at) for row in db.execute(stmt)}
+    return [code for code, (_, ts) in readings.items() if (code, ts) in existing]
 
 
 # ---------------------------------------------------------------------------
@@ -398,10 +553,13 @@ def _parse_iso(value: Any) -> datetime | None:
 
 
 __all__ = [
+    "POLL_EVENT_PREFIX",
     "READING_CODES",
     "IngestResult",
     "TelemetryReading",
     "apply_to_latest_state",
+    "ingest_polled_signals",
     "ingest_vehicle_event",
     "list_readings",
+    "poll_event_id",
 ]

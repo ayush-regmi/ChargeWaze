@@ -194,6 +194,18 @@ class VehicleState(BaseModel):
     signal_recorded_at: dict[str, datetime]
 
 
+class VehicleRefreshResponse(BaseModel):
+    """Result of an on-demand Smartcar read (api §3.5a, ADR 0010)."""
+
+    refreshed_at: datetime
+    # vehicle_telemetry rows added; 0 when Smartcar had nothing newer than what
+    # is already stored (``state`` may then still be stale).
+    inserted: int
+    # Earliest time the per-vehicle rate limit allows another refresh.
+    next_refresh_at: datetime
+    state: VehicleState
+
+
 __all__ = [
     "BaselineSource",
     "ChargingCurvePoint",
@@ -207,6 +219,7 @@ __all__ = [
     "Connector",
     "VehicleDetail",
     "VehicleList",
+    "VehicleRefreshResponse",
     "VehicleSpecsOut",
     "VehicleSpecsUpdate",
     "VehicleState",

@@ -130,6 +130,13 @@ describe("VehicleStateView", () => {
     expect(banner.querySelector("time")).toHaveAttribute("datetime", fresh.recorded_at);
     // Values are still shown, just flagged.
     expect(card("Battery")).toHaveTextContent("72%");
+    // The user can ask for one live read to fill a webhook gap (ADR 0010).
+    expect(within(banner).getByRole("button", { name: "Refresh" })).toBeEnabled();
+  });
+
+  it("offers no Refresh while data is fresh", () => {
+    render(<VehicleStateView vehicle={vehicle} state={fresh} units="metric" />);
+    expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
   });
 
   it("shows the awaiting-first-update state with no cards", () => {
@@ -139,6 +146,9 @@ describe("VehicleStateView", () => {
     );
     expect(screen.queryByTestId("stale-banner")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Battery" })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("awaiting-first-update")).getByRole("button", { name: "Refresh" }),
+    ).toBeInTheDocument();
   });
 
   it("links to Plan Trip, Find Chargers and the vehicle", () => {

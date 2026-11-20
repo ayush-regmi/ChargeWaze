@@ -89,6 +89,11 @@ class Settings(BaseSettings):
     # ---- Telemetry ----
     # Readings older than this are flagged stale (phase2_plan.md D11).
     telemetry_stale_after_minutes: int = Field(default=15, gt=0)
+    # On-demand refresh limits per vehicle (ADR 0010). Each refresh is one
+    # Smartcar vehicle request; keep the daily cap well inside the plan's
+    # monthly per-vehicle allowance.
+    smartcar_refresh_min_interval_minutes: int = Field(default=15, gt=0)
+    smartcar_refresh_max_per_day: int = Field(default=8, gt=0)
 
     # The blocks below are reserved for features built in parallel
     # (docs/plan.md §2.3). Each feature adds settings only inside its own block,

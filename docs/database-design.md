@@ -22,6 +22,7 @@ erDiagram
     profiles ||--|| user_preferences : has
     vehicles ||--|| vehicle_specs : has
     vehicles ||--o{ vehicle_telemetry : emits
+    vehicles ||--o{ vehicle_refreshes : refreshed_by
     vehicles ||--o{ planned_trips : plans
     vehicles ||--o{ observed_trips : drove
     planned_trips ||--o{ planned_stops : contains
@@ -251,7 +252,7 @@ Append-only log of every signal reading.
 | `recorded_at` | `timestamptz` | Provider timestamp. |
 | `received_at` | `timestamptz` | Server receive time. Default `now()`. |
 | `source` | `text` | `'smartcar'`, `'manual'`, `'simulated'` (`CHECK`). |
-| `source_event_id` | `text` | Smartcar event ID for deduplication; nullable for manual. |
+| `source_event_id` | `text` | Smartcar event ID for deduplication; nullable for manual. Rows from an on-demand refresh (ADR 0010) use `poll:<vehicle_id>:<recorded_at ISO>`, since a REST read has no event ID. The vehicle is part of the ID because the unique index below doesn't include `vehicle_id`. |
 | `signal_code` | `text` | e.g. `soc`, `odometer`, `range`, `charging_status`. |
 | `value` | `numeric` | Raw numeric. For booleans use 0/1 and document in a code table. Nullable when the signal has no numeric value (kept in `raw_payload`). |
 | `unit` | `text` | e.g. `percent`, `km`, `kwh`. Nullable. |
@@ -259,9 +260,31 @@ Append-only log of every signal reading.
 | `is_simulated` | `boolean` | Default `false`. |
 
 Indexes:
-- `UNIQUE (source, source_event_id, signal_code) WHERE source_event_id IS NOT NULL` — webhook deduplication at signal granularity.
-- `INDEX (vehicle_id, signal_code, recorded_at DESC)` — hot path for "latest SoC".
+- `UNIQUE (source, source_event_id, signal_code) WHERE source_event_id IS NOT NULL` — webhook deduplication at signal granularity. For refresh rows it also makes refreshing the same OEM reading twice a no-op.
+- `INDEX (vehicle_id, signal_code, recorded_at DESC)` — hot path for "latest SoC". Also serves the refresh/webhook cross-dedup lookup on `(vehicle_id, signal_code, recorded_at)`.
 - `INDEX (vehicle_id, recorded_at DESC)` — history scrolling.
+
+Refresh rows and webhook rows don't duplicate each other ([ADR 0010](adr/0010-on-demand-vehicle-refresh.md)):
+
+- A refresh skips a reading already stored from Smartcar with the same `(vehicle_id, signal_code, recorded_at)`.
+- A webhook skips one that a refresh (`poll:` prefix) already stored.
+
+### 3.5a `vehicle_refreshes`
+
+Log of on-demand Smartcar reads (`POST /vehicles/{id}/refresh`, ADR 0010). The per-vehicle rate limit counts these rows. It holds no Smartcar IDs or readings; the readings go to `vehicle_telemetry`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` PK | |
+| `vehicle_id` | `uuid` FK → `vehicles.id` ON DELETE CASCADE | |
+| `requested_at` | `timestamptz` | When the attempt was recorded, just before calling Smartcar. |
+| `outcome` | `text` | `'pending'`, `'ok'`, `'failed'` (`CHECK`). Stays `pending` only if the process died mid-request. |
+| `inserted` | `int` | Telemetry rows the refresh added. Default 0. |
+| `upstream_status` | `int` | Smartcar's HTTP status when the call failed with a response; otherwise `NULL`. |
+
+Indexes: `INDEX (vehicle_id, requested_at DESC)`.
+
+Retention: rows older than 30 days are deleted for a vehicle whenever a new attempt is recorded for it. No job is needed. RLS is enabled with no policies, as for the other server-only tables.
 
 ### 3.6 `charging_stations`
 

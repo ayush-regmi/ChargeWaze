@@ -20,13 +20,13 @@ import logging
 import uuid
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
-from app.core.errors import ApiError
+from app.core.errors import ApiError, ErrorEnvelope
 from app.db.session import get_db
 from app.integrations.smartcar.client import SmartcarClient, get_smartcar_client
 from app.modules.auth.dependencies import AuthenticatedUser, get_current_user
@@ -37,7 +37,9 @@ from app.modules.vehicles.garage import (
     list_vehicles,
     update_specs,
 )
+from app.modules.vehicles.hook_scheduling import schedule_ingest_hooks
 from app.modules.vehicles.redirects import DEFAULT_REDIRECT_AFTER
+from app.modules.vehicles.refresh import RefreshLimits, refresh_vehicle
 from app.modules.vehicles.schemas import (
     ConnectCompleteRequest,
     ConnectCompleteResponse,
@@ -46,6 +48,7 @@ from app.modules.vehicles.schemas import (
     ConnectResponse,
     VehicleDetail,
     VehicleList,
+    VehicleRefreshResponse,
     VehicleSpecsOut,
     VehicleSpecsUpdate,
     VehicleState,
@@ -224,6 +227,54 @@ def get_state(
         user_id=current_user.user_id,
         vehicle_id=vehicle_id,
         stale_after=_stale_after(settings),
+    )
+
+
+@router.post(
+    "/{vehicle_id}/refresh",
+    response_model=VehicleRefreshResponse,
+    responses={
+        404: {"model": ErrorEnvelope},
+        409: {"model": ErrorEnvelope},
+        429: {"model": ErrorEnvelope},
+        502: {"model": ErrorEnvelope},
+        503: {"model": ErrorEnvelope},
+        504: {"model": ErrorEnvelope},
+    },
+)
+def post_refresh(
+    vehicle_id: uuid.UUID,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    smartcar: SmartcarClient = Depends(get_smartcar_client),
+) -> VehicleRefreshResponse:
+    """Read the vehicle live from Smartcar once, to fill a webhook gap (api §3.5a).
+
+    The only vehicle route that calls Smartcar for data, and only when the user
+    asks (ADR 0010). Rate-limited per vehicle. New readings go through the
+    webhook's ingest rules and run the post-ingest hooks after the response.
+    """
+
+    outcome = refresh_vehicle(
+        db,
+        smartcar,
+        user_id=current_user.user_id,
+        vehicle_id=vehicle_id,
+        limits=RefreshLimits(
+            min_interval=timedelta(minutes=settings.smartcar_refresh_min_interval_minutes),
+            max_per_day=settings.smartcar_refresh_max_per_day,
+        ),
+        stale_after=_stale_after(settings),
+    )
+    schedule_ingest_hooks(request, background_tasks, outcome.ingest)
+    return VehicleRefreshResponse(
+        refreshed_at=outcome.refreshed_at,
+        inserted=outcome.inserted,
+        next_refresh_at=outcome.next_refresh_at,
+        state=outcome.state,
     )
 
 

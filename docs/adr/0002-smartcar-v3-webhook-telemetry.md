@@ -35,6 +35,7 @@ We will:
 - Easier: following the vendor's own recommended direction keeps us on supported APIs.
 - Harder: webhooks require a public HTTPS endpoint during development (a tunnel) and robust signature + dedup handling before anything else.
 - Harder: we depend on manufacturer event frequency. If the Toyota produces events too rarely for the Dashboard's freshness target, we'll need a polling fallback. This has to be measured in Phase 2 before the Dashboard commits to a freshness threshold.
+  - Update 2026-11-19: [ADR 0010](0010-on-demand-vehicle-refresh.md) adds a user-triggered, rate-limited refresh for gaps caused by missed deliveries. Dashboard reads still never call Smartcar. Scheduled polling still waits for the cadence measurement.
 
 ## Alternatives considered
 

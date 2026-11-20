@@ -112,6 +112,11 @@ Response item shape ✅:
 ## 6. Limits and SDK
 
 - Rate/usage limits: [usage limits](https://smartcar.com/docs/help/api-limits), [rate-limit errors](https://smartcar.com/docs/errors/api-errors/v3/rate-limit-errors). 🔬 record our plan's numbers from the Dashboard.
+  - **Monthly cap per vehicle.** Set by the plan and not published. The docs' only example is "500 API calls per vehicle per month". Successful calls to vehicle endpoints count. Whether webhook deliveries count isn't stated.
+  - **App-wide bucket.** 120 requests, refilling at 2 per minute.
+  - **Throttled calls** return `429`, body `type: "RATE_LIMIT"`, `code: "VEHICLE"` (per-vehicle, `retry-after` header in seconds) or `"SMARTCAR_API"` (app-wide, no header). Chargewise maps both to `429 SMARTCAR_RATE_LIMITED`.
+  - **Monthly cap reached.** `BILLING`/`VEHICLE_REQUEST_LIMIT` stays `502 SMARTCAR_ERROR`.
+  - **Our own spend.** The on-demand refresh (ADR 0010) spends at most `SMARTCAR_REFRESH_MAX_PER_DAY` (8) signals reads per vehicle per day, about 248 per month.
 - **D10:** the docs show plain HTTP for every V3 call; no SDK is needed. Stay on `httpx`.
 
 ## 7. Real-vehicle results (🚗 fill in after running the spike)

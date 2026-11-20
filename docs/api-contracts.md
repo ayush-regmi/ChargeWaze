@@ -40,7 +40,10 @@ Reserved codes (grow this list as the API grows):
 | `VALIDATION_ERROR` | 422 | Request body failed Pydantic validation. |
 | `CONFLICT` | 409 | Already-saved trip, etc. (not used for vehicle connect; see §3.3). |
 | `SMARTCAR_UNREACHABLE` | 502/504 | Smartcar failed or timed out. |
-| `SMARTCAR_ERROR` | 502 | Smartcar rejected the request; Smartcar's error code is in `details`. |
+| `SMARTCAR_ERROR` | 502 | Smartcar rejected the request; Smartcar's error code is in `details`. Includes Smartcar's monthly per-vehicle cap (`BILLING`/`VEHICLE_REQUEST_LIMIT`). |
+| `SMARTCAR_RATE_LIMITED` | 429 | Smartcar throttled the request (`429` of type `RATE_LIMIT`, per vehicle or app-wide). `details.retry_after_seconds` and a `Retry-After` header when Smartcar said how long to wait. |
+| `RATE_LIMITED` | 429 | Chargewise's own per-vehicle refresh limit (§3.5a). `details.retry_after_seconds`, `details.next_refresh_at` and a `Retry-After` header. |
+| `VEHICLE_NOT_CONNECTED` | 409 | The action needs a connected, real (non-simulated) vehicle (§3.5a). |
 | `SMARTCAR_NOT_CONFIGURED` | 503 | Smartcar credentials, application ID or state secret are not set on the server. |
 | `MAPBOX_UNREACHABLE` | 502/504 | Mapbox failed or timed out. |
 | `MAPBOX_ERROR` | 502 | Mapbox rejected the request or returned an unexpected response; Mapbox's error code (if any) is in `details`. |
@@ -67,6 +70,7 @@ Reserved codes (grow this list as the API grows):
 | `GET` | `/api/v1/vehicles/{id}` | Vehicle metadata and specs. |
 | `PATCH` | `/api/v1/vehicles/{id}/specs` | Edit usable capacity, connectors and charging curve. |
 | `GET` | `/api/v1/vehicles/{id}/state` | Latest cached vehicle state. |
+| `POST` | `/api/v1/vehicles/{id}/refresh` | User-triggered live read from Smartcar to fill a webhook gap (rate-limited). |
 | `DELETE` | `/api/v1/vehicles/{id}` | Disconnect vehicle and stop telemetry. |
 | `POST` | `/api/v1/routes/plan` | Generate and store a charging-aware trip plan. |
 | `GET` | `/api/v1/trips` | List saved (default) or unsaved planned trips. |
@@ -324,8 +328,46 @@ Returns the latest cached state. **Never** triggers a live Smartcar call on the 
 - `is_stale` follows §3.2: `true` with no data yet, or when `recorded_at` is older than `TELEMETRY_STALE_AFTER_MINUTES`.
 - If no telemetry has ever arrived, responds `200` with every signal `null`, `signal_recorded_at: {}`, `recorded_at: null` and `is_stale: true`.
 - A disconnected vehicle still returns its last cached state to its owner.
+- To bring stale data up to date the client calls §3.5a explicitly; this endpoint never does.
 
 **Errors:** `UNAUTHENTICATED`; `VALIDATION_ERROR` if `id` isn't a UUID; `NOT_FOUND` if it doesn't exist **or belongs to another user**.
+
+### 3.5a `POST /api/v1/vehicles/{id}/refresh`
+
+Reads the vehicle once, live, from Smartcar (`GET /v3/vehicles/{id}/signals`). It fills gaps when webhooks were missed, for example while the API or its tunnel was down ([ADR 0010](adr/0010-on-demand-vehicle-refresh.md)). Only the user triggers it: the web app offers it where the data is stale. No body.
+
+**Response 200**
+```json
+{
+  "refreshed_at": "2026-11-19T15:02:11Z",
+  "inserted": 4,
+  "next_refresh_at": "2026-11-19T15:17:11Z",
+  "state": { "vehicle_id": "vehicle-uuid", "recorded_at": "2026-11-19T15:00:40Z", "is_stale": false, "...": "same shape as §3.5" }
+}
+```
+
+- **What gets stored.** Readings are stored with the same rules as a webhook delivery (§3.12, [`architecture.md`](architecture.md) §5):
+  - `recorded_at` is the OEM timestamp;
+  - `latest_state` only moves forward;
+  - signals without a provider timestamp are skipped.
+- **`inserted`** is the number of new `vehicle_telemetry` rows. It is `0` when Smartcar had nothing newer than what is already stored: the same reading from an earlier refresh, or one a webhook already delivered. The returned `state` can then still be `is_stale: true`. The car hasn't reported since, and the API doesn't pretend otherwise.
+- **`state`** is exactly what §3.5 would now return.
+- **Post-ingest hooks.** When rows were inserted, the post-ingest hooks (trip inference, [ADR 0009](adr/0009-in-process-post-ingest-hook-for-trip-inference.md)) run after the response, as for a webhook.
+- **Rate limit per vehicle:**
+  - one refresh per `SMARTCAR_REFRESH_MIN_INTERVAL_MINUTES` (default 15);
+  - at most `SMARTCAR_REFRESH_MAX_PER_DAY` (default 8) in any rolling 24 h;
+  - `next_refresh_at` is the earliest time another refresh is allowed;
+  - an attempt counts once it is about to call Smartcar, even if Smartcar then fails. It doesn't count when the server has no Smartcar credentials.
+- **Gaps stay gaps.** A refresh returns Smartcar's current snapshot. Readings missed during an outage are not recovered.
+
+**Errors:**
+- `UNAUTHENTICATED`.
+- `VALIDATION_ERROR` if `id` isn't a UUID.
+- `NOT_FOUND` if the vehicle doesn't exist or belongs to another user.
+- `VEHICLE_NOT_CONNECTED` (409) if it is disconnected, pending or simulated.
+- `RATE_LIMITED` (429), with a `Retry-After` header.
+- `SMARTCAR_RATE_LIMITED` (429).
+- `SMARTCAR_UNREACHABLE` (502/504), `SMARTCAR_ERROR` (502), `SMARTCAR_NOT_CONFIGURED` (503).
 
 ### 3.6 `DELETE /api/v1/vehicles/{id}`
 
@@ -783,6 +825,8 @@ Verification, deduplication, and persistence happen here. The response body is i
 ```json
 { "accepted": true, "event_id": "smartcar-event-id" }
 ```
+
+A reading that an on-demand refresh (§3.5a) already stored with the same signal and provider timestamp is skipped, so Smartcar retrying a delivery after an outage doesn't duplicate it. Readings from two different webhook events are each stored as before.
 
 `accepted: false` means the event was signed and understood but deliberately not stored: unknown vehicle, a vehicle that isn't `connected` (phase2_plan.md D12), an event type Chargewise doesn't ingest, or a `VEHICLE_ERROR` whose shape couldn't be parsed. Smartcar treats it like any 200 and stops retrying. A duplicate delivery returns `accepted: true` and writes nothing.
 

@@ -15,6 +15,7 @@ import {
 } from "@/lib/units";
 import { vehicleTitle, type VehicleState, type VehicleSummary } from "@/lib/vehicles";
 
+import { RefreshButton } from "./refresh-button";
 import { TimeAgo } from "./time-ago";
 
 type Props = {
@@ -57,17 +58,20 @@ export function VehicleStateView({ vehicle, state, units }: Props) {
             It can take a few minutes after connecting for your car to report its battery
             state. This page will show it once it arrives.
           </p>
+          <RefreshButton vehicleId={vehicle.id} className="mt-3" />
         </div>
       ) : (
         <>
           {state.is_stale ? (
             <div
-              role="alert"
               data-testid="stale-banner"
-              className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
+              className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm"
             >
-              Data may be stale — last update{" "}
-              <TimeAgo iso={state.recorded_at as string} />.
+              <p role="alert" className="py-1.5 text-warning">
+                Data may be stale — last update{" "}
+                <TimeAgo iso={state.recorded_at as string} />.
+              </p>
+              <RefreshButton vehicleId={vehicle.id} className="items-end" />
             </div>
           ) : null}
 
