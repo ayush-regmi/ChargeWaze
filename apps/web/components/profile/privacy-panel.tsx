@@ -53,16 +53,21 @@ function NoticeConsent({ notice }: { notice: ConsentStatus }) {
     setError(null);
     startTransition(async () => {
       const result = await recordPrivacyConsent(current.current_version, granted);
-      if ("error" in result) {
-        setError(result.error);
-        return;
-      }
-      setCurrent({
-        ...current,
-        granted: result.granted,
-        version: current.current_version,
-        recorded_at: new Date().toISOString(),
-        is_current: result.granted,
+      // Updates after an `await` aren't part of the outer transition, so wrap
+      // them again; otherwise "Accepted" can render while the button still
+      // says "Saving…".
+      startTransition(() => {
+        if ("error" in result) {
+          setError(result.error);
+          return;
+        }
+        setCurrent({
+          ...current,
+          granted: result.granted,
+          version: current.current_version,
+          recorded_at: new Date().toISOString(),
+          is_current: result.granted,
+        });
       });
     });
   }

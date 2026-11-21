@@ -92,7 +92,7 @@ describe("PrivacyPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
     expect(recordPrivacyConsent).toHaveBeenCalledWith("2026-11-19", true);
     await waitFor(() => expect(screen.getByText("Accepted")).toBeInTheDocument());
-    expect(screen.getByRole("button", { name: "Withdraw" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Withdraw" })).toBeEnabled();
   });
 
   it("asks again when the notice version changed", () => {
