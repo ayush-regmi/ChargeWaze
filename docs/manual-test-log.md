@@ -6,7 +6,7 @@ Checks that automated tests can't cover: they need the real Toyota bZ, real Mapb
 - **Where results go:** a check's result row here, plus wherever its "Record in" says (PR, roadmap, phase plan). Screenshots go in the named PR or close-out PR, not in the repo.
 - **Status values:** `open`, `blocked (<what>)`, `pass`, `fail (<issue/PR>)`.
 
-Last updated 2026-11-19 (P5-F8 close-out: M-11 added).
+Last updated 2026-11-21 (production set up on `chargewaze.vercel.app`: M-14 checked except the car and alerts; P6-F2 merged, so M-18 has steps).
 
 ---
 
@@ -25,8 +25,14 @@ Last updated 2026-11-19 (P5-F8 close-out: M-11 added).
 | M-09 | Clean up local per-session databases | Docker | Nothing | open |
 | M-10 | Real-key Frederick → Toronto **plan** with charging stops, latency and screenshot (P4-F9) | Mapbox public + secret, AFDC, connected vehicle | Phase 4 "complete" (roadmap) | open |
 | M-11 | Real drives and a charge produce observed legs with no manual step; record the quality mix (P5-F8) | Real car, a few days, M-02 first | Phase 5 "complete" (roadmap) | open |
+| M-12 | On-demand Refresh fills missed webhooks, no duplicates after retry (#66, ADR 0010) | Real car, ngrok | Nothing (confidence) | open |
+| M-13 | A car on a second account shows "owned elsewhere"; the first account keeps working (#62) | Real car, two accounts | Nothing (confidence) | open |
+| M-14 | Production setup and first deploy; smoke workflow green (P6-F3, P6-F4) | Supabase, Render, Vercel, GitHub, Smartcar, Sentry accounts | Public launch, P6-F6 numbers | open (car connect and alerts left) |
+| M-15 | Delete a test account on production; rows gone, Smartcar revoked, auth user gone (P6-F5) | M-14, a test account with a car | Nothing (confidence) | open |
+| M-16 | Retention job scheduled daily on a host (P6-F5) | M-14, a scheduler | Retention promises in the privacy notice | open |
+| M-17 | Per-vehicle baseline on the real bZ changes the plan (P4-F8) | Real keys, connected vehicle | Nothing (confidence) | open |
+| M-18 | Public demo deployment seeded and reachable (P6-F2) | Second Render/Vercel/Supabase | P6-F6 screenshots and demo script | open |
 
-Upcoming checks that close-out features will add (listed so they aren't a surprise): see [Upcoming](#upcoming).
 
 ---
 
@@ -357,13 +363,81 @@ Merged so far: `p3_stations`, `p3_charging`, `p3_planner`, `p3_favorites`, `p4_e
 
 ---
 
-## Upcoming
+## Added after W8
 
-Checks that later close-outs will need; they'll move into the summary when their feature merges.
+### M-12 · On-demand Refresh fills missed webhooks (#66, ADR 0010)
 
-| Feature | Check |
-|---|---|
-| P3-F8 favorites | Favorite a station, sign out and back in: still favorited (Playwright covers it; a quick real-data look is enough). |
-| P4-F8 | Set a per-vehicle baseline on the real bZ and re-plan; numbers change as expected. |
-| P6-F3 / F4 | Deployed app smoke test: sign in, Garage, Charging, Trip Planner on the production URL; alerts fire. |
-| P6-F5 | Delete a test account end to end; its rows are gone. |
+1. `cd services/api && uv run alembic upgrade head` (dev database).
+2. Run the API **without** the ngrok tunnel, so Smartcar webhooks can't arrive. Wait until the bZ's Dashboard shows its data as stale (older than 15 min).
+3. Press **Refresh** on the Dashboard banner. Expected: the cards show the car's own timestamps; Supabase has a new `vehicle_refreshes` row with `outcome = 'ok'` and new `vehicle_telemetry` rows whose IDs start with `poll:`.
+4. Press **Refresh** again within 15 minutes. Expected: "refreshed recently", no new Smartcar call.
+5. Start the tunnel again and let Smartcar retry the failed deliveries. Expected: no duplicate `vehicle_telemetry` rows for readings the refresh already stored.
+
+| Date | Refresh stored readings | Second press throttled | No duplicates after retry | Notes |
+|---|---|---|---|---|
+| | | | | |
+
+### M-13 · Car on a second account (#62)
+
+1. Account A has the bZ connected. Sign out, sign in as account B (another email), and connect the same car in Garage.
+2. Expected: B sees the "this car is connected to another ChargeWaze account" message, not a generic error.
+3. In B, remove the attempted connection (if any). Sign back in as A: the car still updates (Dashboard shows a fresh reading after the next event or a Refresh).
+
+| Date | B sees owned-elsewhere message | A still works | Notes |
+|---|---|---|---|
+| | | | |
+
+### M-14 · Production setup and first deploy (P6-F3, P6-F4)
+
+Follow [`deployment.md`](deployment.md) §2–§8 in order, then §12.3 (alerts). Done when: the **Deploy (production)** run shows migrations applied, Render `live`, `/health` OK and a Vercel URL; the **Smoke (production)** run passes every check; you can sign in on the production URL, connect the car, see the Charging page and plan a trip.
+
+| Date | Deploy run green | Smoke run green | Sign-in, Garage, Charging, Planner OK | Alerts set up | Notes |
+|---|---|---|---|---|---|
+| 2026-11-21 | yes (run 44868674488, `2d2c3a9`: head `20261123_01`, Render `live`, `/health` OK) | yes (run 44868883336) | yes, except connecting the car | not checked | See below. |
+
+Checked on 2026-11-21, signed in with Google on `https://chargewaze.vercel.app`:
+
+- **Domain change.** `chargewaze.vercel.app` is the main Vercel domain. `chargetrip.vercel.app`, used by the first deploy, answers `307` to the same path and query on chargewaze. Setting it up needed every item in [`deployment.md`](deployment.md) §4 "Changing the web domain later". Two were missed at first: Render `ALLOWED_ORIGINS` (the API answered `400 Disallowed CORS origin`) and the production Supabase URL Configuration (Google sign-in returned to `http://localhost:3000`). Both were fixed the same day.
+- **Google sign-in.** It was enabled in Vercel but not in the production Supabase project until 2026-11-21. It reuses the dev project's Google OAuth client, with the production Supabase callback added.
+- **Pages.** Dashboard and Garage load for the allowlisted account (no vehicle yet). On Charging, a Frederick search shows AFDC stations on the Mapbox map, so the public token's URL restriction allows the new domain. On the Trip Planner, Frederick → Toronto gives two routes (464 mi and 500 mi) and 113 chargers within 1.9 mi of route A. The charging plan needs a connected vehicle.
+- **Smartcar.** Add vehicle opens Smartcar Connect in `live` mode with `redirect_uri=https://chargetrip.vercel.app/garage/connect/callback`, which redirects to chargewaze with `code` and `state` kept. To do: change Render `SMARTCAR_REDIRECT_URI` to the chargewaze callback, rename the Smartcar app (its consent screen says "ChargeWise"), and connect the bZ.
+- **Found on the way (not production issues):** the station favorite star has `viewBox="0 20"` (one console error per station card), and the sign-in page doesn't show Supabase's `error_description` (an expired OAuth state lands back on the form with no message).
+
+### M-15 · Account deletion on production (P6-F5)
+
+Needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` on Render. Use a **test** account, never your main one.
+
+1. Sign up a test account on production, connect a car (or the Smartcar simulator), plan and save a trip.
+2. Profile → **Delete account** → type `DELETE` → confirm. You are signed out.
+3. Expected: in the production Supabase SQL editor, no rows for that user's ID in `profiles`, `vehicles`, `vehicle_telemetry`, `planned_trips`, `observed_trips`; an `account_deletions` row exists. Authentication → Users no longer lists the account. The Smartcar Dashboard shows the vehicle's connection revoked.
+4. Signing in again with the old session fails (401) and doesn't recreate the profile.
+
+| Date | Rows gone | Auth user gone | Smartcar revoked | Notes |
+|---|---|---|---|---|
+| | | | | |
+
+### M-16 · Retention job scheduled (P6-F5)
+
+`scripts/retention.py` must run daily against production. Render's free plan has no cron, so pick a host (a Render Cron Job, which is paid, or a scheduled GitHub Actions workflow, which would be a small follow-up PR). Dry-run first: `uv run python scripts/retention.py --dry-run` with `DATABASE_URL`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` set to production values. Expected: exit code 0 once no deletion work is owed.
+
+| Date | Host | Dry run OK | First scheduled run OK | Notes |
+|---|---|---|---|---|
+| | | | | |
+
+### M-17 · Per-vehicle baseline on the real bZ (P4-F8)
+
+1. Plan Frederick → Toronto on `/trips` and note the stops and arrival charges.
+2. Garage → the bZ → specs → set the consumption baseline (e.g. `0.20` kWh/km, higher than the catalog value) and save.
+3. Re-plan the same trip. Expected: more or longer stops and lower arrival charges. Clear the baseline and re-plan: the original numbers come back.
+
+| Date | Plan changed as expected | Cleared baseline restores plan | Notes |
+|---|---|---|---|
+| | | | |
+
+### M-18 · Public demo deployment (P6-F2)
+
+Follow [`deployment.md`](deployment.md) §13.2 steps 1–6: a second Supabase project (demo user, sign-ups off), migrations, `seed_demo.py` (it also installs the `chargewaze_demo_auth_guard` trigger), a second Render service with `APP_PUBLIC_DEMO_MODE=true` and no Smartcar secrets, and a second Vercel project with `NEXT_PUBLIC_DEMO_*`. Step 6 is the check.
+
+| Date | Seeded | "Explore the demo" works | Writes blocked except planning | Notes |
+|---|---|---|---|---|
+| | | | | |

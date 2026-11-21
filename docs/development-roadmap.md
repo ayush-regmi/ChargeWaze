@@ -108,7 +108,7 @@ With real providers, Mapbox Directions and the paged AFDC along-route search add
 
 ### Phase 5 — History and analytics (Weeks 10–11)
 
-Status: **code complete; awaiting the real-car check (M-11)**. F0–F8 merged or in review (#34, #39, #48, #51, #53, #56, #57, #58, P5-F8). Close-out evidence is in [`phase5_plan.md`](phase5_plan.md) §6 and F8. Two of the three completion criteria have automated evidence: analytics error without silently mixing simulated data (F5 API tests, F6 Vitest and Playwright), and CSV = UI (F5 CSV = JSON, F6 Playwright download). The first criterion has automated evidence that signed webhooks alone produce legs, matches and backtests (`test_phase5_closeout.py`), but "a handful of *real* trips" needs [M-11](manual-test-log.md#m-11--real-drives-produce-observed-legs-p5-f8), which needs the cadence from M-02 first. The measured cadence and the high/medium/low mix go in the risk table (§5) after M-11. A backlog of readings that arrives after a newer reading is now built whole by the per-webhook inference, with no `full` recompute needed (P5-F3 follow-up).
+Status: **code complete; awaiting the real-car check (M-11)**. F0–F8 merged (#34, #39, #48, #51, #53, #56, #57, #58, #68). Close-out evidence is in [`phase5_plan.md`](phase5_plan.md) §6 and F8. Two of the three completion criteria have automated evidence: analytics error without silently mixing simulated data (F5 API tests, F6 Vitest and Playwright), and CSV = UI (F5 CSV = JSON, F6 Playwright download). The first criterion has automated evidence that signed webhooks alone produce legs, matches and backtests (`test_phase5_closeout.py`), but "a handful of *real* trips" needs [M-11](manual-test-log.md#m-11--real-drives-produce-observed-legs-p5-f8), which needs the cadence from M-02 first. The measured cadence and the high/medium/low mix go in the risk table (§5) after M-11. A backlog of readings that arrives after a newer reading is now built whole by the per-webhook inference, with no `full` recompute needed (P5-F3 follow-up).
 
 **Scope**
 
@@ -125,6 +125,8 @@ Status: **code complete; awaiting the real-car check (M-11)**. F0–F8 merged or
 - CSV export reproduces the data visible in the UI.
 
 ### Phase 6 — Production and portfolio (Week 12)
+
+Status: **in progress; P6-F6 left**. P6-F1 to P6-F5 merged (#46, #73, #55, #67, #69). Production is live at `https://chargewaze.vercel.app`, and the deploy and smoke workflows pass ([M-14](manual-test-log.md#m-14--production-setup-and-first-deploy-p6-f3-p6-f4), 2026-11-21). The public demo deployment ([M-18](manual-test-log.md#m-18--public-demo-deployment-p6-f2)) isn't set up yet. The first completion criterion needs it, and P6-F6 writes the demo script against it. The project was renamed to ChargeWaze on the new domain ([ADR 0011](adr/0011-rename-to-chargewaze.md)).
 
 **Scope**
 
