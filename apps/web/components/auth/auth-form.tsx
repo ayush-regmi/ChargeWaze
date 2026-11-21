@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { authErrorMessage } from "@/lib/auth-error";
 import { safeNextPath } from "@/lib/safe-next";
 import { createClient } from "@/lib/supabase/browser";
 import { buttonVariants } from "@/components/ui/button";
@@ -29,9 +30,14 @@ export function AuthForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  // An error Supabase or /auth/callback sent back in the URL. It stays until
+  // the user tries again.
+  const [retried, setRetried] = useState(false);
+  const urlError = mode === "sign-in" && !retried ? authErrorMessage(searchParams) : null;
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setRetried(true);
     setError(null);
     setInfo(null);
     setSubmitting(true);
@@ -69,6 +75,7 @@ export function AuthForm({
   }
 
   async function onOAuth(provider: "google" | "apple") {
+    setRetried(true);
     setError(null);
     setInfo(null);
     const supabase = createClient();
@@ -83,6 +90,14 @@ export function AuthForm({
 
   return (
     <div className="space-y-4">
+      {urlError && (
+        <p
+          role="alert"
+          className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+        >
+          {urlError}
+        </p>
+      )}
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block space-y-1.5">
           <span className={cn("block", labelClass)}>Email</span>
