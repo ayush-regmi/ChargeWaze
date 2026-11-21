@@ -123,7 +123,7 @@ Machine-learning energy models are post-MVP. No ML result is claimed until one b
 
 ## Run it locally
 
-You need Node (version in [`.nvmrc`](.nvmrc)), [`uv`](https://docs.astral.sh/uv/) and Docker.
+You need Node (version in [`.nvmrc`](.nvmrc)), [`uv`](https://docs.astral.sh/uv/) and Docker. Run every command below from the repository root; the ones that need `services/api` change into it in a subshell, so the next block still starts at the root.
 
 ```bash
 npm install
@@ -134,13 +134,13 @@ docker compose up -d
 ```
 
 ```bash
-cd services/api && uv sync --group dev
+(cd services/api && uv sync --group dev)
 ```
 
 Copy [`services/api/.env.example`](services/api/.env.example) to `services/api/.env` and [`apps/web/.env.example`](apps/web/.env.example) to `apps/web/.env.local`, then fill in your Supabase, Mapbox and AFDC values. Never commit them. Smartcar values are only needed to connect a car.
 
 ```bash
-cd services/api && uv run alembic upgrade head
+(cd services/api && uv run alembic upgrade head)
 ```
 
 The typed API client is generated from FastAPI's OpenAPI document and isn't committed, so generate it before the first build or type check:
@@ -152,7 +152,7 @@ uv run --project services/api python services/api/scripts/export_openapi.py && n
 Then start the API and the web app:
 
 ```bash
-cd services/api && uv run fastapi dev app/main.py
+(cd services/api && uv run fastapi dev app/main.py)
 ```
 
 ```bash
@@ -166,7 +166,7 @@ npm run lint && npm run typecheck && npm run test
 ```
 
 ```bash
-cd services/api && uv run ruff check && uv run mypy app && uv run pytest
+(cd services/api && uv run ruff check && uv run mypy app && uv run pytest)
 ```
 
 ```bash
