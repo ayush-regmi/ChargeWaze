@@ -10,6 +10,7 @@ How ChargeWaze runs in production, and the one-time setup the project lead does 
 | Errors | Sentry (two projects, from P6-F1) | `app/core/observability.py`, `apps/web/sentry.*.config.ts` |
 | Pipeline | GitHub Actions | [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml), `docker-build` job in [`ci.yml`](../.github/workflows/ci.yml) |
 | Monitoring | JSON logs, `GET /metrics`, smoke workflow (from P6-F4) | `app/core/monitoring.py`, [`.github/workflows/smoke.yml`](../.github/workflows/smoke.yml) (§12) |
+| Retention | Daily GitHub Actions run of `scripts/retention.py` (P6-F5, M-16) | [`.github/workflows/retention.yml`](../.github/workflows/retention.yml) (§14) |
 
 **Scope:** production only. The preview/staging environment in architecture §7.1 is deferred (no second Supabase project yet, and Render preview environments are a paid feature). Vercel's Git deployments, including PR previews, are switched off in `apps/web/vercel.json`.
 
@@ -126,7 +127,7 @@ curl -s -i -X OPTIONS https://<api-domain>/api/v1/me -H "Origin: https://<web-do
 Repository → Settings → **Environments → New environment** → `production`:
 
 - **Deployment branches:** "Selected branches" → `main` only.
-- **Required reviewers** (optional): add yourself if you want to approve every production deploy.
+- **Required reviewers** (optional): add yourself if you want to approve every production deploy. Every job in this environment then waits for approval, including each scheduled smoke run (§12.2) and the daily retention run (§14). Leave reviewers off unless you will approve those too.
 - **Environment secrets:**
 
   | Secret | From |
@@ -138,6 +139,9 @@ Repository → Settings → **Environments → New environment** → `production
   | `VERCEL_ORG_ID` | §4 step 3 (Team/Org ID) |
   | `VERCEL_PROJECT_ID` | §4 step 3 (`prj_…`) |
   | `MONITORING_METRICS_TOKEN` | Optional. Same value as on Render (§3). Lets the smoke workflow check the alert thresholds (§12). |
+  | `SUPABASE_SERVICE_ROLE_KEY` | Same value as on Render (§2, §3). Used by the retention workflow (§14) to delete owed Supabase auth users. |
+  | `SMARTCAR_CLIENT_ID` | Same value as on Render (§3). Retention workflow (§14): retries owed Smartcar revocations. |
+  | `SMARTCAR_CLIENT_SECRET` | Same value as on Render (§3). Retention workflow (§14). |
 
 - **Environment variables** (not secret):
 
@@ -145,6 +149,7 @@ Repository → Settings → **Environments → New environment** → `production
   |---|---|
   | `API_BASE_URL` | Render service URL, e.g. `https://chargewise-api.onrender.com` |
   | `WEB_URL` | Vercel production URL (optional; shown as the deployment link in Actions) |
+  | `SUPABASE_URL` | `https://<ref>.supabase.co`, same as on Render (§3). Used by the retention workflow (§14). |
 
 Store these only in GitHub, Render and Vercel. Never in a committed file, an issue or a PR.
 
@@ -215,7 +220,7 @@ Changing a `NEXT_PUBLIC_*` value only takes effect after the next web build: re-
 - Committed: none. `render.yaml` lists key names only (`sync: false` or generated), and `.dockerignore` keeps `.env*` out of the image.
 - Server-only (Render, GitHub): Smartcar client secret and management token, Mapbox secret token, AFDC key, database URL, Render API key, Vercel token.
 - Server-only (Render, GitHub), from P6-F4: `MONITORING_METRICS_TOKEN`.
-- Server-only (Render), from P6-F5: `SUPABASE_SERVICE_ROLE_KEY`. It bypasses row level security, so it never goes in Vercel, a `NEXT_PUBLIC_*` variable or the browser bundle (the deploy workflow fails if the name shows up there).
+- Server-only (Render, GitHub), from P6-F5: `SUPABASE_SERVICE_ROLE_KEY`. GitHub has it, with `SMARTCAR_CLIENT_ID` and `SMARTCAR_CLIENT_SECRET`, only for the retention workflow (§14). It bypasses row level security, so it never goes in Vercel, a `NEXT_PUBLIC_*` variable or the browser bundle (the deploy workflow fails if the name shows up there).
 - Build-time only (Vercel, Sensitive): `SENTRY_AUTH_TOKEN`.
 - Public (Vercel, `NEXT_PUBLIC_*`): API base URL, Supabase URL and anon key, Mapbox public token, web Sentry DSN, auth toggles. On the demo deployment only (§13): `NEXT_PUBLIC_DEMO_MODE` and the shared demo account's `NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD`, which are public on purpose.
 - Not secret, but required on the production API: `LIVE_ALLOWED_USER_IDS` (§3).
@@ -340,3 +345,23 @@ Setup, all by hand:
    - Analytics shows about four weeks.
    - Planning a new trip works.
    - Any other action (for example deleting a trip) shows "The public demo is read-only".
+
+## 14. Retention workflow (P6-F5, M-16)
+
+[`scripts/retention.py`](../services/api/scripts/retention.py) has to run once a day, because the privacy notice says it does ([`database-design.md`](database-design.md) §6). Render's free plan has no cron jobs, so [`.github/workflows/retention.yml`](../.github/workflows/retention.yml) runs it from GitHub Actions in the `production` environment.
+
+**When it runs.** Every day at 07:41 UTC (GitHub may start scheduled runs late), and by hand: **Actions → Retention (production) → Run workflow** on `main`. It checks out `main`, installs the API's runtime dependencies and runs `uv run python scripts/retention.py` from `services/api/` with `APP_ENV=production`.
+
+**What it needs.** These go in the `production` environment (§5): the secrets `PROD_DATABASE_URL` (already there for deploys), `SUPABASE_SERVICE_ROLE_KEY`, `SMARTCAR_CLIENT_ID` and `SMARTCAR_CLIENT_SECRET`, and the variable `SUPABASE_URL`. Use the same values as on Render. If any is missing, the run ends with a notice ("Production retention skipped …") and changes nothing. A skipped run is green, so check the first scheduled run after setup.
+
+**Dry run.** A manual run has a **Dry run** box, ticked by default. A dry run only counts (`unsaved_plans`, `telemetry`, `refreshes`, `deletions_owed`) and changes nothing. Untick it to run the full job by hand. Scheduled runs always run for real. The counts line appears in the run log and the run summary. It holds counts only, no IDs.
+
+**What a failure means.** The script exits 1 while deletion work is still owed after the run: `smartcar_pending` (a Smartcar revocation keeps failing) or `auth_users_pending` (deleting the Supabase auth user keeps failing) is above 0. The run then fails with "Deletion work is still owed", and GitHub notifies you as for the smoke workflow (§12.3). On a scheduled run, GitHub notifies the user who last edited the `cron` line in `retention.yml`. To fix it:
+
+- `auth_users_pending`: check `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` here and on Render, and Supabase's status page. The next successful run clears it.
+- `smartcar_pending`: check the Smartcar credentials and Smartcar's status. After `PRIVACY_REVOCATION_GIVE_UP_DAYS` (30) the job stops retrying, counts the connection as `smartcar_abandoned` and logs `smartcar_revocation_abandoned`. Then revoke it by hand in the Smartcar Dashboard.
+- A traceback without a counts line (for example, the database is unreachable) means nothing after the failing step ran. Each step commits on its own, so running it again is safe.
+
+A dry run exits 0 even when `deletions_owed` is above 0, because it doesn't retry anything.
+
+**Keep it running.** GitHub turns off scheduled workflows in a repository with no activity for 60 days. Re-enable it under **Actions → Retention (production)**. Required reviewers on the `production` environment (§5) hold every scheduled run until someone approves it, so leave them off or approve each run. To stop the job, use **Actions → Retention (production) → ⋯ → Disable workflow**.

@@ -29,7 +29,7 @@ Last updated 2026-11-21 (production set up on `chargewaze.vercel.app`: M-14 chec
 | M-13 | A car on a second account shows "owned elsewhere"; the first account keeps working (#62) | Real car, two accounts | Nothing (confidence) | open |
 | M-14 | Production setup and first deploy; smoke workflow green (P6-F3, P6-F4) | Supabase, Render, Vercel, GitHub, Smartcar, Sentry accounts | Public launch, P6-F6 numbers | open (car connect and alerts left) |
 | M-15 | Delete a test account on production; rows gone, Smartcar revoked, auth user gone (P6-F5) | M-14, a test account with a car | Nothing (confidence) | open |
-| M-16 | Retention job scheduled daily on a host (P6-F5) | M-14, a scheduler | Retention promises in the privacy notice | open |
+| M-16 | Retention workflow runs daily against production (P6-F5) | M-14, retention secrets in GitHub `production` | Retention promises in the privacy notice | open |
 | M-17 | Per-vehicle baseline on the real bZ changes the plan (P4-F8) | Real keys, connected vehicle | Nothing (confidence) | open |
 | M-18 | Public demo deployment seeded and reachable (P6-F2) | Second Render/Vercel/Supabase | P6-F6 screenshots and demo script | open |
 
@@ -416,11 +416,16 @@ Needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` on Render. Use a **test** a
 |---|---|---|---|---|
 | | | | | |
 
-### M-16 · Retention job scheduled (P6-F5)
+### M-16 · Retention workflow scheduled (P6-F5)
 
-`scripts/retention.py` must run daily against production. Render's free plan has no cron, so pick a host (a Render Cron Job, which is paid, or a scheduled GitHub Actions workflow, which would be a small follow-up PR). Dry-run first: `uv run python scripts/retention.py --dry-run` with `DATABASE_URL`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` set to production values. Expected: exit code 0 once no deletion work is owed.
+`scripts/retention.py` must run daily against production. The host is the scheduled GitHub Actions workflow **Retention (production)** ([`deployment.md`](deployment.md) §14).
 
-| Date | Host | Dry run OK | First scheduled run OK | Notes |
+1. **Add the settings.** In GitHub → Settings → Environments → `production`, add the secrets `SUPABASE_SERVICE_ROLE_KEY`, `SMARTCAR_CLIENT_ID` and `SMARTCAR_CLIENT_SECRET`, and the variable `SUPABASE_URL`, with the same values as on Render. `PROD_DATABASE_URL` is already there. Check that the environment has no required reviewers, or every daily run will wait for approval.
+2. **Dry run.** Actions → Retention (production) → Run workflow on `main`, with **Dry run** ticked. Expected: the run is green, not "Production retention skipped" (that notice names whatever is still missing). The log and summary show one line, `dry_run unsaved_plans=… telemetry=… refreshes=… deletions_owed=…`. `deletions_owed` should be 0 unless an account deletion (M-15) is still owed. A dry run exits 0 either way.
+3. **Real run (optional).** Run it again with **Dry run** unticked. Expected: green, with `smartcar_pending=0 auth_users_pending=0`.
+4. **First scheduled run.** The next day after 07:41 UTC, open the run that the `schedule` event started. Expected: green, with the full counts line and no skip notice. If it is red with "Deletion work is still owed", follow "What a failure means" in [`deployment.md`](deployment.md) §14.
+
+| Date | Settings added | Dry run OK | First scheduled run OK | Notes |
 |---|---|---|---|---|
 | | | | | |
 
