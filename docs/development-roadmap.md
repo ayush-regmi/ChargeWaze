@@ -1,6 +1,6 @@
 # ChargeWaze — Development Roadmap
 
-Status: **Phase 2 code complete; real-car verification and cadence measurement pending, then Phase 3** · Last updated: 2026-11-16
+Status: **MVP code complete (Phases 1–6); production live; real-car checks and the public demo deployment (M-18) pending** · Last updated: 2026-11-21
 
 Delivery plan for ChargeWaze. Estimates assume part-time development with Claude Code / Cursor and real testing. They are planning estimates, not deadlines.
 
@@ -126,7 +126,11 @@ Status: **code complete; awaiting the real-car check (M-11)**. F0–F8 merged (#
 
 ### Phase 6 — Production and portfolio (Week 12)
 
-Status: **in progress; P6-F6 left**. P6-F1 to P6-F5 merged (#46, #73, #55, #67, #69). Production is live at `https://chargewaze.vercel.app`, and the deploy and smoke workflows pass ([M-14](manual-test-log.md#m-14--production-setup-and-first-deploy-p6-f3-p6-f4), 2026-11-21). The public demo deployment ([M-18](manual-test-log.md#m-18--public-demo-deployment-p6-f2)) isn't set up yet. The first completion criterion needs it, and P6-F6 writes the demo script against it. The project was renamed to ChargeWaze on the new domain ([ADR 0011](adr/0011-rename-to-chargewaze.md)).
+Status: **code complete; awaiting the public demo deployment (M-18)**. P6-F1 to P6-F5 merged (#46, #73, #55, #67, #69); P6-F6 adds the README, architecture diagram, screenshots ([`images/`](images/)) and [`demo-script.md`](demo-script.md). The project was renamed to ChargeWaze on the new domain ([ADR 0011](adr/0011-rename-to-chargewaze.md)).
+
+- **Second completion criterion (smoke tests in production): met.** Production is live at `https://chargewaze.vercel.app`; the deploy run and the smoke run were green on 2026-11-21 ([M-14](manual-test-log.md#m-14--production-setup-and-first-deploy-p6-f3-p6-f4)). M-14 still lists connecting the car and setting up alerts.
+- **First completion criterion (a recruiter runs the demo without a car): needs [M-18](manual-test-log.md#m-18--public-demo-deployment-p6-f2).** The demo script was checked on a local demo-mode run seeded with `seed_demo.py` on 2026-11-21. The demo URL goes into the script and the README once M-18 passes.
+- **Known gap for the demo:** the web app shows generic errors for the demo's read-only `403` (`DEMO_READ_ONLY`), for example on Delete and Refresh. It's a P6-F2 follow-up in the web write actions.
 
 **Scope**
 
@@ -246,17 +250,17 @@ Tracked explicitly here and in the per-doc "open questions" sections.
 
 ## 6. Portfolio deliverables
 
-Measurable outcomes to claim (only after they're true):
+Measurable outcomes to claim (only after they're true). Status as of 2026-11-21; every number below was measured on the date given.
 
-- [ ] Authenticated, multi-user full-stack web application.
-- [ ] Real Smartcar V3 integration with event-driven telemetry ingestion.
-- [ ] Automated charging-aware route planner with battery constraints.
-- [ ] Real vehicle testing and documented routing edge cases.
-- [ ] Persisted trip analytics with provenance and data-quality indicators.
-- [ ] Deployed frontend / backend with CI and automated tests.
-- [ ] ML model compared against a deterministic energy baseline.
+- [x] **Authenticated, multi-user full-stack web application.** Supabase Auth with JWKS verification ([ADR 0006](adr/0006-supabase-auth-jwks-lazy-profiles.md)), ownership checks that answer 404 on every user-owned resource, row level security on every `public` table, and a live-mode allowlist. Google sign-in works on production ([M-14](manual-test-log.md#m-14--production-setup-and-first-deploy-p6-f3-p6-f4), 2026-11-21).
+- [ ] **Real Smartcar V3 integration with event-driven telemetry ingestion.** The code is done and tested with signed webhook fixtures: signature check, dedup, out-of-order handling, on-demand refresh. Closes when the real bZ is connected on production (the step left in M-14) and [M-01](manual-test-log.md#m-01--disconnected-cars-events-are-not-stored-p2-r1) and [M-02](manual-test-log.md#m-02--event-cadence-over-a-few-days-p2-r2) pass.
+- [x] **Automated charging-aware route planner with battery constraints.** Route-ordered DP optimizer ([ADR 0008](adr/0008-route-ordered-dp-charging-optimizer.md)); every PRD §9 case has a passing test (Phase 4 above). Frederick → Toronto on recorded fixtures: 748.1 km, 121 candidates, whole `POST /routes/plan` 241–272 ms (median 243 ms), optimizer stage 22–25 ms (2026-11-19). The real-provider latency is recorded by M-10.
+- [ ] **Real vehicle testing and documented routing edge cases.** The edge cases are documented and tested (PRD §9, [`phase4_plan.md`](phase4_plan.md) §5). Closes with the real-car checks [M-10](manual-test-log.md#m-10--real-key-frederick--toronto-plan-p4-f9) (real-key plan with the car), [M-07](manual-test-log.md#m-07--saved-trips-pages-p4-f7) (saved-trip pages) and [M-17](manual-test-log.md#m-17--per-vehicle-baseline-on-the-real-bz-p4-f8) (per-vehicle baseline).
+- [ ] **Persisted trip analytics with provenance and data-quality indicators.** Built and tested end to end on signed webhooks and the simulated demo car: `is_simulated` and `source` on every row, high/medium/low quality flags with reasons, CSV = UI. A local demo seed on 2026-11-21 produced 3,308 simulated telemetry rows and 62 inferred legs (16 high, 37 medium, 9 low). Closes with [M-11](manual-test-log.md#m-11--real-drives-produce-observed-legs-p5-f8) (real drives produce legs with no manual step), which needs M-02 first.
+- [x] **Deployed frontend / backend with CI and automated tests.** Vercel (web) and Render (API) with deploy and smoke workflows, both green on 2026-11-21 (M-14). On `main` at `0d7b27b`, run locally on 2026-11-21: 1,546 pytest, 513 Vitest (51 files) and 17 Playwright tests passed; ruff, mypy, ESLint and `tsc` clean. The API exposes 33 OpenAPI paths (37 operations).
+- [ ] **ML model compared against a deterministic energy baseline.** Post-MVP (§3). Not started; no ML metric is claimed.
 
-Quantify these with measured numbers (test coverage, MAE, routing latency) after they land. No invented metrics.
+Not measured, so not claimed: test coverage (the repo has no coverage tooling), production planner latency with real providers (M-10), and any ML MAE/RMSE.
 
 ## 7. What's explicitly deferred
 
