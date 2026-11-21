@@ -1,16 +1,16 @@
-# Chargewise — Product Requirements
+# ChargeWaze — Product Requirements
 
 Status: **Draft (specification phase)** · Owner: project lead · Last updated: 2026-11-06
 
 ## 1. Vision
 
-Chargewise is a full-stack EV intelligence and route-planning platform that combines connected-vehicle data, charging-aware routing, trip analytics, and (later) personalized machine learning.
+ChargeWaze is a full-stack EV intelligence and route-planning platform that combines connected-vehicle data, charging-aware routing, trip analytics, and (later) personalized machine learning.
 
 The core question it must answer:
 
 > Given my vehicle's current battery level, where I want to go, the weather, and available charging infrastructure, what is the most efficient and reliable way to complete my trip?
 
-Chargewise is **not** a dashboard that only shows a battery percentage and a station map. The routing intelligence is the product.
+ChargeWaze is **not** a dashboard that only shows a battery percentage and a station map. The routing intelligence is the product.
 
 ## 2. Target users
 
@@ -20,7 +20,7 @@ Chargewise is **not** a dashboard that only shows a battery percentage and a sta
 
 ## 3. Core demo flow (MVP definition of done)
 
-Chargewise is "MVP complete" when a user can, in one session:
+ChargeWaze is "MVP complete" when a user can, in one session:
 
 1. Sign in with Supabase Auth.
 2. Connect the Toyota through Smartcar Connect (V3).
@@ -46,7 +46,7 @@ The app is organized into six areas. Each one lists the primary user stories and
 
 **Acceptance criteria**
 - All displayed values show their source timestamp (local time) and unit.
-- Chargewise-predicted range is rendered only when the energy model has enough signal; otherwise only the manufacturer estimate is shown and the UI says so.
+- ChargeWaze-predicted range is rendered only when the energy model has enough signal; otherwise only the manufacturer estimate is shown and the UI says so.
 - Stale readings (older than the freshness threshold in [`architecture.md`](architecture.md)) are visually marked and never silently treated as current.
 - The page renders with no telemetry available ("Not yet connected", "Awaiting first webhook event").
 
@@ -59,7 +59,7 @@ The app is organized into six areas. Each one lists the primary user stories and
 - I can use my vehicle's last known location as the origin, with explicit permission.
 - I get driving directions and reasonable alternatives.
 - I see compatible charging stations near each candidate route.
-- Chargewise automatically inserts charging stops when needed.
+- ChargeWaze automatically inserts charging stops when needed.
 - I see estimated arrival SoC, charging duration per stop, total trip time, and detour versus the shortest route.
 - I can adjust charging preferences (minimum reserve SoC, max detour, preferred networks, charge-to limit) and re-plan.
 - I can save a planned trip and open the driving directions in an external navigation app.
@@ -111,7 +111,7 @@ The app is organized into six areas. Each one lists the primary user stories and
 - I can view completed or manually confirmed trips.
 - I can compare estimated vs observed energy consumption per trip.
 - I can view consumption in Wh/mi or kWh/100 mi (based on my unit preference).
-- I can view manufacturer range vs Chargewise-predicted range over time.
+- I can view manufacturer range vs ChargeWaze-predicted range over time.
 - I can see consumption trends by weather, route, and speed where measurements exist.
 - I can export trip data as CSV.
 
@@ -143,7 +143,7 @@ To keep Phase 1–4 shippable, we explicitly defer:
 - Machine-learning consumption models (planned for post-MVP; see roadmap ML stages).
 - A React Native mobile client (web-only, with a responsive PWA as an intermediate step).
 - Live stall availability for stations whose provider doesn't supply it.
-- Mapbox EV Routing (currently private preview; Chargewise builds its own charging-aware optimizer instead — see [`docs/adr/0003-own-charging-optimizer-over-mapbox-ev-routing.md`](adr/0003-own-charging-optimizer-over-mapbox-ev-routing.md)).
+- Mapbox EV Routing (currently private preview; ChargeWaze builds its own charging-aware optimizer instead — see [`docs/adr/0003-own-charging-optimizer-over-mapbox-ev-routing.md`](adr/0003-own-charging-optimizer-over-mapbox-ev-routing.md)).
 - Automatic background trip tracking (requires a native mobile capability; MVP relies on Smartcar telemetry and optional manual confirmation).
 - An LLM chatbot bolted on for "AI" branding.
 
@@ -195,7 +195,7 @@ Dashboard and Garage must also handle: first-time connect with no telemetry yet,
 Carry these into the roadmap as Phase-level decisions:
 
 - ~~**Canadian charger data.**~~ Resolved 2026-11-16 (Phase 3 F0): AFDC includes Natural Resources Canada's stations when called with `country=all`; a Frederick, MD → Toronto, ON route returned stations on both sides of the border. No second provider is needed. See [`maps-stations-notes.md`](maps-stations-notes.md).
-- **Weather provider licensing.** Open-Meteo is free for non-commercial use. Confirm whether Chargewise remains non-commercial before relying on it long-term.
+- **Weather provider licensing.** Open-Meteo is free for non-commercial use. Confirm whether ChargeWaze remains non-commercial before relying on it long-term.
 - **Smartcar entitlements.** Confirm the plan's event frequency and request quotas are enough for the Dashboard's freshness target. May require a telemetry-polling fallback.
 - ~~**Public demo data.**~~ Resolved 2026-11-20 (P6-F2):
   - **Vehicle:** a simulated 2026 Toyota bZ XLE AWD, the v1 target car, with its catalog specs.

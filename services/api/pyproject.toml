@@ -1,11 +1,11 @@
 [project]
-name = "chargewise-api"
+name = "chargewaze-api"
 version = "0.0.0"
-description = "Chargewise FastAPI backend (modular monolith)."
+description = "ChargeWaze FastAPI backend (modular monolith)."
 requires-python = ">=3.12"
 readme = "README.md"
 license = { text = "UNLICENSED" }
-authors = [{ name = "Chargewise" }]
+authors = [{ name = "ChargeWaze" }]
 
 # Real dependencies (FastAPI, Pydantic, SQLAlchemy, Alembic, Supabase client, etc.)
 # are added in Phase 1 via `uv add <package>`. See docs/development-roadmap.md.

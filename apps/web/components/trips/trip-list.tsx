@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import type { components } from "@chargewise/api-client";
+import type { components } from "@chargewaze/api-client";
 
 import { LocalTime } from "@/components/garage/local-time";
 import { formatDistanceText } from "@/lib/geo-format";

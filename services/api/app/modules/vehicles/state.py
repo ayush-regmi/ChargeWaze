@@ -1,7 +1,7 @@
 """Signed, short-lived Smartcar Connect ``state`` (phase2_plan.md D2).
 
 Stateless: an HS256 JWT keyed with ``SMARTCAR_STATE_SECRET`` that carries the
-Chargewise user ID, the validated ``redirect_after`` path and a random nonce.
+ChargeWaze user ID, the validated ``redirect_after`` path and a random nonce.
 There is no code exchange under ``response_type=none``, so ``state`` can't be
 made single-use. Completion requires the signed-in user to equal ``sub``, so a
 replayed ``state`` only re-runs completion for its own user, which is
@@ -22,7 +22,7 @@ from app.core.errors import ApiError
 from app.modules.vehicles.redirects import is_safe_redirect_path
 
 STATE_TTL = timedelta(minutes=10)
-STATE_ISSUER = "chargewise-api"
+STATE_ISSUER = "chargewaze-api"
 STATE_AUDIENCE = "smartcar-connect"
 STATE_ALGORITHM = "HS256"
 # RFC 7518 §3.2: an HS256 key must be at least 256 bits.

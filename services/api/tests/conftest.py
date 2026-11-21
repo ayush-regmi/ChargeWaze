@@ -39,7 +39,7 @@ from app.modules.auth.dependencies import JwtVerifier
 
 API_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TEST_DATABASE_URL = (
-    "postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise_test"
+    "postgresql+psycopg://chargewaze:chargewaze@localhost:5432/chargewaze_test"
 )
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 

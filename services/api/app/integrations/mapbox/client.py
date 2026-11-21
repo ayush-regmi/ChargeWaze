@@ -1,4 +1,4 @@
-"""Mapbox HTTP client: the only code in Chargewise that talks to Mapbox.
+"""Mapbox HTTP client: the only code in ChargeWaze that talks to Mapbox.
 
 Covers Directions (phase3_plan.md D5) and Search Box suggest/retrieve (D2).
 Facts behind the request shapes are in docs/maps-stations-notes.md §2.

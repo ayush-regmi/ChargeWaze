@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chargewise",
+  title: "ChargeWaze",
   description:
     "EV intelligence and charging-aware route planning. See docs/product-requirements.md.",
 };

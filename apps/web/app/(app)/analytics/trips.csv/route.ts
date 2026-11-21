@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
   const disposition = upstream.headers.get("content-disposition");
   headers.set(
     "Content-Disposition",
-    disposition ?? 'attachment; filename="chargewise-trips.csv"',
+    disposition ?? 'attachment; filename="chargewaze-trips.csv"',
   );
   return new NextResponse(upstream.body, { status: 200, headers });
 }

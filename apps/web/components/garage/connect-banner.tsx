@@ -28,7 +28,7 @@ const BANNERS: Record<ConnectFlag, Banner> = {
   owned_elsewhere: {
     tone: "error",
     title: "This car is connected to another account",
-    body: "Each car can be linked to one Chargewise account at a time. Disconnect it in the other account's Garage, then try again.",
+    body: "Each car can be linked to one ChargeWaze account at a time. Disconnect it in the other account's Garage, then try again.",
   },
   denied: {
     tone: "info",

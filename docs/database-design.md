@@ -1,4 +1,4 @@
-# Chargewise — Database Design
+# ChargeWaze — Database Design
 
 Status: **Draft (specification phase)** · Last updated: 2026-11-19
 
@@ -182,7 +182,7 @@ erDiagram
 
 ### 3.1 `profiles`
 
-Supabase Auth owns identity; this table is Chargewise's profile extension and is keyed by Supabase's user ID.
+Supabase Auth owns identity; this table is ChargeWaze's profile extension and is keyed by Supabase's user ID.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -239,7 +239,7 @@ Constraints:
 }
 ```
 
-- Keys under `signals` are Chargewise signal codes (the same ones as `supported_signals`).
+- Keys under `signals` are ChargeWaze signal codes (the same ones as `supported_signals`).
 - Each signal keeps its own provider `recorded_at` and only moves forward (out-of-order rule, D5).
 - The top-level `recorded_at` is the max across signals; `received_at` is our clock for the newest delivery.
 - Readers take the max of the top-level and per-signal `recorded_at` and treat anything malformed as "no data yet".
@@ -312,7 +312,7 @@ Cached station records. Treated as a local cache of external data, not the sourc
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `uuid` PK | Stable Chargewise ID. |
+| `id` | `uuid` PK | Stable ChargeWaze ID. |
 | `provider` | `text` | `'afdc'`, `'simulated'` (`CHECK`). AFDC includes NRCan's Canadian data, so there is no separate Canadian provider (phase 3 F0). |
 | `external_id` | `text` | Provider's station ID. Not null. |
 | `name` | `text` | Not null. |

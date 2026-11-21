@@ -1,4 +1,4 @@
-# Chargewise — API Contracts
+# ChargeWaze — API Contracts
 
 Status: **Draft (specification phase)** · Last updated: 2026-11-17
 
@@ -7,7 +7,7 @@ This document defines the public REST surface the FastAPI backend exposes to the
 ## 1. Conventions
 
 - **Base URL:** all endpoints live under `/api/v1`. Breaking changes land under a new major version (`/api/v2`), never in place.
-- **Authentication:** `Authorization: Bearer <Supabase JWT>`. The `auth` module validates the JWT and resolves the Chargewise user. The one exception is `POST /api/v1/webhooks/smartcar`, which authenticates via Smartcar's signed webhook payload.
+- **Authentication:** `Authorization: Bearer <Supabase JWT>`. The `auth` module validates the JWT and resolves the ChargeWaze user. The one exception is `POST /api/v1/webhooks/smartcar`, which authenticates via Smartcar's signed webhook payload.
 - **Deployment mode (P6-F2, architecture §7.2):** after the JWT verifies, every authenticated endpoint applies the deployment's gate.
   - **Live mode:** a caller not in `LIVE_ALLOWED_USER_IDS` gets `403 FORBIDDEN` with `details.reason = "LIVE_ACCESS_RESTRICTED"`. An empty list allows everyone in development/test and nobody under `APP_ENV=production`.
   - **Public demo mode:** every non-`GET` request except `POST /routes/plan`, `POST /routes/directions` and `POST /stations/along-route` gets `403 FORBIDDEN` with `details.reason = "DEMO_READ_ONLY"`. While the database holds any real (`is_simulated = false`) vehicle, every request gets `503 DEMO_MODE_UNSAFE`.
@@ -46,7 +46,7 @@ Reserved codes (grow this list as the API grows):
 | `SMARTCAR_UNREACHABLE` | 502/504 | Smartcar failed or timed out. |
 | `SMARTCAR_ERROR` | 502 | Smartcar rejected the request; Smartcar's error code is in `details`. Includes Smartcar's monthly per-vehicle cap (`BILLING`/`VEHICLE_REQUEST_LIMIT`). |
 | `SMARTCAR_RATE_LIMITED` | 429 | Smartcar throttled the request (`429` of type `RATE_LIMIT`, per vehicle or app-wide). `details.retry_after_seconds` and a `Retry-After` header when Smartcar said how long to wait. |
-| `RATE_LIMITED` | 429 | One of Chargewise's own limits: the per-vehicle refresh limit (§3.5a; `details.next_refresh_at`) or the per-user limit on `/routes/plan` and `/places/suggest` (§3.7, §3.13; `details.limit` is `plan` or `suggest`). Always `details.retry_after_seconds` and a `Retry-After` header. |
+| `RATE_LIMITED` | 429 | One of ChargeWaze's own limits: the per-vehicle refresh limit (§3.5a; `details.next_refresh_at`) or the per-user limit on `/routes/plan` and `/places/suggest` (§3.7, §3.13; `details.limit` is `plan` or `suggest`). Always `details.retry_after_seconds` and a `Retry-After` header. |
 | `VEHICLE_NOT_CONNECTED` | 409 | The action needs a connected, real (non-simulated) vehicle (§3.5a). |
 | `DEMO_MODE_UNSAFE` | 503 | Public demo mode, but the database holds a real (non-simulated) vehicle; nothing is served (§1 "Deployment mode"). |
 | `SMARTCAR_NOT_CONFIGURED` | 503 | Smartcar credentials, application ID or state secret are not set on the server. |
@@ -281,7 +281,7 @@ The backend verifies `state` **and requires its user to be the caller**, so a Co
 |---|---|
 | `success` | At least one vehicle was added or reconnected. |
 | `already_connected` | Every authorized vehicle was already connected to this user. |
-| `owned_elsewhere` | Every authorized vehicle is already connected to another Chargewise account (one car belongs to one account at a time). Nothing is stored, and the connections this Connect just created are deleted on Smartcar, best-effort (a failed delete doesn't change the result). |
+| `owned_elsewhere` | Every authorized vehicle is already connected to another ChargeWaze account (one car belongs to one account at a time). Nothing is stored, and the connections this Connect just created are deleted on Smartcar, best-effort (a failed delete doesn't change the result). |
 | `denied` | The user declined or backed out of Smartcar Connect (`error=access_denied` or `error=user_manually_returned_to_application`). |
 | `error` | Bad/expired `state`, `state` belongs to another user, Smartcar unreachable, no matching connection, or a mix of outcomes with nothing added (for example one duplicate and one car owned by another account). |
 
@@ -561,7 +561,7 @@ The main planning call (Phase 4). The server gets the driving route itself, find
 
 - **Units and rounding:** SoC values are fractions (0..1) with 3 decimals. Minutes are whole numbers, rounded half-up; totals are computed before rounding, so per-stop minutes can differ from the totals by a minute. `total_minutes = drive + charging + detour + stop_overhead + waiting`.
 - `starting_soc_source` is `telemetry` or `override`; `starting_soc_recorded_at` is the reading's provider timestamp, or `null` for an override.
-- `stops` is in route order; `[]` when no charging is needed. Each `station.id` is the stable Chargewise station ID (§3.16), and `station.power_kw` is the known power of the connector type used. `detour_minutes` is always an estimate (`2 × distance_from_route_km × detour_road_factor` at `detour_speed_kmh`).
+- `stops` is in route order; `[]` when no charging is needed. Each `station.id` is the stable ChargeWaze station ID (§3.16), and `station.power_kw` is the known power of the connector type used. `detour_minutes` is always an estimate (`2 × distance_from_route_km × detour_road_factor` at `detour_speed_kmh`).
 - `assumptions` says where each vehicle number came from: `*_source` is `vehicle` (the user's specs, §3.4a) or `catalog`. `charging_curve_source` is `vehicle`, `catalog` or `catalog_derived` (derived from published figures, not measured; the UI says so). `adjustments_applied` lists energy adjustments (speed, temperature, …) and is always `[]` in v1. `preferred_networks_relaxed` is `true` when no plan existed using only preferred networks, so all networks were used.
 - `candidates` explains which stations were used. Stations with no known power for a compatible connector are **never** used and are counted in `excluded_unknown_power`. When no charging was needed, the stations search isn't run: `searched: false` and the counts are `0`.
   - `considered` is the number of usable stations handed to the optimizer, after the three exclusions. Each excluded station is counted once, in the order incompatible → unknown power → detour.
@@ -699,7 +699,7 @@ Marks a stored plan as saved, so it appears in `GET /trips` (§3.8). No body. Id
 
 ### 3.10 `GET /api/v1/stations`
 
-Search chargers near a point, independent of trip planning ([`phase3_plan.md`](phase3_plan.md) F5). Results always come from the provider (AFDC) and are upserted into the `charging_stations` cache, so each station's `id` is a stable Chargewise UUID (D7).
+Search chargers near a point, independent of trip planning ([`phase3_plan.md`](phase3_plan.md) F5). Results always come from the provider (AFDC) and are upserted into the `charging_stations` cache, so each station's `id` is a stable ChargeWaze UUID (D7).
 
 | Param | Required | Meaning |
 |---|---|---|
@@ -759,7 +759,7 @@ Defaults: only `status = open`, `access = public`, and not `restricted_access` s
 - `max_power_kw` is the highest *known* connector power, or `null`.
 - `compatible` is `true`/`false` only when `vehicle_id` is given and that vehicle's connectors are known; otherwise `null`. It compares connector types only (D9).
 - `live_availability` is always `null` in Phase 3: no provider returns verified live data, and it is **never** fabricated.
-- Freshness: `fetched_at` is when Chargewise last fetched the station (it plays the role of `recorded_at` from §1); `source_updated_at` is the provider's own timestamp, or `null`. Search results are always fresh (`is_stale: false`).
+- Freshness: `fetched_at` is when ChargeWaze last fetched the station (it plays the role of `recorded_at` from §1); `source_updated_at` is the provider's own timestamp, or `null`. Search results are always fresh (`is_stale: false`).
 - `total_results` is the provider's match count (it counts restricted stations, and is taken before `min_power_kw`). `unknown_power_count` counts the items on this page with unknown power. A page can hold fewer than `limit` items because of those two filters.
 - `next_cursor` is opaque and HMAC-signed (`STATIONS_CURSOR_SECRET`). It is bound to the caller and the exact query; a tampered, expired (secret rotated) or reused-with-other-params cursor is `422 VALIDATION_ERROR`, and the client should restart the search. When the server has no cursor secret, `next_cursor` is always `null`.
 - Coordinates and filters are never logged (D13).
@@ -876,7 +876,7 @@ The analytics table: one row per observed leg with its model estimate. Query par
 
 ### 3.11b `GET /api/v1/analytics/trips.csv`
 
-The rows of §3.11a as CSV, for the same filters (no `limit`/`cursor`: every row). `Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment; filename="chargewise-trips-<from>-<to>.csv"`.
+The rows of §3.11a as CSV, for the same filters (no `limit`/`cursor`: every row). `Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment; filename="chargewaze-trips-<from>-<to>.csv"`.
 
 - The header row is exactly the §3.11a field names, in the order shown; `quality_reasons` is joined with `;`. Timestamps are ISO-8601 UTC, numbers use `.` and no thousands separator, `null` is an empty cell, and booleans are `true`/`false`. Parsing the CSV gives the same values as the JSON pages.
 - Text cells starting with `=`, `+`, `-`, `@`, tab or carriage return are prefixed with `'` (CSV injection; labels are user text). Numeric cells are never changed.
@@ -897,7 +897,7 @@ Verification, deduplication, and persistence happen here. The response body is i
 
 A reading that an on-demand refresh (§3.5a) already stored with the same signal and provider timestamp is skipped, so Smartcar retrying a delivery after an outage doesn't duplicate it. Readings from two different webhook events are each stored as before.
 
-`accepted: false` means the event was signed and understood but deliberately not stored: unknown vehicle, a vehicle that isn't `connected` (phase2_plan.md D12), an event type Chargewise doesn't ingest, or a `VEHICLE_ERROR` whose shape couldn't be parsed. Smartcar treats it like any 200 and stops retrying. A duplicate delivery returns `accepted: true` and writes nothing.
+`accepted: false` means the event was signed and understood but deliberately not stored: unknown vehicle, a vehicle that isn't `connected` (phase2_plan.md D12), an event type ChargeWaze doesn't ingest, or a `VEHICLE_ERROR` whose shape couldn't be parsed. Smartcar treats it like any 200 and stops retrying. A duplicate delivery returns `accepted: true` and writes nothing.
 
 **`VERIFY` response 200** (only after the signature checks out)
 ```json
@@ -1004,7 +1004,7 @@ Plain driving directions between two points: up to three alternatives, best firs
 
 ### 3.16 `GET /api/v1/stations/{id}`
 
-One station from the cache (`id` is the Chargewise UUID from §3.10 / §3.17). Optional `?vehicle_id=` sets `compatible`, as in §3.10.
+One station from the cache (`id` is the ChargeWaze UUID from §3.10 / §3.17). Optional `?vehicle_id=` sets `compatible`, as in §3.10.
 
 **Response 200:** one station object, the same shape as a §3.10 item.
 

@@ -15,7 +15,7 @@ export default function GaragePage() {
     <section className="mx-auto max-w-4xl space-y-6">
       <PageHeader
         title="My Garage"
-        description="Connect your EV through Smartcar so Chargewise can read its battery level, range and charging status."
+        description="Connect your EV through Smartcar so ChargeWaze can read its battery level, range and charging status."
         actions={
           <form action={startVehicleConnect}>
             <button type="submit" className={buttonVariants({ size: "sm" })}>

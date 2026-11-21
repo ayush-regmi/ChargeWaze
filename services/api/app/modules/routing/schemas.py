@@ -189,7 +189,7 @@ class PlanTotals(BaseModel):
     charging_minutes: int
     detour_minutes: int
     stop_overhead_minutes: int
-    # Never invented: Chargewise has no availability data (architecture §6.3).
+    # Never invented: ChargeWaze has no availability data (architecture §6.3).
     waiting_minutes: int = 0
     total_minutes: int
     energy_kwh_estimated: float

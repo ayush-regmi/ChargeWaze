@@ -51,7 +51,7 @@ export function StationDetail({ station }: { station: Station }) {
           className="rounded-md bg-warning/10 px-3 py-2 text-sm text-warning"
         >
           This information may be out of date: the station provider couldn&apos;t be reached, so
-          this is the last copy Chargewise saved.
+          this is the last copy ChargeWaze saved.
         </p>
       ) : null}
 

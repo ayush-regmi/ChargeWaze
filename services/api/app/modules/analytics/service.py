@@ -205,7 +205,7 @@ def trips_csv(
         for leg in observed_queries.list_legs(db, rng, now=now)
     ]
     filename = (
-        f"chargewise-trips-{filters.range.first.isoformat()}-{filters.range.last.isoformat()}.csv"
+        f"chargewaze-trips-{filters.range.first.isoformat()}-{filters.range.last.isoformat()}.csv"
     )
     return CsvExport(filename=filename, body=render_csv(rows))
 

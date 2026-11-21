@@ -2,7 +2,7 @@ import { Zap } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-/** Monochrome Chargewise mark: a bolt in a small rounded square. */
+/** Monochrome ChargeWaze mark: a bolt in a small rounded square. */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <span
@@ -22,7 +22,7 @@ export function Logo({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-2 text-sm font-semibold tracking-tight", className)}>
       <LogoMark />
-      <span>Chargewise</span>
+      <span>ChargeWaze</span>
     </span>
   );
 }

@@ -383,7 +383,7 @@ def test_csv_rows_equal_json_rows(
     assert resp.status_code == 200, resp.text
     assert resp.headers["content-type"] == "text/csv; charset=utf-8"
     assert resp.headers["content-disposition"] == (
-        'attachment; filename="chargewise-trips-2026-11-08-2026-11-10.csv"'
+        'attachment; filename="chargewaze-trips-2026-11-08-2026-11-10.csv"'
     )
     reader = csv.reader(io.StringIO(resp.text))
     header = next(reader)

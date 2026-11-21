@@ -6,7 +6,7 @@
 
 ## Context
 
-Chargewise is a monorepo with two language ecosystems:
+ChargeWaze is a monorepo with two language ecosystems:
 
 - JavaScript/TypeScript under [`apps/web`](../../apps/web) (Next.js) and [`packages/api-client`](../../packages/api-client) (generated TS client).
 - Python 3.12+ under [`services/api`](../../services/api) (FastAPI backend) and [`ml/`](../../ml) (training, evaluation, notebooks).
@@ -46,7 +46,7 @@ Concretely:
 - **Yarn Berry.** Rejected: PnP would complicate editor/tooling config; classic Yarn adds no clear win over npm here.
 - **poetry.** Rejected as primary: slower, older resolver; requires a separate pyenv to pin Python versions. We would still consider it if `uv` turns out to be blocking on a hosting provider.
 - **pip + requirements.txt + venv.** Rejected: no lockfile semantics, no dev/prod group separation, no Python-version management.
-- **Nx instead of Turborepo.** Rejected: more features than Chargewise needs; higher learning cost.
+- **Nx instead of Turborepo.** Rejected: more features than ChargeWaze needs; higher learning cost.
 
 ## References
 

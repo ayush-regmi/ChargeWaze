@@ -6,7 +6,7 @@
 
 ## Context
 
-A later Chargewise milestone is a personalized ML consumption model. Reasons to resist starting with ML:
+A later ChargeWaze milestone is a personalized ML consumption model. Reasons to resist starting with ML:
 
 - No training data exists yet. Smartcar readings are not automatically a clean energy dataset — SoC rounding, usable-capacity uncertainty, and charging intervals all contaminate naïve SoC-difference estimates.
 - Routing can't ship without an energy model, but it doesn't need a learned one.

@@ -1,4 +1,4 @@
-"""FastAPI application factory for Chargewise.
+"""FastAPI application factory for ChargeWaze.
 
 The HTTP surface lives under ``/api/v1``. See ``docs/api-contracts.md`` for
 conventions. Modules under ``app/modules/*`` register their own routers via
@@ -28,10 +28,10 @@ def create_app() -> FastAPI:
     _redact_access_log_queries()
 
     app = FastAPI(
-        title="Chargewise API",
+        title="ChargeWaze API",
         version="0.1.0",
         description=(
-            "Chargewise backend. Authentication, vehicles, routing, trips, "
+            "ChargeWaze backend. Authentication, vehicles, routing, trips, "
             "analytics, and ML inference. See docs/api-contracts.md for the "
             "public surface."
         ),

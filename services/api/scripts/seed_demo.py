@@ -36,7 +36,7 @@ be mixed into a database with real data (architecture.md §7.2):
 session created in the last 24 hours change the password (or start an email
 change) without reauthentication, even with "Secure password change" on. A
 visitor could lock every later visitor out. So on a Supabase database the seed
-installs ``chargewise_demo_auth_guard``, a ``BEFORE UPDATE`` trigger on
+installs ``chargewaze_demo_auth_guard``, a ``BEFORE UPDATE`` trigger on
 ``auth.users`` that refuses any change to the demo user's password, email or
 phone (deployment.md §13.2). A plain Postgres database has no ``auth`` schema,
 and there the step is skipped.
@@ -170,7 +170,7 @@ def check_no_real_data(db: Session) -> None:
 # Auth guard (Supabase only)
 # ---------------------------------------------------------------------------
 
-AUTH_GUARD = "chargewise_demo_auth_guard"
+AUTH_GUARD = "chargewaze_demo_auth_guard"
 # The demo user's ID is a validated ``uuid.UUID``, so formatting it into the
 # function body is safe. ``set search_path = ''`` and ``security definer``
 # follow Supabase's documented pattern for triggers on ``auth.users``.
@@ -185,7 +185,7 @@ BEGIN
     OR NEW.phone IS DISTINCT FROM OLD.phone
     OR NEW.phone_change IS DISTINCT FROM OLD.phone_change
   ) THEN
-    RAISE EXCEPTION 'The Chargewise demo account''s sign-in details are locked.'
+    RAISE EXCEPTION 'The ChargeWaze demo account''s sign-in details are locked.'
       USING ERRCODE = 'insufficient_privilege';
   END IF;
   RETURN NEW;

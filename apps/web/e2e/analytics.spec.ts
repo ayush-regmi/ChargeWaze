@@ -146,7 +146,7 @@ test("shows trends, quality badges and a CSV that matches the table", async ({
   await page.getByRole("link", { name: "Download CSV" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(
-    /^chargewise-trips-\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-\d{2}\.csv$/,
+    /^chargewaze-trips-\d{4}-\d{2}-\d{2}-\d{4}-\d{2}-\d{2}\.csv$/,
   );
   const csv = (await readFile((await download.path())!, "utf8"))
     .trim()

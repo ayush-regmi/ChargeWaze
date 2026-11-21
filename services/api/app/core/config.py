@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:3000"
 
     # ---- Database ----
-    database_url: str = "postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise"
+    database_url: str = "postgresql+psycopg://chargewaze:chargewaze@localhost:5432/chargewaze"
 
     # ---- Supabase ----
     supabase_url: str = ""

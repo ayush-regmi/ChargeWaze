@@ -18,7 +18,7 @@ export const API_ENV: Record<string, string> = {
   APP_ENV: "development",
   DATABASE_URL:
     process.env.E2E_DATABASE_URL ??
-    "postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise_e2e",
+    "postgresql+psycopg://chargewaze:chargewaze@localhost:5432/chargewaze_e2e",
   // Environment values win over services/api/.env, so a developer's real
   // settings there can't leak into the run.
   SUPABASE_JWKS_URL: "",

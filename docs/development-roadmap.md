@@ -1,8 +1,8 @@
-# Chargewise — Development Roadmap
+# ChargeWaze — Development Roadmap
 
 Status: **Phase 2 code complete; real-car verification and cadence measurement pending, then Phase 3** · Last updated: 2026-11-16
 
-Delivery plan for Chargewise. Estimates assume part-time development with Claude Code / Cursor and real testing. They are planning estimates, not deadlines.
+Delivery plan for ChargeWaze. Estimates assume part-time development with Claude Code / Cursor and real testing. They are planning estimates, not deadlines.
 
 ## 0. Immediate actions (do these first, in order)
 
@@ -20,7 +20,7 @@ Each phase ends when its **completion criteria** are satisfied. "Done" means tes
 
 ### Phase 1 — Foundation (Weeks 1–2) — complete
 
-Status: done. Merged in [PR #1](https://github.com/ayush-regmi/ChargeWise/pull/1) with CI green on `main`; verified against hosted Supabase on 2026-11-12. A follow-up migration enables Row Level Security (no policies) on every `public` table, so Supabase's Data API cannot read Chargewise tables with the publishable key. FastAPI connects as the table owner and is unaffected.
+Status: done. Merged in [PR #1](https://github.com/ayush-regmi/ChargeWaze/pull/1) with CI green on `main`; verified against hosted Supabase on 2026-11-12. A follow-up migration enables Row Level Security (no policies) on every `public` table, so Supabase's Data API cannot read ChargeWaze tables with the publishable key. FastAPI connects as the table owner and is unaffected.
 
 **Scope**
 
@@ -179,7 +179,7 @@ Features to start with:
 | Wind speed / direction | Open-Meteo |
 | Initial SoC | Smartcar |
 | Vehicle model | Smartcar + `vehicle_specs` |
-| Historical consumption | Chargewise database |
+| Historical consumption | ChargeWaze database |
 | Trip duration | Observed trip or route estimate |
 
 ### Stage C — Personalization
@@ -237,7 +237,7 @@ Tracked explicitly here and in the per-doc "open questions" sections.
 |---|---|---|
 | Smartcar event frequency on the Toyota is lower than Dashboard needs. | Phase 2 | Measure during Phase 2; if too low, add a polling fallback or widen the freshness threshold. |
 | Canadian charging data is missing. | Phase 3 | **Resolved 2026-11-16 (F0):** AFDC returns Ontario stations with `country=all` (its default is `US`). No second provider needed. |
-| Open-Meteo license is non-commercial. | Pre-ML | Confirm Chargewise stays non-commercial, or pick a different weather provider before Stage B. |
+| Open-Meteo license is non-commercial. | Pre-ML | Confirm ChargeWaze stays non-commercial, or pick a different weather provider before Stage B. |
 | Mapbox EV Routing becomes GA mid-project. | Ongoing | Stay on the self-built optimizer unless Mapbox EV Routing gives a clear win and acceptable pricing. |
 | API costs exceed hobby budget. | Phase 6 | Add per-user rate limits in Phase 6; monitor Mapbox and Smartcar usage. |
 | Public demo leaks real location history. | Phase 6 | Public demo loads only `is_simulated = true` rows; live mode is behind an allowlist. |

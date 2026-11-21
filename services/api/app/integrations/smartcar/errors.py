@@ -1,4 +1,4 @@
-"""Map Smartcar transport and HTTP failures onto the Chargewise error envelope.
+"""Map Smartcar transport and HTTP failures onto the ChargeWaze error envelope.
 
 Callers never see ``httpx`` exceptions: the client converts them here.
 """

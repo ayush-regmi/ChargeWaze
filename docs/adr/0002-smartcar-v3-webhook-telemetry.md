@@ -6,7 +6,7 @@
 
 ## Context
 
-Chargewise needs vehicle data (SoC, range, odometer, charging status) for the 2026 Toyota bZ and, later, for other EVs.
+ChargeWaze needs vehicle data (SoC, range, odometer, charging status) for the 2026 Toyota bZ and, later, for other EVs.
 
 Relevant facts from Smartcar as of planning:
 
@@ -22,7 +22,7 @@ These details are from a planning document; implementation must verify them agai
 We will:
 
 - Build the Smartcar integration against **API V3**. Ignore V2 tutorials and per-vehicle refresh-token patterns.
-- Treat **webhooks as the primary telemetry path**: the backend subscribes each connected vehicle to a Chargewise webhook endpoint after Connect.
+- Treat **webhooks as the primary telemetry path**: the backend subscribes each connected vehicle to a ChargeWaze webhook endpoint after Connect.
 - Store a cached `latest_state` on the `vehicles` row, updated by the webhook ingestor. Dashboard reads never trigger live Smartcar calls on the hot path.
 - Require every webhook request to pass signature verification before persisting anything.
 - Deduplicate events by Smartcar event ID.
@@ -39,9 +39,9 @@ We will:
 
 ## Alternatives considered
 
-- **Smartcar V2.** Rejected: deprecating, less uniform API, and a reasonable Chargewise should not launch on a sunset path.
+- **Smartcar V2.** Rejected: deprecating, less uniform API, and a reasonable ChargeWaze should not launch on a sunset path.
 - **Polling-only telemetry.** Rejected as primary: higher request volume, worse latency between vehicle state and UI, and against Smartcar's own guidance. Polling stays available as a fallback if events turn out to be too sparse.
-- **Skip Smartcar entirely and go OEM-direct.** Rejected: OEM APIs are not standardized and would lock Chargewise to one manufacturer.
+- **Skip Smartcar entirely and go OEM-direct.** Rejected: OEM APIs are not standardized and would lock ChargeWaze to one manufacturer.
 
 ## References
 

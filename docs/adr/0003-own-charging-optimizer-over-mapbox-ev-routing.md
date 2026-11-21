@@ -8,7 +8,7 @@
 
 Mapbox publishes an EV Routing API that handles energy prediction and automatically inserted charging stops. As of planning, Mapbox EV Routing is labeled **private preview**.
 
-Chargewise needs:
+ChargeWaze needs:
 
 - Reliable charging-aware routing on day one for the portfolio demo.
 - An algorithm whose details we can explain and iterate on.
@@ -19,7 +19,7 @@ Chargewise needs:
 We will:
 
 - Use Mapbox for **plain road routing** (Directions) and geocoding/search only.
-- Implement Chargewise's own **charging-aware optimizer** in Python, inside the `routing` and `energy` modules.
+- Implement ChargeWaze's own **charging-aware optimizer** in Python, inside the `routing` and `energy` modules.
 - Start with a deterministic energy model (segment length × consumption, piecewise charging curve) and a bounded search over feasible charging-stop sequences.
 - Upgrade later (Phase 4 end or later) to a SoC-discretized Dijkstra / A* search over (charger, SoC-bucket) nodes.
 - Keep station data behind the `integrations/stations` adapter so provider swaps don't touch `routing`.

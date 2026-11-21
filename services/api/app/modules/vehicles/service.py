@@ -4,11 +4,11 @@ Completion only learns which vehicles were authorized *after* the redirect,
 by listing the Smartcar user's connections (smartcar-v3-notes.md §2-3). The
 redirect's ``user_id`` is an unauthenticated query parameter and our
 application token can read every Smartcar user's connections, so a connection
-is only accepted if its ``externalId`` (which we set to the Chargewise profile
+is only accepted if its ``externalId`` (which we set to the ChargeWaze profile
 ID in the Connect URL) matches the user inside the signed ``state``. The
 router has already checked that ``state`` belongs to the signed-in user.
 
-One real car belongs to one Chargewise user at a time. A car another account
+One real car belongs to one ChargeWaze user at a time. A car another account
 already holds is refused (``owned_elsewhere``) and the connection this account
 just created is deleted on Smartcar, best-effort, so nothing is left behind.
 
@@ -138,7 +138,7 @@ def _upsert_vehicle(
 ) -> VehicleResult:
     sc_vehicle_id = connection.vehicle_id
 
-    # One real car belongs to one Chargewise user at a time.
+    # One real car belongs to one ChargeWaze user at a time.
     held_elsewhere = db.scalar(
         select(Vehicle.id).where(
             Vehicle.smartcar_vehicle_id == sc_vehicle_id,

@@ -57,7 +57,7 @@ export function DisconnectButton({
         <AlertDialogHeader>
           <AlertDialogTitle>Disconnect {vehicleName}?</AlertDialogTitle>
           <AlertDialogDescription>
-            Chargewise will stop receiving data from this vehicle and revoke its Smartcar
+            ChargeWaze will stop receiving data from this vehicle and revoke its Smartcar
             access. Its history is kept, and you can connect it again later.
           </AlertDialogDescription>
         </AlertDialogHeader>

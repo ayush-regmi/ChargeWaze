@@ -1,5 +1,5 @@
 /**
- * Chargewise typed API client.
+ * ChargeWaze typed API client.
  *
  * Re-exports ``openapi-fetch``'s ``createClient`` plus the generated
  * ``paths`` / ``components`` / ``operations`` types so the frontend has a
@@ -7,7 +7,7 @@
  *
  * Usage:
  *
- *     import { createClient, type paths } from "@chargewise/api-client";
+ *     import { createClient, type paths } from "@chargewaze/api-client";
  *     const api = createClient<paths>({ baseUrl: "http://localhost:8000" });
  *     const { data, error } = await api.GET("/api/v1/me");
  *

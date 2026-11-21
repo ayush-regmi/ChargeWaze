@@ -4,7 +4,7 @@ phase3_plan.md F5 and decisions D6, D7, D9, D10:
 
 - Searches always go to the provider. Every result is upserted on
   ``(provider, external_id)`` (one statement per provider page), so a station's
-  Chargewise ``id`` stays the same across fetches (E5).
+  ChargeWaze ``id`` stays the same across fetches (E5).
 - ``get_station`` reads the cache and refreshes a row older than the TTL. If the
   refresh fails, the cached row comes back with ``is_stale: true``.
 - ``min_power_kw`` hides stations whose *known* maximum power is lower; stations
@@ -203,7 +203,7 @@ def search_along_route(
     Provider pages are fetched until every match is collected or
     ``max_results`` stations are (``truncated`` says which). ``filters.limit``
     and ``filters.offset`` are ignored; paging is done here. Every station is
-    upserted, so ``items[].id`` are stable Chargewise IDs.
+    upserted, so ``items[].id`` are stable ChargeWaze IDs.
     """
 
     if len(route) < 2:
@@ -317,7 +317,7 @@ def get_station(
 def upsert_stations(
     db: Session, stations: Sequence[ProviderStation], *, now: datetime | None = None
 ) -> list[StationOut]:
-    """Insert or update ``stations`` in one statement; return them with Chargewise IDs.
+    """Insert or update ``stations`` in one statement; return them with ChargeWaze IDs.
 
     Order follows ``stations``; a station listed twice is returned once.
     """

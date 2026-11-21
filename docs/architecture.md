@@ -1,4 +1,4 @@
-# Chargewise — Architecture
+# ChargeWaze — Architecture
 
 Status: **Draft (specification phase)** · Last updated: 2026-11-06
 
@@ -97,22 +97,22 @@ Rules:
 
 ## 4. Two separate identities
 
-Chargewise authenticates two different things:
+ChargeWaze authenticates two different things:
 
-1. **The Chargewise user**, authenticated via Supabase Auth; identified by a Supabase user ID (`profiles.id`).
+1. **The ChargeWaze user**, authenticated via Supabase Auth; identified by a Supabase user ID (`profiles.id`).
 2. **The vehicle connection**, authorized by the vehicle owner via Smartcar Connect; identified by the Smartcar user ID (`sc-user-id`) and the per-vehicle Smartcar vehicle ID.
 
 The connect flow:
 
-1. User signs into Chargewise (Supabase JWT).
+1. User signs into ChargeWaze (Supabase JWT).
 2. User selects **Add Vehicle** on the Garage page.
-3. Backend (`POST /api/v1/vehicles/connect`) signs a 10-minute `state` (HS256 JWT with the Chargewise user ID, the validated `redirect_after` path and a nonce) and returns a Connect URL with `response_type=none` and `external_id = profiles.id`.
+3. Backend (`POST /api/v1/vehicles/connect`) signs a 10-minute `state` (HS256 JWT with the ChargeWaze user ID, the validated `redirect_after` path and a nonce) and returns a Connect URL with `response_type=none` and `external_id = profiles.id`.
 4. User authorizes vehicle access with Smartcar.
 5. Smartcar redirects the browser to the web app's `/garage/connect/callback` (`SMARTCAR_REDIRECT_URI`) with `user_id`, `state` and `external_id`. There is no code to exchange: V3 uses one application token for every user.
 6. The web app forwards that query to `POST /api/v1/vehicles/connect/complete` with the **signed-in user's** Supabase JWT. The backend verifies `state` and requires its user to be the caller. Connect has to finish where the user's session is: otherwise an attacker could start Connect on their own account, send the authorization URL to a victim, and receive the victim's car (both `state` and Smartcar's `externalId` would name the attacker).
-7. Backend lists the Smartcar user's connections and only accepts active ones whose `externalId` equals the user in `state`; the redirect's `user_id` is unauthenticated and the application token can read any Smartcar user's connections. Per connection: a car already connected to this user is a duplicate; a disconnected (or leftover pending) row is reactivated; a car active on another Chargewise user is refused; otherwise a `vehicles` row (`connected`) and `vehicle_specs` (from the static catalog, or `NULL`s) are inserted. `supported_signals` comes from a best-effort signal read and is often `[]` right after Connect; F5/F6 recompute it when data arrives.
+7. Backend lists the Smartcar user's connections and only accepts active ones whose `externalId` equals the user in `state`; the redirect's `user_id` is unauthenticated and the application token can read any Smartcar user's connections. Per connection: a car already connected to this user is a duplicate; a disconnected (or leftover pending) row is reactivated; a car active on another ChargeWaze user is refused; otherwise a `vehicles` row (`connected`) and `vehicle_specs` (from the static catalog, or `NULL`s) are inserted. `supported_signals` comes from a best-effort signal read and is often `[]` right after Connect; F5/F6 recompute it when data arrives.
 8. Backend returns `{ result, redirect_after }`; the web app redirects to `redirect_after` with `connect=success|already_connected|owned_elsewhere|denied|error`, and the Garage shows a banner.
-9. Webhook enrolment: vehicles are enrolled by the Smartcar Dashboard's auto-subscribe setting. Chargewise does not call the V3 subscribe API; revisit if the real-car check shows a newly connected vehicle isn't enrolled.
+9. Webhook enrolment: vehicles are enrolled by the Smartcar Dashboard's auto-subscribe setting. ChargeWaze does not call the V3 subscribe API; revisit if the real-car check shows a newly connected vehicle isn't enrolled.
 
 Verified V3 details live in [`smartcar-v3-notes.md`](smartcar-v3-notes.md).
 
@@ -203,7 +203,7 @@ Objective:
 \min \left( T_{\text{drive}} + \sum_{\text{stops}} \left( T_{\text{charge}} + T_{\text{detour}} + T_{\text{overhead}} \right) + T_{\text{waiting}} \right)
 \]
 
-\(T_{\text{drive}}\) is the same for every plan on one route. Waiting time is zero: Chargewise never fabricates real-time queue data.
+\(T_{\text{drive}}\) is the same for every plan on one route. Waiting time is zero: ChargeWaze never fabricates real-time queue data.
 
 ### 6.4 Charging time model
 

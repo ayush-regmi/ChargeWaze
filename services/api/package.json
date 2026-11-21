@@ -1,8 +1,8 @@
 {
-  "name": "@chargewise/api",
+  "name": "@chargewaze/api",
   "private": true,
   "version": "0.0.0",
-  "description": "Chargewise FastAPI backend. Scripts shim into uv so turbo can orchestrate Python tasks alongside the JS workspaces.",
+  "description": "ChargeWaze FastAPI backend. Scripts shim into uv so turbo can orchestrate Python tasks alongside the JS workspaces.",
   "scripts": {
     "dev": "uv run fastapi dev app/main.py",
     "build": "echo 'no-op: Python backend has no build step'",
