@@ -21,20 +21,20 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: chargewise
-          POSTGRES_PASSWORD: chargewise
-          POSTGRES_DB: chargewise
+          POSTGRES_USER: chargewaze
+          POSTGRES_PASSWORD: chargewaze
+          POSTGRES_DB: chargewaze
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U chargewise -d chargewise"
+          --health-cmd "pg_isready -U chargewaze -d chargewaze"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
 
     env:
-      DATABASE_URL: postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise
+      DATABASE_URL: postgresql+psycopg://chargewaze:chargewaze@localhost:5432/chargewaze
       # pytest creates and resets this separate database (tests/conftest.py).
-      TEST_DATABASE_URL: postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise_test
+      TEST_DATABASE_URL: postgresql+psycopg://chargewaze:chargewaze@localhost:5432/chargewaze_test
 
     steps:
       - uses: actions/checkout@v7
@@ -72,12 +72,12 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: chargewise
-          POSTGRES_PASSWORD: chargewise
-          POSTGRES_DB: chargewise
+          POSTGRES_USER: chargewaze
+          POSTGRES_PASSWORD: chargewaze
+          POSTGRES_DB: chargewaze
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U chargewise -d chargewise"
+          --health-cmd "pg_isready -U chargewaze -d chargewaze"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
@@ -86,15 +86,15 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Build image
-        run: docker build -t chargewise-api:ci services/api
+        run: docker build -t chargewaze-api:ci services/api
 
       - name: Migrate and serve /health from the image
         run: |
-          db="postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise"
+          db="postgresql+psycopg://chargewaze:chargewaze@localhost:5432/chargewaze"
           docker run --rm --network host -e APP_ENV=production -e DATABASE_URL="$db" \
-            chargewise-api:ci alembic upgrade head
+            chargewaze-api:ci alembic upgrade head
           docker run -d --name api --network host -e APP_ENV=production -e PORT=8000 \
-            -e DATABASE_URL="$db" chargewise-api:ci
+            -e DATABASE_URL="$db" chargewaze-api:ci
           for _ in $(seq 1 30); do
             if body=$(curl -fsS http://localhost:8000/health); then
               echo "$body"
@@ -181,12 +181,12 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: chargewise
-          POSTGRES_PASSWORD: chargewise
-          POSTGRES_DB: chargewise
+          POSTGRES_USER: chargewaze
+          POSTGRES_PASSWORD: chargewaze
+          POSTGRES_DB: chargewaze
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U chargewise -d chargewise"
+          --health-cmd "pg_isready -U chargewaze -d chargewaze"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20

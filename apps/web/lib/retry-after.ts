@@ -1,5 +1,5 @@
 /**
- * Helpers for Chargewise's own `RATE_LIMITED` (429) error (docs/api-contracts.md
+ * Helpers for ChargeWaze's own `RATE_LIMITED` (429) error (docs/api-contracts.md
  * §2): the envelope always carries `details.retry_after_seconds`, which the UI
  * turns into "try again in N minutes".
  */

@@ -1,4 +1,4 @@
-import type { components } from "@chargewise/api-client";
+import type { components } from "@chargewaze/api-client";
 
 export type PrivacySettings = components["schemas"]["PrivacyResponse"];
 export type ConsentStatus = components["schemas"]["ConsentStatus"];

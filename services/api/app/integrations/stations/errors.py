@@ -1,4 +1,4 @@
-"""Map station-provider transport and HTTP failures onto the Chargewise error envelope.
+"""Map station-provider transport and HTTP failures onto the ChargeWaze error envelope.
 
 Callers never see ``httpx`` exceptions. Provider error *bodies* are never passed
 on: AFDC's can echo the request, which may include the API key.

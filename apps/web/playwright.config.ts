@@ -11,7 +11,7 @@ import { PROVIDER_STUB_URL } from "./e2e/support/provider-stub-lib.mjs";
  * - an Auth stub standing in for Supabase Auth (`e2e/support/auth-stub.mjs`);
  * - a provider stub standing in for Mapbox and AFDC, serving the fixtures in
  *   `e2e/support/provider-fixtures/` (`e2e/support/provider-stub.mjs`);
- * - the FastAPI backend on a local `chargewise_e2e` Postgres database, with
+ * - the FastAPI backend on a local `chargewaze_e2e` Postgres database, with
  *   test-only secrets, Mapbox/AFDC pointed at the provider stub and the
  *   Smartcar API pointed at an unreachable address;
  * - `next dev` pointed at the Auth stub and the API, with no Mapbox public

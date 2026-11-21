@@ -1,4 +1,4 @@
-"""Throwaway Mapbox + AFDC spike for Chargewise Phase 3 (F0). Not production code.
+"""Throwaway Mapbox + AFDC spike for ChargeWaze Phase 3 (F0). Not production code.
 
 Standard library only. Reads keys from services/api/.env, or the file named by
 SPIKE_ENV_FILE (values are never printed):

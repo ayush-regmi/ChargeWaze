@@ -4,7 +4,7 @@
  * units happens only here. Null stays null: missing data is never guessed.
  */
 
-import type { components } from "@chargewise/api-client";
+import type { components } from "@chargewaze/api-client";
 
 import { kmToMiles, KM_PER_MILE, type UnitSystem } from "@/lib/units";
 

@@ -50,7 +50,7 @@ def station(
     """A synthetic candidate with a stable id derived from its name."""
 
     return CandidateStation(
-        station_id=uuid.uuid5(uuid.NAMESPACE_URL, f"chargewise-test-station:{name}"),
+        station_id=uuid.uuid5(uuid.NAMESPACE_URL, f"chargewaze-test-station:{name}"),
         name=name,
         network=None,
         connector=connector,

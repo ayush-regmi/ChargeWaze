@@ -1,4 +1,4 @@
-"""Throwaway Smartcar V3 spike for Chargewise Phase 2 (F0). Not production code.
+"""Throwaway Smartcar V3 spike for ChargeWaze Phase 2 (F0). Not production code.
 
 Standard library only. Reads credentials from services/api/.env (never printed).
 
@@ -207,7 +207,7 @@ def cmd_connect(env: dict[str, str]) -> None:
         "scope": env.get("SMARTCAR_SCOPES") or DEFAULT_SCOPES,
         "mode": mode,
         "state": state,
-        "external_id": "chargewise-spike",
+        "external_id": "chargewaze-spike",
         "flags": "country:US",
     }
     print("\nOpen this URL in your browser and authorize the vehicle:\n")
@@ -228,7 +228,7 @@ def cmd_connect(env: dict[str, str]) -> None:
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
-            self.wfile.write(b"Chargewise spike: redirect received. You can close this tab.")
+            self.wfile.write(b"ChargeWaze spike: redirect received. You can close this tab.")
 
         def log_message(self, *_: Any) -> None:
             pass

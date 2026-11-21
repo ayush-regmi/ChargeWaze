@@ -12,7 +12,7 @@ export const DEFAULT_NEXT_PATH = "/dashboard";
 
 // Placeholder origin used only to resolve the path. ``.invalid`` is reserved
 // (RFC 2606), so it can never collide with a real host.
-const PROBE_ORIGIN = "http://chargewise.invalid";
+const PROBE_ORIGIN = "http://chargewaze.invalid";
 
 export function safeNextPath(
   next: string | null | undefined,

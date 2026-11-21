@@ -13,7 +13,7 @@ import pytest
 from app.integrations.smartcar.client import SmartcarClient
 
 FIXTURES = Path(__file__).resolve().parents[4] / "fixtures" / "smartcar"
-TEST_MANAGEMENT_TOKEN = "chargewise-test-management-token"
+TEST_MANAGEMENT_TOKEN = "chargewaze-test-management-token"
 
 API_BASE = "https://vehicle.test/v3"
 AUTH_URL = "https://iam.test/oauth2/token"

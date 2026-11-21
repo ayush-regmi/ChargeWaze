@@ -1,6 +1,6 @@
-# Chargewise
+# ChargeWaze
 
-A full-stack EV intelligence and route-planning platform. Chargewise combines connected-vehicle data (Smartcar V3), driving directions (Mapbox), charging-station data (AFDC, US and Canada), and its own charging-aware route optimizer to answer one question:
+A full-stack EV intelligence and route-planning platform. ChargeWaze combines connected-vehicle data (Smartcar V3), driving directions (Mapbox), charging-station data (AFDC, US and Canada), and its own charging-aware route optimizer to answer one question:
 
 > Given my vehicle's current battery level, where I want to go, the weather, and available charging infrastructure, what is the most efficient and reliable way to complete my trip?
 
@@ -8,7 +8,7 @@ A full-stack EV intelligence and route-planning platform. Chargewise combines co
 
 ## MVP demo flow
 
-Chargewise reaches its MVP definition of done when a user can, in one session:
+ChargeWaze reaches its MVP definition of done when a user can, in one session:
 
 1. Sign in with Supabase Auth.
 2. Connect their vehicle through Smartcar Connect (V3).
@@ -21,7 +21,7 @@ Full acceptance criteria are in [`docs/product-requirements.md`](docs/product-re
 ## Repository layout
 
 ```
-chargewise/
+chargewaze/
 ├── apps/
 │   └── web/                 # Next.js + TypeScript frontend (.env.example inside)
 ├── services/

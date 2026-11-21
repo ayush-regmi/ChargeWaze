@@ -33,7 +33,7 @@ from app.modules.vehicles.models import Vehicle  # noqa: E402
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     target = parser.add_mutually_exclusive_group(required=True)
-    target.add_argument("--vehicle-id", type=uuid.UUID, help="One vehicle (Chargewise ID).")
+    target.add_argument("--vehicle-id", type=uuid.UUID, help="One vehicle (ChargeWaze ID).")
     target.add_argument("--all", action="store_true", help="Every vehicle.")
     parser.add_argument("--full", action="store_true", help="Rebuild the whole history.")
     args = parser.parse_args(argv)

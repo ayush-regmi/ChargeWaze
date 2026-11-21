@@ -1,4 +1,4 @@
-# Render Blueprint for the Chargewise API (P6-F3). Setup steps: docs/deployment.md.
+# Render Blueprint for the ChargeWaze API (P6-F3). Setup steps: docs/deployment.md.
 #
 # Values marked `sync: false` are typed into the Render dashboard when the
 # Blueprint is first created; none are committed. Deploys are not automatic:
@@ -6,6 +6,8 @@
 # deploy the exact commit that passed CI.
 services:
   - type: web
+    # Keeps the pre-rename name on purpose (ADR 0011): Render matches Blueprint
+    # services by name, and the URL chargewise-api.onrender.com never changes.
     name: chargewise-api
     runtime: docker
     dockerfilePath: ./services/api/Dockerfile
@@ -25,7 +27,7 @@ services:
       # APP_ENV=production an empty list locks EVERYONE out, the owner too.
       - key: LIVE_ALLOWED_USER_IDS
         sync: false
-      - key: ALLOWED_ORIGINS # the Vercel production URL, e.g. https://chargewise.vercel.app
+      - key: ALLOWED_ORIGINS # the Vercel production URL, e.g. https://chargewaze.vercel.app
         sync: false
       # ---- Database (Supabase session pooler, postgresql+psycopg://...) ----
       - key: DATABASE_URL

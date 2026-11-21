@@ -71,7 +71,7 @@ def _enforce_live(user_id: uuid.UUID, settings: Settings) -> None:
         return
     raise ApiError(
         "FORBIDDEN",
-        "This Chargewise deployment is private. Ask the owner for access.",
+        "This ChargeWaze deployment is private. Ask the owner for access.",
         status_code=status.HTTP_403_FORBIDDEN,
         details={"reason": "LIVE_ACCESS_RESTRICTED"},
     )

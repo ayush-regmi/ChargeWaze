@@ -33,7 +33,7 @@ def test_connections_fixture_parses() -> None:
     assert conn.user_id == "redacted-id-1"
     assert conn.vehicle_id == "redacted-id-3"
     assert conn.is_active
-    assert conn.attributes.user.external_id == "chargewise-spike"
+    assert conn.attributes.user.external_id == "chargewaze-spike"
     assert conn.attributes.permissions == [
         "read_battery",
         "read_charge",

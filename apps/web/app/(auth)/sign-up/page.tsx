@@ -8,7 +8,7 @@ export default function SignUpPage() {
   return (
     <div className="space-y-8">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Create your Chargewise account</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Create your ChargeWaze account</h1>
         <p className="text-sm text-muted-foreground">
           You will receive a confirmation email if required by your project.
         </p>

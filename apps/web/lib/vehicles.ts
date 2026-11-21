@@ -1,10 +1,10 @@
-import type { components } from "@chargewise/api-client";
+import type { components } from "@chargewaze/api-client";
 
 export type VehicleSummary = components["schemas"]["VehicleSummary"];
 export type VehicleDetail = components["schemas"]["VehicleDetail"];
 
 /**
- * Display names for Chargewise signal codes (see SIGNAL_MAP in
+ * Display names for ChargeWaze signal codes (see SIGNAL_MAP in
  * services/api/app/integrations/smartcar/schemas.py). Unknown codes fall back
  * to the code itself so a new backend signal still shows up.
  */

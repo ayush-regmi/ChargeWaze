@@ -6,11 +6,11 @@
 
 ## Context
 
-[ADR 0002](0002-smartcar-v3-webhook-telemetry.md) makes Smartcar webhooks the only telemetry path. It leaves one question open: whether Chargewise needs a polling fallback.
+[ADR 0002](0002-smartcar-v3-webhook-telemetry.md) makes Smartcar webhooks the only telemetry path. It leaves one question open: whether ChargeWaze needs a polling fallback.
 
 On 2026-11-18 the real 2026 Toyota bZ sent 12 readings in the 20 minutes after Connect, then nothing. The local API and the ngrok tunnel had been stopped. A day later the Dashboard said "Data may be stale — last update 29 hours ago", and the user had no way to fix it.
 
-The readings were not lost because the car stopped reporting. They were lost because Chargewise wasn't there to receive them. Smartcar retries failed deliveries for up to 3 days, but only for events it tried to send while our endpoint was failing.
+The readings were not lost because the car stopped reporting. They were lost because ChargeWaze wasn't there to receive them. Smartcar retries failed deliveries for up to 3 days, but only for events it tried to send while our endpoint was failing.
 
 Constraints:
 
@@ -29,7 +29,7 @@ We add an **on-demand, user-triggered refresh** and no scheduled polling.
   - one refresh per `SMARTCAR_REFRESH_MIN_INTERVAL_MINUTES` (default 15);
   - at most `SMARTCAR_REFRESH_MAX_PER_DAY` (default 8) in any rolling 24 hours;
   - the worst case is 8 × 31 = 248 requests per vehicle per month;
-  - an attempt counts once Chargewise is about to call Smartcar, whether or not the call succeeds;
+  - an attempt counts once ChargeWaze is about to call Smartcar, whether or not the call succeeds;
   - the vehicle row is locked while the limit is checked, so concurrent clicks serialize. It is locked again, and reloaded, before the results are stored. A webhook or disconnect that lands during the Smartcar call is then merged or respected, not overwritten by the copy loaded before the call.
 - **Same ingest rules as webhooks.** Results go through the same code as webhook deliveries (`telemetry_service._store_signals`):
   - same normalization;

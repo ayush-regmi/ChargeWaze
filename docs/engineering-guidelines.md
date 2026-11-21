@@ -1,4 +1,4 @@
-# Chargewise Engineering Guidelines
+# ChargeWaze Engineering Guidelines
 
 These are the rules every contributor follows, human or AI. This file is the single source of truth; [`CLAUDE.md`](../CLAUDE.md) and [`AGENTS.md`](../AGENTS.md) point AI assistants here (see [ADR 0007](adr/0007-commit-agent-instructions.md)).
 
@@ -26,7 +26,7 @@ If the docs contradict each other, flag it in your PR and propose a fix before w
 - Business logic lives inside FastAPI, not Next.js.
 - The browser never calls private provider APIs directly. All third-party calls (Smartcar, Mapbox server-side, AFDC, weather) go through adapters in [`services/api/app/integrations/`](../services/api). Nothing else imports vendor SDKs directly.
 - Smartcar is V3 only. Ignore V2 tutorials and per-vehicle refresh-token patterns.
-- Chargewise is a modular monolith. Modules depend down, not across. See [`architecture.md`](architecture.md#3-module-layout-modular-monolith).
+- ChargeWaze is a modular monolith. Modules depend down, not across. See [`architecture.md`](architecture.md#3-module-layout-modular-monolith).
 - REST endpoints live under `/api/v1/*`. Breaking changes land under a new major version, not in place. See [`api-contracts.md`](api-contracts.md).
 - API schemas stay consistent across endpoints (timestamps, units, error envelope, freshness fields).
 
@@ -97,7 +97,7 @@ Tooling is **npm workspaces + Turborepo** on the JS side and **`uv`** on the Pyt
   - `npm run build` / `npm run lint` / `npm run test` / `npm run typecheck`.
 - Workspace-scoped:
   - Frontend: `npm run dev --workspace=apps/web`, `npm run test --workspace=apps/web`, `npm run test:e2e --workspace=apps/web`.
-  - E2E needs local Postgres (`docker compose up -d`), `uv`, and Playwright's browser (`npx playwright install chromium` in `apps/web`). It starts its own API (port 8765), web app (port 3100) and Auth stub, and uses a separate `chargewise_e2e` database.
+  - E2E needs local Postgres (`docker compose up -d`), `uv`, and Playwright's browser (`npx playwright install chromium` in `apps/web`). It starts its own API (port 8765), web app (port 3100) and Auth stub, and uses a separate `chargewaze_e2e` database.
   - Backend (from [`services/api/`](../services/api)): `uv sync --group dev`, `uv run fastapi dev app/main.py`, `uv run pytest`, `uv run ruff check`, `uv run mypy app`.
   - Migrations: `uv run alembic upgrade head`, `uv run alembic downgrade -1`.
 - Generated typed API client: `uv run --project services/api python services/api/scripts/export_openapi.py && npm run generate --workspace=packages/api-client`.

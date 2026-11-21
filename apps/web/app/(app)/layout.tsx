@@ -18,7 +18,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     <div className="flex min-h-full">
       <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
         <div className="flex h-14 items-center px-5">
-          <Link href="/dashboard" aria-label="Chargewise home">
+          <Link href="/dashboard" aria-label="ChargeWaze home">
             <Logo />
           </Link>
         </div>

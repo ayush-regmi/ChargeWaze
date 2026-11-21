@@ -271,7 +271,7 @@ class _SignalSpec:
     unit: str | None = None
 
 
-# Smartcar signal code → Chargewise signal code. docs/smartcar-v3-notes.md §4.
+# Smartcar signal code → ChargeWaze signal code. docs/smartcar-v3-notes.md §4.
 SIGNAL_MAP: dict[str, _SignalSpec] = {
     "tractionbattery-stateofcharge": _SignalSpec("soc", "number", unit="percent"),
     "tractionbattery-range": _SignalSpec("range", "number"),
@@ -295,9 +295,9 @@ SignalOutcome = Literal["ok", "error"]
 
 @dataclass(frozen=True)
 class NormalizedSignal:
-    """One Smartcar signal mapped onto Chargewise's vocabulary.
+    """One Smartcar signal mapped onto ChargeWaze's vocabulary.
 
-    ``code`` is ``None`` for signals Chargewise doesn't map; they keep their
+    ``code`` is ``None`` for signals ChargeWaze doesn't map; they keep their
     ``smartcar_code`` and ``raw`` so nothing is lost. ``value`` is ``None``
     whenever the signal errored or has no numeric value (text signals keep
     theirs in ``text_value``). Booleans are 1/0 to match
@@ -466,7 +466,7 @@ def _item_id(item: RestSignal | WebhookSignal) -> str:
 
 
 def supported_signal_codes(signals: list[NormalizedSignal]) -> list[str]:
-    """Chargewise codes the vehicle supports, for ``vehicles.supported_signals``.
+    """ChargeWaze codes the vehicle supports, for ``vehicles.supported_signals``.
 
     A signal counts as supported if it returned a value, or errored with a code
     that means "empty right now" (e.g. ``NOT_CHARGING``). ``VEHICLE_NOT_CAPABLE``

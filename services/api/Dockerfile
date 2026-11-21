@@ -1,4 +1,4 @@
-# Chargewise API image (P6-F3, docs/deployment.md).
+# ChargeWaze API image (P6-F3, docs/deployment.md).
 #
 # Built by Render from render.yaml and by CI's docker-build job. Runtime
 # dependencies only (no dev group); configuration comes from the environment,
@@ -28,9 +28,9 @@ COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
 RUN uv sync --frozen --no-dev \
-    && useradd --system --uid 10001 --no-create-home chargewise
+    && useradd --system --uid 10001 --no-create-home chargewaze
 
-USER chargewise
+USER chargewaze
 
 # Render sets PORT; 8000 is the local default. --proxy-headers so client IPs and
 # https scheme come from Render's proxy. Migrations are not run here: the

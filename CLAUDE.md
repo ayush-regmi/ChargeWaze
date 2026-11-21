@@ -1,4 +1,4 @@
-# Chargewise agent instructions
+# ChargeWaze agent instructions
 
 Instructions for AI coding agents (Claude Code, Cursor, Codex, etc.) working in this repository. The rules themselves live in [`docs/engineering-guidelines.md`](docs/engineering-guidelines.md); this file only points to them and adds agent-specific behaviour.
 

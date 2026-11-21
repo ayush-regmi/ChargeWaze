@@ -9,7 +9,7 @@ import { formatRetention, type ConsentStatus, type PrivacySettings } from "./pri
 import { recordPrivacyConsent } from "./privacy-actions";
 
 /**
- * Profile "Privacy" (PRD §4.6): what Chargewise stores, how long, and the
+ * Profile "Privacy" (PRD §4.6): what ChargeWaze stores, how long, and the
  * user's answer to the privacy notice (`GET /api/v1/me/privacy`). Each answer
  * is stored as a new consent record, so the history stays auditable.
  */
@@ -25,7 +25,7 @@ export function PrivacyPanel({ privacy }: { privacy: PrivacySettings }) {
       <h2 className="text-sm font-medium">Privacy</h2>
       <div className="space-y-2 text-sm text-muted-foreground">
         <p>
-          Chargewise stores what your connected cars report through Smartcar (battery level,
+          ChargeWaze stores what your connected cars report through Smartcar (battery level,
           range, odometer, charging status, and location when the car sends it), the trips you
           plan, the drives inferred from those readings, and your favorite stations. Nothing is
           shared with other users.

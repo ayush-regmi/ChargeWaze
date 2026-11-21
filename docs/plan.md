@@ -1,4 +1,4 @@
-# Chargewise Master Plan: Remaining Work and Parallel Agent Sessions
+# ChargeWaze Master Plan: Remaining Work and Parallel Agent Sessions
 
 Status: **Approved 2026-11-18** (P4/P5 decision tables stay recommendations until P4-F0 / P5-F0) · Baseline: `main` at `314ae9e` (Phase 3 F0–F4 merged) · Owner: project lead
 
@@ -86,23 +86,23 @@ The four lanes as a list: **migration**, **dependency**, **CI**, **E2E harness**
 Each desktop session already gets its own git worktree. What the worktrees still share is the local Postgres container and the dev/E2E ports. Use a per-session slug (e.g. `p4-energy`, with `-` → `_` in database names):
 
 ```bash
-export TEST_DATABASE_URL="postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise_p4_energy_test"
+export TEST_DATABASE_URL="postgresql+psycopg://chargewaze:chargewaze@localhost:5432/chargewaze_p4_energy_test"
 ```
 
 ```bash
-export DATABASE_URL="postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise_p4_energy"
+export DATABASE_URL="postgresql+psycopg://chargewaze:chargewaze@localhost:5432/chargewaze_p4_energy"
 ```
 
 ```bash
-docker exec chargewise-postgres createdb -U chargewise chargewise_p4_energy
+docker exec chargewaze-postgres createdb -U chargewaze chargewaze_p4_energy
 ```
 
 - `TEST_DATABASE_URL`: pytest creates this database itself and refuses any name not ending in `_test` (`tests/conftest.py`). Verified 2026-11-17 with a scratch database.
-- `DATABASE_URL`: used by the Alembic round-trip. **Always set it explicitly**: `services/api/.env` points at hosted Supabase, and `alembic downgrade base` there would drop real data. The database must exist first (`createdb` above; verified 2026-11-17). Drop it when the feature merges: `docker exec chargewise-postgres dropdb -U chargewise chargewise_p4_energy`.
+- `DATABASE_URL`: used by the Alembic round-trip. **Always set it explicitly**: `services/api/.env` points at hosted Supabase, and `alembic downgrade base` there would drop real data. The database must exist first (`createdb` above; verified 2026-11-17). Drop it when the feature merges: `docker exec chargewaze-postgres dropdb -U chargewaze chargewaze_p4_energy`.
 - **E2E (Playwright)** defaults to ports 3100/8765/54399 and reuses already-running servers locally, so a second session on the defaults would silently test the first session's branch. Each session that runs Playwright sets its own ports and database (W0 added the port variables), for example:
 
 ```bash
-export E2E_WEB_PORT=3200 E2E_API_PORT=8865 E2E_AUTH_PORT=54499 E2E_DATABASE_URL="postgresql+psycopg://chargewise:chargewise@localhost:5432/chargewise_p4_energy_e2e"
+export E2E_WEB_PORT=3200 E2E_API_PORT=8865 E2E_AUTH_PORT=54499 E2E_DATABASE_URL="postgresql+psycopg://chargewaze:chargewaze@localhost:5432/chargewaze_p4_energy_e2e"
 ```
 
   The E2E database is created by the suite itself. Sessions pick ports by adding 100 per session (3200/8865/54499, 3300/8965/54599, …).
@@ -386,7 +386,7 @@ Phase 6 has no design session of its own; each feature's session proposes its pl
     - **Demo mode:** first, any real vehicle in the database gives `503 DEMO_MODE_UNSAFE` on every request (one `EXISTS` on `vehicles`; telemetry, plans and legs all cascade from a vehicle). Then every non-GET is refused with `403 FORBIDDEN` (`DEMO_READ_ONLY`), except `POST /routes/plan`, `/routes/directions` and `/stations/along-route`.
     - Settings refuse `APP_PUBLIC_DEMO_MODE=true` together with `SMARTCAR_CLIENT_SECRET` or `SMARTCAR_MANAGEMENT_TOKEN`.
   - **Demo access: one shared, seeded account (D1).** `NEXT_PUBLIC_DEMO_MODE`, `NEXT_PUBLIC_DEMO_EMAIL` and `NEXT_PUBLIC_DEMO_PASSWORD` (public on purpose) show **Explore the demo** on the sign-in page (`components/demo/demo-sign-in.tsx`). `components/demo/demo-banner.tsx` sits in `app/(app)/layout.tsx`. In demo mode Analytics includes simulated data by default, and `simulated=0` leaves it out (`components/analytics/params.ts`).
-  - **Seed.** `scripts/seed_demo.py --user-id UUID --target HOST/DB [--now ISO]`. It reads the process environment only, never `services/api/.env`. It refuses (exit 2) without `APP_PUBLIC_DEMO_MODE=true`, with a `--target` that doesn't match the URL's host/database, or when any of `vehicles`, `vehicle_telemetry`, `planned_trips` or `observed_trips` holds an `is_simulated = false` row. Re-running replaces the account's data (and clears a tombstone) in one transaction. On a Supabase database it also installs `chargewise_demo_auth_guard`, a `BEFORE UPDATE` trigger on `auth.users` that refuses changes to the demo user's password, email and phone. It refuses to seed if `--user-id` isn't an auth user or the trigger can't be created. This is the fix for Codex's P1 on #73: Supabase's "Secure password change" only applies to sessions older than 24 hours, so any visitor could have changed the shared password. The SQL is tested against a stand-in `auth.users` table, not a real Supabase project. What it writes:
+  - **Seed.** `scripts/seed_demo.py --user-id UUID --target HOST/DB [--now ISO]`. It reads the process environment only, never `services/api/.env`. It refuses (exit 2) without `APP_PUBLIC_DEMO_MODE=true`, with a `--target` that doesn't match the URL's host/database, or when any of `vehicles`, `vehicle_telemetry`, `planned_trips` or `observed_trips` holds an `is_simulated = false` row. Re-running replaces the account's data (and clears a tombstone) in one transaction. On a Supabase database it also installs `chargewaze_demo_auth_guard`, a `BEFORE UPDATE` trigger on `auth.users` that refuses changes to the demo user's password, email and phone. It refuses to seed if `--user-id` isn't an auth user or the trigger can't be created. This is the fix for Codex's P1 on #73: Supabase's "Secure password change" only applies to sessions older than 24 hours, so any visitor could have changed the shared password. The SQL is tested against a stand-in `auth.users` table, not a real Supabase project. What it writes:
     - A simulated 2026 Toyota bZ XLE AWD with catalog specs.
     - About 28 days of `source = 'simulated'` odometer, SoC, range and charging readings (about 3,300 rows): weekday commutes, Wednesday errands, weekend drives and home L2 charging.
     - A Frederick → Toronto road trip four days before `--now`. Its plan comes from the real `plan_trip()` over the recorded `fixtures/mapbox` and `fixtures/stations/afdc` files through `httpx.MockTransport` (no network), starting at 90 % and saved. The car then drives the plan, charging at its 3 stops, plus a day in Toronto and an unplanned drive home.

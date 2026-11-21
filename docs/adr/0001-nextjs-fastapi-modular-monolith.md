@@ -6,7 +6,7 @@
 
 ## Context
 
-Chargewise needs:
+ChargeWaze needs:
 
 - A production-quality web UI with routing, layouts, auth-friendly patterns, and a realistic React ecosystem.
 - Business logic for routing optimization, Smartcar integration, and (later) ML — all easier in Python.
@@ -22,7 +22,7 @@ Options for shape:
 
 ## Decision
 
-We will build Chargewise as:
+We will build ChargeWaze as:
 
 - **Next.js + TypeScript** frontend, used primarily as a frontend.
 - **FastAPI** backend organized as a **modular monolith** under `services/api/app/modules/*` and `services/api/app/integrations/*`.

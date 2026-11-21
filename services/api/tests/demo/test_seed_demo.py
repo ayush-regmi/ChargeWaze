@@ -156,8 +156,8 @@ def test_target_must_name_the_database() -> None:
 
 
 def test_cli_refuses_before_connecting(capsys: pytest.CaptureFixture[str]) -> None:
-    args = ["--user-id", str(DEMO_USER_ID), "--target", "localhost/chargewise_demo"]
-    live = make_settings(database_url="postgresql+psycopg://u:p@localhost:1/chargewise_demo")
+    args = ["--user-id", str(DEMO_USER_ID), "--target", "localhost/chargewaze_demo"]
+    live = make_settings(database_url="postgresql+psycopg://u:p@localhost:1/chargewaze_demo")
     assert seed_demo.main(args, settings_factory=lambda: live) == 2
     assert "APP_PUBLIC_DEMO_MODE" in capsys.readouterr().err
 

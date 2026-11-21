@@ -1,4 +1,4 @@
-"""Smartcar V3 HTTP client — the only code in Chargewise that talks to Smartcar.
+"""Smartcar V3 HTTP client — the only code in ChargeWaze that talks to Smartcar.
 
 V3 uses one application-level token (client credentials) for every user; the
 ``sc-user-id`` header picks whose vehicle a request is for. There are no

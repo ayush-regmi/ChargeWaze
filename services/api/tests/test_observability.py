@@ -199,7 +199,7 @@ def test_unhandled_route_error_is_scrubbed_before_sending(captured: _CaptureTran
         point = (lat, lon)
         settings = _settings(mapbox_secret_token=SECRET, smartcar_client_secret=SECRET)
         route = {"geometry_polyline6": POLYLINE6}
-        logging.getLogger("chargewise.test").info("planning for %s at %s", user_id, point)
+        logging.getLogger("chargewaze.test").info("planning for %s at %s", user_id, point)
         raise RuntimeError(f"no route for {user_id} near {point}: {route!r} ({settings.app_env})")
 
     sentry_sdk.set_user({"id": USER_ID})

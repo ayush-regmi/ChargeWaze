@@ -1,8 +1,8 @@
 {
-  "name": "@chargewise/api-client",
+  "name": "@chargewaze/api-client",
   "version": "0.0.0",
   "private": true,
-  "description": "Typed Chargewise API client. The `src/schema.d.ts` file is generated from the FastAPI OpenAPI document via `npm run generate`.",
+  "description": "Typed ChargeWaze API client. The `src/schema.d.ts` file is generated from the FastAPI OpenAPI document via `npm run generate`.",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

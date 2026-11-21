@@ -10,7 +10,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-col">
       <header className="flex h-14 items-center px-6">
-        <Link href="/dashboard" aria-label="Chargewise home">
+        <Link href="/dashboard" aria-label="ChargeWaze home">
           <Logo />
         </Link>
       </header>

@@ -10,7 +10,7 @@ export default function SignInPage() {
   return (
     <div className="space-y-8">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Sign in to Chargewise</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Sign in to ChargeWaze</h1>
         <p className="text-sm text-muted-foreground">
           Use your email and password or a social provider.
         </p>

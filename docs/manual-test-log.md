@@ -346,11 +346,11 @@ Record in: this row; screenshots on the P4-F9 PR (or a comment on it).
 Not a test, but left over from merged sessions (plan.md §2.4). Check what exists, then drop the ones for merged features:
 
 ```bash
-docker exec chargewise-postgres psql -U chargewise -lqt | cut -d '|' -f1 | grep chargewise_
+docker exec chargewaze-postgres psql -U chargewaze -lqt | cut -d '|' -f1 | grep chargewaze_
 ```
 
 ```bash
-docker exec chargewise-postgres dropdb -U chargewise <name>
+docker exec chargewaze-postgres dropdb -U chargewaze <name>
 ```
 
 Merged so far: `p3_stations`, `p3_charging`, `p3_planner`, `p3_favorites`, `p4_energy`, `p4_trips`, `p4_optimizer`, `p4_history`, `p4_prefs`, `p4_plan_endpoint`, `p4_planner_ui`, `p4_closeout`, `p4_vehicle_baseline`, `p5_inference`, `p5_observed_schema`, `p5_trip_ingestion`, `p5_analytics_api`, `p6_sentry` (exact names vary by session; each has `_test` and sometimes `_e2e` twins). Leave the ones for the W7 sessions (P5-F4, P5-F6, P5-F7, P6-F3), which are running now.

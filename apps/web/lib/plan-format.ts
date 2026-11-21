@@ -6,7 +6,7 @@
  *
  * Nothing here recomputes a plan: every number shown comes from the API.
  */
-import type { components } from "@chargewise/api-client";
+import type { components } from "@chargewaze/api-client";
 
 import type { Preferences, PreferencesBody } from "@/components/profile/preferences";
 import { formatSoc } from "@/components/trips/plan-payload";

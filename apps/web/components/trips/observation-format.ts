@@ -7,7 +7,7 @@
  * generated client (P5-F4), so the API's validation is the shape check here.
  */
 
-import type { components } from "@chargewise/api-client";
+import type { components } from "@chargewaze/api-client";
 
 import type { StoredPlan } from "./plan-payload";
 

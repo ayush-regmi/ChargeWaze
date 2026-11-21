@@ -1,6 +1,6 @@
 # Deployment
 
-How Chargewise runs in production, and the one-time setup the project lead does by hand. Built in P6-F3 ([`plan.md`](plan.md) §4.4); hosts follow [`architecture.md`](architecture.md#7-deployment) §7.
+How ChargeWaze runs in production, and the one-time setup the project lead does by hand. Built in P6-F3 ([`plan.md`](plan.md) §4.4); hosts follow [`architecture.md`](architecture.md#7-deployment) §7.
 
 | Piece | Where | Config in this repo |
 |---|---|---|
@@ -48,7 +48,7 @@ Row level security is turned on by the migrations themselves (guidelines → Sec
 
 ## 3. Render (API)
 
-1. In Render: **New → Blueprint**. Connect the GitHub repository and pick branch `main`. Render reads `render.yaml` and proposes one web service, `chargewise-api` (Docker, free plan, Oregon).
+1. In Render: **New → Blueprint**. Connect the GitHub repository and pick branch `main`. Render reads `render.yaml` and proposes one web service, `chargewise-api` (Docker, free plan, Oregon). The service keeps its pre-rename name and URL, `chargewise-api.onrender.com`, on purpose ([ADR 0011](adr/0011-rename-to-chargewaze.md)): a Render service URL never changes, and renaming it in the Blueprint would create a second service.
 2. Fill in the values Render asks for. These are the `sync: false` keys; Render only asks for them when the Blueprint is first created. After that, change them under the service's **Environment** tab.
 
    | Key | Value |
@@ -102,8 +102,24 @@ Row level security is turned on by the migrations themselves (guidelines → Sec
 3. Note three values for GitHub (§5):
    - **Project ID**: Settings → General → Project ID (`prj_…`).
    - **Team/Org ID**: team Settings → General → Team ID. For a personal account, use the user ID under Account Settings.
-   - **Production URL**, e.g. `https://chargewise.vercel.app`. This is `<web-domain>` in §2, §3 and §6.
+   - **Production URL**: `https://chargewaze.vercel.app`. This is `<web-domain>` in §2, §3 and §6. The first deploy used `chargetrip.vercel.app`; it is now an alias that redirects (`307`, path and query kept) to the main domain.
 4. Create a token: Account Settings → **Tokens**, scoped to the team that owns the project.
+
+**Changing the web domain later.** The web origin is listed in seven places, and the browser blocks every API call while Render's `ALLOWED_ORIGINS` lacks it. Update all of them:
+
+| Where | Setting |
+|---|---|
+| Render (§3) | `ALLOWED_ORIGINS` (keep the old origin too while it still serves pages), `SMARTCAR_REDIRECT_URI` |
+| Supabase (§2) | Site URL, Redirect URLs (`/auth/callback`) |
+| Smartcar (§6) | Redirect URI, matching `SMARTCAR_REDIRECT_URI` exactly |
+| Mapbox | The public token's URL restrictions |
+| GitHub (§5) | Variable `WEB_URL` |
+
+Check CORS from outside afterwards. It must print `access-control-allow-origin: https://<web-domain>`; the API answers `400 Disallowed CORS origin` otherwise:
+
+```bash
+curl -s -i -X OPTIONS https://<api-domain>/api/v1/me -H "Origin: https://<web-domain>" -H "Access-Control-Request-Method: GET" | grep -iE "^HTTP|access-control-allow-origin"
+```
 
 ## 5. GitHub environment `production`
 
@@ -302,10 +318,10 @@ Setup, all by hand:
    APP_PUBLIC_DEMO_MODE=true DATABASE_URL='<demo session-pooler URL>' uv run python scripts/seed_demo.py --user-id <demo User UID> --target aws-0-<region>.pooler.supabase.com/postgres
    ```
 
-   On a Supabase database the seed also installs `chargewise_demo_auth_guard`, a `BEFORE UPDATE` trigger on `auth.users` (function `public.chargewise_demo_auth_guard`). It refuses any change to the demo user's password, email or phone, so a visitor holding the shared credentials can't lock everyone else out: Supabase answers their `updateUser` with an error. The seed refuses to write anything if `--user-id` isn't an auth user or the trigger can't be created. Its output says "Auth guard installed on auth.users". To rotate the demo password yourself:
+   On a Supabase database the seed also installs `chargewaze_demo_auth_guard`, a `BEFORE UPDATE` trigger on `auth.users` (function `public.chargewaze_demo_auth_guard`). It refuses any change to the demo user's password, email or phone, so a visitor holding the shared credentials can't lock everyone else out: Supabase answers their `updateUser` with an error. The seed refuses to write anything if `--user-id` isn't an auth user or the trigger can't be created. Its output says "Auth guard installed on auth.users". To rotate the demo password yourself:
 
    ```sql
-   DROP TRIGGER chargewise_demo_auth_guard ON auth.users;
+   DROP TRIGGER chargewaze_demo_auth_guard ON auth.users;
    ```
 
    Then change the password in the dashboard and run the seed again, which re-creates the trigger. What the guard doesn't stop: a visitor can sign the shared account out everywhere (other visitors just click **Explore the demo** again) or enroll an MFA factor (sign-in still gives the AAL1 session the app uses).

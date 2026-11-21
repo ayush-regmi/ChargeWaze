@@ -1,4 +1,4 @@
-"""Chargewise error envelope.
+"""ChargeWaze error envelope.
 
 Every non-2xx response the API emits uses this shape. See
 ``docs/api-contracts.md`` section 1.1 for the full codes table.
@@ -59,7 +59,7 @@ def _envelope(code: str, message: str, details: dict[str, Any] | None = None) ->
 
 
 def register_error_handlers(app: FastAPI) -> None:
-    """Register handlers that coerce every error into the Chargewise envelope."""
+    """Register handlers that coerce every error into the ChargeWaze envelope."""
 
     @app.exception_handler(ApiError)
     async def _handle_api_error(_: Request, exc: ApiError) -> JSONResponse:

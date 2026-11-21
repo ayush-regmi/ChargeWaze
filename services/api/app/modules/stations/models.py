@@ -6,7 +6,7 @@ no drift.
 
 The table is a global cache of provider data, not the source of truth: searches
 always go to the provider and upsert here on ``(provider, external_id)``, which
-keeps each station's Chargewise ``id`` stable across fetches.
+keeps each station's ChargeWaze ``id`` stable across fetches.
 """
 
 from __future__ import annotations

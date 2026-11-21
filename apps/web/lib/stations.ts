@@ -7,7 +7,7 @@
  * them (PRD §7, D9).
  */
 
-import type { components } from "@chargewise/api-client";
+import type { components } from "@chargewaze/api-client";
 
 import { haversineKm, roundCoord, type Point } from "@/lib/geo-format";
 import { milesToKm, type UnitSystem } from "@/lib/units";

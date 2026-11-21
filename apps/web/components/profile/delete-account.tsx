@@ -70,7 +70,7 @@ export function DeleteAccount() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete your account?</AlertDialogTitle>
             <AlertDialogDescription>
-              All of your Chargewise data is deleted right away and your cars are disconnected.
+              All of your ChargeWaze data is deleted right away and your cars are disconnected.
               You&apos;ll be signed out.
             </AlertDialogDescription>
           </AlertDialogHeader>

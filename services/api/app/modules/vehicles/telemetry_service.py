@@ -508,7 +508,7 @@ def apply_to_latest_state(
 
 def _telemetry_code(signal: NormalizedSignal) -> str:
     # Unmapped signals keep Smartcar's code so nothing is lost and they can't
-    # collide with Chargewise codes (which never contain a hyphen).
+    # collide with ChargeWaze codes (which never contain a hyphen).
     return signal.code if signal.code is not None else signal.smartcar_code
 
 

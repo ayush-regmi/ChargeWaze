@@ -1,6 +1,6 @@
 "use server";
 
-import type { components } from "@chargewise/api-client";
+import type { components } from "@chargewaze/api-client";
 
 import { createApi } from "@/lib/api";
 import { stationsErrorCode, type StationsErrorCode } from "@/lib/stations";

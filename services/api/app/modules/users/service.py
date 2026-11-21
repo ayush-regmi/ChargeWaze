@@ -51,7 +51,7 @@ def get_or_create_profile(
 ) -> Profile:
     """Return the caller's ``profiles`` row, creating it lazily on first visit.
 
-    Supabase owns identity; Chargewise records ``profiles.id`` equal to the
+    Supabase owns identity; ChargeWaze records ``profiles.id`` equal to the
     Supabase ``auth.users.id`` on the first authenticated request from a given
     user. Default ``user_preferences`` are seeded in the same transaction.
 

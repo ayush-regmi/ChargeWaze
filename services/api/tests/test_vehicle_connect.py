@@ -423,7 +423,7 @@ def test_callback_external_id_mismatch_in_redirect(api: TestClient, db: Session)
     assert _vehicles(db) == []
 
 
-def test_callback_rejects_connections_of_another_chargewise_user(
+def test_callback_rejects_connections_of_another_chargewaze_user(
     api: TestClient, db: Session, smartcar: FakeSmartcar
 ) -> None:
     """A valid state plus someone else's Smartcar user ID must not attach their car."""
@@ -598,7 +598,7 @@ def test_callback_redirect_never_leaves_the_site(api: TestClient) -> None:
 
     forged = jwt.encode(
         {
-            "iss": "chargewise-api",
+            "iss": "chargewaze-api",
             "aud": "smartcar-connect",
             "sub": str(TEST_USER_ID),
             "ra": "//evil.example",

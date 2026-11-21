@@ -1,4 +1,4 @@
-import type { components } from "@chargewise/api-client";
+import type { components } from "@chargewaze/api-client";
 
 import { KM_PER_MILE, type UnitSystem } from "@/lib/units";
 

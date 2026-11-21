@@ -1,4 +1,4 @@
-import type { components } from "@chargewise/api-client";
+import type { components } from "@chargewaze/api-client";
 
 import { parseFilters, serializeFilters } from "@/lib/stations";
 

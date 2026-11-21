@@ -1,4 +1,4 @@
-"""Map Mapbox transport and HTTP failures onto the Chargewise error envelope.
+"""Map Mapbox transport and HTTP failures onto the ChargeWaze error envelope.
 
 Callers never see ``httpx`` exceptions: the client converts them here. Mapbox
 error *messages* are never passed on; they can echo the request.

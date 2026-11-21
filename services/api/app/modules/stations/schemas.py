@@ -64,7 +64,7 @@ class StationOut(BaseModel):
     # Never fabricated: no provider gives verified live data in Phase 3.
     live_availability: None = None
     source_updated_at: datetime | None
-    # When Chargewise last fetched this station (the ``recorded_at`` of §1).
+    # When ChargeWaze last fetched this station (the ``recorded_at`` of §1).
     fetched_at: datetime
     is_stale: bool
 
