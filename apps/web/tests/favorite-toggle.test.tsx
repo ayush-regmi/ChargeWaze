@@ -65,6 +65,12 @@ describe("FavoriteToggle", () => {
     expect(onCardClick).not.toHaveBeenCalled();
   });
 
+  it("draws the star in a valid 20x20 viewBox", () => {
+    render(<FavoriteToggle stationId={ID} stationName="Kehne DC" favorite={false} />);
+    const svg = screen.getByRole("button", { name: "Add Kehne DC to favorites" }).querySelector("svg");
+    expect(svg).toHaveAttribute("viewBox", "0 0 20 20");
+  });
+
   it("follows a new value from the server", () => {
     const { rerender } = render(<FavoriteToggle stationId={ID} stationName="Kehne DC" favorite={false} />);
     rerender(<FavoriteToggle stationId={ID} stationName="Kehne DC" favorite />);

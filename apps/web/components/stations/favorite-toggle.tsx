@@ -10,7 +10,7 @@ function StarIcon({ filled }: { filled: boolean }) {
   return (
     <svg
       aria-hidden="true"
-      viewBox="0 20"
+      viewBox="0 0 20 20"
       className="size-5"
       fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
