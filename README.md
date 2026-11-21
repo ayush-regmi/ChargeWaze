@@ -28,40 +28,40 @@ Screenshots of each page are in [the tour below](#screenshots).
 The Next.js app only talks to one backend, a FastAPI modular monolith. Every third-party call (Smartcar, Mapbox with the secret token, AFDC, Supabase admin) goes through an adapter in `services/api/app/integrations/`. The only exceptions are the map tiles and the sign-in flow, which the browser reaches with public keys. More detail is in [`docs/architecture.md`](docs/architecture.md).
 
 ```mermaid
-flowchart LR
-    subgraph Browser
-        Web["Next.js web app<br/>(Vercel)"]
-        GL["Mapbox GL JS<br/>public token"]
+flowchart TB
+    subgraph Browser["Browser"]
+        Web["Next.js web app (Vercel)"]
+        GL["Mapbox GL JS, public token"]
     end
 
     subgraph API["FastAPI modular monolith (Render, Docker)"]
-        direction TB
-        Gate["auth: Supabase JWT,<br/>live allowlist / demo gate,<br/>rate limits"]
-        Mods["vehicles · trips · places · stations<br/>routing + energy · analytics · users"]
-        Adapters["integrations/*<br/>smartcar · mapbox · stations (AFDC) · supabase admin"]
-        Gate --> Mods --> Adapters
+        Gate["auth: Supabase JWT, live allowlist or demo gate, rate limits"]
+        Hook["webhooks: HMAC check, dedup by event ID"]
+        Mods["modules: vehicles, trips, places, stations, routing + energy, analytics, users"]
+        Adapters["integrations/*: smartcar, mapbox, stations (AFDC), supabase admin"]
+        Gate --> Mods
+        Hook --> Mods
+        Mods --> Adapters
     end
 
-    DB[("Postgres<br/>(Supabase)")]
-    SupaAuth["Supabase Auth"]
-    Smartcar["Smartcar V3"]
-    Mapbox["Mapbox Directions,<br/>Search Box"]
-    AFDC["AFDC stations<br/>(US + Canada)"]
-    Sentry["Sentry"]
-    GHA["GitHub Actions<br/>CI · deploy · smoke"]
+    subgraph Providers["Third-party APIs"]
+        Smartcar["Smartcar V3"]
+        Mapbox["Mapbox Directions, Search Box, tiles"]
+        AFDC["AFDC stations, US + Canada"]
+    end
 
-    Web -->|"HTTPS + JWT<br/>/api/v1/*"| Gate
-    Web -->|sign-in| SupaAuth
+    DB[("Postgres + Auth (Supabase)")]
+    Ops["Sentry (scrubbed errors), GitHub Actions (CI, deploy, smoke)"]
+
+    Web -->|"HTTPS + JWT, /api/v1/*"| Gate
+    Web -->|sign-in| DB
     GL -->|tiles| Mapbox
-    Gate -.->|JWKS| SupaAuth
     Mods <--> DB
     Adapters --> Smartcar
     Adapters --> Mapbox
     Adapters --> AFDC
-    Smartcar -->|"signed webhooks"| API
-    API -.->|scrubbed errors| Sentry
-    Web -.->|scrubbed errors| Sentry
-    GHA -->|"migrate, deploy,<br/>smoke /health, /metrics"| API
+    Smartcar -->|signed webhooks| Hook
+    API -.-> Ops
 ```
 
 The public demo is a second copy of the same stack: its own Supabase project, Render service and Vercel project. The API runs with `APP_PUBLIC_DEMO_MODE=true`, which refuses to start with Smartcar secrets, is read-only except trip planning, and serves nothing if its database holds a real vehicle ([`architecture.md`](docs/architecture.md) §7.2).
