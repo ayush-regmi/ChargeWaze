@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { createApi, type ApiClient } from "@/lib/api";
+import { isDemoEmail } from "@/lib/demo";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 
 /**
@@ -16,4 +17,16 @@ export async function requireSessionApi(next: string): Promise<ApiClient> {
     redirect(`/sign-in?next=${encodeURIComponent(next)}`);
   }
   return createApi({ accessToken: session.access_token });
+}
+
+/**
+ * Whether the signed-in user is the public demo account (`lib/demo.ts`).
+ * False with no session. Server-only; for display, the API enforces the rules.
+ */
+export async function sessionIsDemo(): Promise<boolean> {
+  const supabase = await createSupabaseClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return isDemoEmail(session?.user.email);
 }

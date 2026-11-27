@@ -1,10 +1,10 @@
-"""Seed the public demo database with simulated data (P6-F2, database-design.md §5).
+"""Seed the public demo account with simulated data (P6-F2, ADR 0012, database-design.md §5).
 
-  APP_PUBLIC_DEMO_MODE=true DATABASE_URL=postgresql+psycopg://… \\
+  DEMO_USER_ID=<demo auth user UUID> DATABASE_URL=postgresql+psycopg://… \\
     uv run python scripts/seed_demo.py --user-id <demo auth user UUID> --target HOST/DBNAME
 
-Gives the demo account (a Supabase auth user you create in the demo project)
-one simulated 2026 Toyota bZ XLE AWD and about four weeks of history:
+Gives the demo account (a Supabase auth user you create in the production
+project; architecture.md §7.2) one simulated 2026 Toyota bZ XLE AWD and about four weeks of history:
 weekday commutes, weekend errands, home charging, and a Frederick, MD →
 Toronto, ON road trip with DC fast-charging stops and a drive back.
 
@@ -21,14 +21,19 @@ Toronto, ON road trip with DC fast-charging stops and a drive back.
   account's data (vehicles cascade to telemetry, plans and legs); run it daily
   if the demo should keep looking recent.
 
-Refuses to run (exit 2) unless all of these hold, because demo data must never
-be mixed into a database with real data (architecture.md §7.2):
+The demo account shares the database with real accounts, and the seed only
+ever deletes or writes that one account's rows. It refuses to run (exit 2)
+unless all of these hold, so it can never touch a real account:
 
-1. ``APP_PUBLIC_DEMO_MODE=true`` in the environment. Settings are read from
-   the process environment only, never from ``services/api/.env``.
+1. ``DEMO_USER_ID`` is set in the environment and equals ``--user-id``.
+   Settings are read from the process environment only, never from
+   ``services/api/.env``, and they refuse a ``DEMO_USER_ID`` that is also in
+   ``LIVE_ALLOWED_USER_IDS``.
 2. ``--target`` equals the database URL's ``host/database``.
-3. No row in ``vehicles``, ``vehicle_telemetry``, ``planned_trips`` or
-   ``observed_trips`` has ``is_simulated = false``.
+3. The account owns no real data: none of its vehicles, their telemetry or
+   their observed trips has ``is_simulated = false``. (Its planned trips
+   aren't checked: visitors plan trips on the demo car, and the seed replaces
+   them.)
 4. On a Supabase database (one with ``auth.users``): ``--user-id`` is an
    auth user, and the auth guard below can be installed.
 
@@ -117,10 +122,10 @@ _SMARTCAR_CODE = {
 _UNIT = {"soc": "percent", "range": "km", "odometer": "km", "charging_status": "bool"}
 
 REAL_DATA_CHECK = text(
-    "SELECT EXISTS (SELECT 1 FROM vehicles WHERE NOT is_simulated)"
-    " OR EXISTS (SELECT 1 FROM vehicle_telemetry WHERE NOT is_simulated)"
-    " OR EXISTS (SELECT 1 FROM planned_trips WHERE NOT is_simulated)"
-    " OR EXISTS (SELECT 1 FROM observed_trips WHERE NOT is_simulated)"
+    "SELECT EXISTS (SELECT 1 FROM vehicles WHERE user_id = :user_id AND NOT is_simulated)"
+    " OR EXISTS (SELECT 1 FROM vehicle_telemetry t JOIN vehicles v ON v.id = t.vehicle_id"
+    "            WHERE v.user_id = :user_id AND NOT t.is_simulated)"
+    " OR EXISTS (SELECT 1 FROM observed_trips WHERE user_id = :user_id AND NOT is_simulated)"
 )
 
 
@@ -144,12 +149,16 @@ class SeedSummary:
 # ---------------------------------------------------------------------------
 
 
-def check_settings(settings: Settings) -> None:
-    if not settings.app_public_demo_mode:
+def check_settings(settings: Settings, user_id: uuid.UUID) -> None:
+    if settings.demo_user_id is None:
         raise SeedRefused(
-            "APP_PUBLIC_DEMO_MODE is not true. The demo seed only runs against a demo "
-            "deployment's database."
+            "DEMO_USER_ID is not set. The seed only writes the account the API treats as "
+            "the read-only public demo."
         )
+    if user_id != settings.demo_user_id:
+        raise SeedRefused(f"--user-id {user_id} isn't DEMO_USER_ID ({settings.demo_user_id}).")
+    if user_id in settings.live_allowlist:
+        raise SeedRefused(f"--user-id {user_id} is in LIVE_ALLOWED_USER_IDS.")
 
 
 def check_target(url: URL, target: str) -> None:
@@ -158,11 +167,11 @@ def check_target(url: URL, target: str) -> None:
         raise SeedRefused(f"--target {target!r} doesn't match DATABASE_URL ({actual!r}).")
 
 
-def check_no_real_data(db: Session) -> None:
-    if db.execute(REAL_DATA_CHECK).scalar_one():
+def check_no_real_data(db: Session, user_id: uuid.UUID) -> None:
+    if db.execute(REAL_DATA_CHECK, {"user_id": user_id}).scalar_one():
         raise SeedRefused(
-            "This database has real (is_simulated = false) vehicles, telemetry or trips. "
-            "Demo data never goes into a database with real data."
+            f"Account {user_id} has real (is_simulated = false) vehicles, telemetry or "
+            "observed trips. The seed only replaces the data of an account with none."
         )
 
 
@@ -476,8 +485,8 @@ def seed(
     """Replace ``user_id``'s data with the demo history. Flushes; the caller commits."""
 
     current = (now or datetime.now(UTC)).astimezone(UTC)
-    check_settings(settings)
-    check_no_real_data(db)
+    check_settings(settings, user_id)
+    check_no_real_data(db, user_id)
     catalog = lookup_spec(DEMO_MAKE, DEMO_MODEL, DEMO_YEAR)
     if (
         catalog is None
@@ -637,7 +646,7 @@ def main(
     settings = (settings_factory or (lambda: Settings(_env_file=None)))()  # type: ignore[call-arg]
     url = make_url(settings.database_url)
     try:
-        check_settings(settings)
+        check_settings(settings, args.user_id)
         check_target(url, args.target)
         engine = create_engine(url)
         try:

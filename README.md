@@ -6,7 +6,7 @@ ChargeWaze is a full-stack EV route planner and vehicle-analytics app. It reads 
 
 Once you've driven, ChargeWaze compares what it predicted with what the car reported.
 
-**Live:** [chargewaze.vercel.app](https://chargewaze.vercel.app). Sign-in is limited to an allowlist, because the production app holds real vehicle data. A public demo with simulated data is described in [`docs/demo-script.md`](docs/demo-script.md); its URL is pending (see [Status](#status)).
+**Live:** [chargewaze.vercel.app](https://chargewaze.vercel.app). Sign-in is limited to an allowlist, because the production app holds real vehicle data. Anyone else can click **Explore the demo** on the sign-in page: a shared, read-only account with a simulated car and trips ([`docs/demo-script.md`](docs/demo-script.md)), once it's switched on (M-18, see [Status](#status)).
 
 ![Trip Planner: Frederick, MD to Toronto, ON with three charging stops (simulated vehicle, recorded route and station data)](docs/images/trip-planner.png)
 
@@ -64,7 +64,7 @@ flowchart TB
     API -.-> Ops
 ```
 
-The public demo is a second copy of the same stack: its own Supabase project, Render service and Vercel project. The API runs with `APP_PUBLIC_DEMO_MODE=true`, which refuses to start with Smartcar secrets, is read-only except trip planning, and serves nothing if its database holds a real vehicle ([`architecture.md`](docs/architecture.md) §7.2).
+The public demo is one shared account in the production deployment (`DEMO_USER_ID`, [ADR 0012](docs/adr/0012-demo-account-in-production.md)). It is read-only except trip planning, sees only its own simulated rows (every query is scoped to the caller), and can't connect a car ([`architecture.md`](docs/architecture.md) §7.2).
 
 ### How the planner works
 
@@ -100,7 +100,7 @@ All screenshots come from a local run in demo mode, seeded with [`seed_demo.py`]
 
 | | |
 |---|---|
-| ![Sign-in page with the "Explore the demo" card](docs/images/sign-in-demo.png) **Sign-in.** The demo deployment adds a one-click demo account. | ![Dashboard with the simulated Toyota bZ's battery and range, marked stale](docs/images/dashboard.png) **Dashboard.** The latest reading with its timestamp, marked stale once it's older than 15 minutes. |
+| ![Sign-in page with the "Explore the demo" card](docs/images/sign-in-demo.png) **Sign-in.** **Explore the demo** signs in to a shared demo account. | ![Dashboard with the simulated Toyota bZ's battery and range, marked stale](docs/images/dashboard.png) **Dashboard.** The latest reading with its timestamp, marked stale once it's older than 15 minutes. |
 | ![Saved Frederick to Toronto trip with planned vs actual energy](docs/images/trip-planned-vs-actual.png) **Saved trip.** The plan next to the four drives matched to it. | ![Observed drives with high, medium and low quality badges](docs/images/observed-drives.png) **Observed drives.** Drives inferred from telemetry, each graded with a reason. |
 | ![Analytics with weekly consumption and estimated vs observed energy](docs/images/analytics.png) **Analytics.** Consumption over time and prediction error, with simulated data labeled. | ![Trip Planner with charging stops](docs/images/trip-planner.png) **Trip Planner.** Stops, charge at each arrival, and total time. |
 
@@ -115,7 +115,7 @@ ChargeWaze is in Phase 6 of six ([`docs/development-roadmap.md`](docs/developmen
 | 3 Maps and chargers | Code complete. Waits on real-key checks M-03 to M-06. |
 | 4 Charging-aware planner | Code complete. Waits on M-07 and M-10 (saved-trip pages and a real-key plan with the car). |
 | 5 History and analytics | Code complete. Waits on M-11 (real drives produce legs). |
-| 6 Production and portfolio | Production deployed and smoke-tested (M-14, 2026-11-21). The public demo deployment is M-18. |
+| 6 Production and portfolio | Production deployed and smoke-tested (M-14, 2026-11-21). The public demo account on production is M-18. |
 
 Test suites on `main` at `0d7b27b`, run locally on 2026-11-21: 1,546 pytest tests, 513 Vitest tests (51 files) and 17 Playwright tests passed; ruff, mypy, ESLint and `tsc` were clean. The API has 33 OpenAPI paths (37 operations).
 
@@ -175,7 +175,7 @@ npm run test:e2e --workspace=apps/web
 
 The backend tests need the local Postgres container. The Playwright suite starts its own API, web app, Supabase Auth stub and a Mapbox/AFDC stub that serves recorded responses, so it needs no keys. Ports and test databases are in [`docs/engineering-guidelines.md`](docs/engineering-guidelines.md#commands).
 
-To try demo mode locally, seed a separate database with `scripts/seed_demo.py` (the flags are in [`docs/deployment.md`](docs/deployment.md) §13.2). It refuses to run against a database that holds real data.
+To try the demo locally, create a user, set `DEMO_USER_ID` to its ID and seed it with `scripts/seed_demo.py` (the flags are in [`docs/deployment.md`](docs/deployment.md) §13.2). The seed only touches that account and refuses one that holds real data.
 
 ## Repository layout
 

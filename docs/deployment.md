@@ -69,7 +69,7 @@ Row level security is turned on by the migrations themselves (guidelines → Sec
    | `SENTRY_DSN_BACKEND` | DSN of the Sentry **backend** project (§7). Leave empty to keep Sentry off. |
    | `MONITORING_METRICS_TOKEN` | A random string (`openssl rand -hex 32`) that guards `GET /metrics` (§12). Same value as the GitHub secret. Leave empty to hide the endpoint. |
 
-   The Blueprint sets `APP_ENV=production`, `APP_PUBLIC_DEMO_MODE=false`, `SMARTCAR_MODE=live` and `SUPABASE_JWT_AUDIENCE=authenticated`. It also generates random values for `SMARTCAR_STATE_SECRET` and `STATIONS_CURSOR_SECRET`. Every other setting uses its default from `app/core/config.py`. `SMARTCAR_REFRESH_MIN_INTERVAL_MINUTES` (15) and `SMARTCAR_REFRESH_MAX_PER_DAY` (8) bound the user-triggered Refresh ([ADR 0010](adr/0010-on-demand-vehicle-refresh.md)). Lower the daily cap if the Smartcar plan's monthly per-vehicle allowance is below about 250.
+   The Blueprint sets `APP_ENV=production`, `SMARTCAR_MODE=live` and `SUPABASE_JWT_AUDIENCE=authenticated`. It also generates random values for `SMARTCAR_STATE_SECRET` and `STATIONS_CURSOR_SECRET`. Every other setting uses its default from `app/core/config.py`. `SMARTCAR_REFRESH_MIN_INTERVAL_MINUTES` (15) and `SMARTCAR_REFRESH_MAX_PER_DAY` (8) bound the user-triggered Refresh ([ADR 0010](adr/0010-on-demand-vehicle-refresh.md)). Lower the daily cap if the Smartcar plan's monthly per-vehicle allowance is below about 250.
 3. Render deploys once when the Blueprint is created. That's fine: `/health` doesn't touch the database. The first real deploy (§8) runs the migrations.
 4. Note two values for GitHub (§5):
    - **Service ID**: the `srv-…` part of the service's dashboard URL.
@@ -222,8 +222,9 @@ Changing a `NEXT_PUBLIC_*` value only takes effect after the next web build: re-
 - Server-only (Render, GitHub), from P6-F4: `MONITORING_METRICS_TOKEN`.
 - Server-only (Render, GitHub), from P6-F5: `SUPABASE_SERVICE_ROLE_KEY`. GitHub has it, with `SMARTCAR_CLIENT_ID` and `SMARTCAR_CLIENT_SECRET`, only for the retention workflow (§14). It bypasses row level security, so it never goes in Vercel, a `NEXT_PUBLIC_*` variable or the browser bundle (the deploy workflow fails if the name shows up there).
 - Build-time only (Vercel, Sensitive): `SENTRY_AUTH_TOKEN`.
-- Public (Vercel, `NEXT_PUBLIC_*`): API base URL, Supabase URL and anon key, Mapbox public token, web Sentry DSN, auth toggles. On the demo deployment only (§13): `NEXT_PUBLIC_DEMO_MODE` and the shared demo account's `NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD`, which are public on purpose.
+- Public (Vercel, `NEXT_PUBLIC_*`): API base URL, Supabase URL and anon key, Mapbox public token, web Sentry DSN, auth toggles. For the public demo account (§13.2): `NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD`, which are public on purpose.
 - Not secret, but required on the production API: `LIVE_ALLOWED_USER_IDS` (§3).
+- Not secret, optional on the production API: `DEMO_USER_ID`, the public demo account (§13.2).
 
 ## 12. Monitoring and alerts (from P6-F4)
 
@@ -284,67 +285,59 @@ No pager. Three channels, set up once:
 - `RATE_LIMIT_ENABLED=false` on Render: no per-user limits.
 - Disable the smoke workflow under **Actions → Smoke (production) → ⋯ → Disable workflow**.
 
-## 13. Live allowlist and the public demo (from P6-F2)
+## 13. Live allowlist and the public demo account (from P6-F2, ADR 0012)
 
-Architecture §7.2: a deployment runs either **private live mode** or **public demo mode**, chosen by `APP_PUBLIC_DEMO_MODE`. The two never share a database. The gate is in `app/modules/auth/access.py` and runs inside `get_current_user`, so it covers every signed-in route. Webhooks and `/health` aren't gated.
+Architecture §7.2 and [ADR 0012](adr/0012-demo-account-in-production.md): the production deployment serves real accounts on the live allowlist and one shared, read-only **demo account**, from the same database. The gate is in `app/modules/auth/access.py` and runs inside `get_current_user`, so it covers every signed-in route. Webhooks and `/health` aren't gated.
 
-### 13.1 Live mode (the production service above)
+### 13.1 Live allowlist
 
-- Only the Supabase user IDs in `LIVE_ALLOWED_USER_IDS` are served. Anyone else who signs in gets `403 FORBIDDEN` with `details.reason = "LIVE_ACCESS_RESTRICTED"`.
+- Only the Supabase user IDs in `LIVE_ALLOWED_USER_IDS` are served, plus the demo account (§13.2). Anyone else who signs in gets `403 FORBIDDEN` with `details.reason = "LIVE_ACCESS_RESTRICTED"`.
 - **The list must be set before the first deploy.** With `APP_ENV=production`, an empty list fails closed and locks everyone out, the owner included. In development and test, an empty list means no restriction.
 - To find your ID: Supabase → Authentication → Users → your row → **User UID**. To add someone, append their ID with a comma and redeploy (Render restarts the service with the new value).
 
-### 13.2 Public demo (optional second deployment)
+### 13.2 Public demo account (optional)
 
-The demo is a separate API service, web project and database. A recruiter signs in with one shared demo account, sees a simulated 2026 Toyota bZ with about four weeks of drives, a saved Frederick → Toronto road trip matched to its drive, and analytics. They can also plan new trips live.
+A recruiter clicks **Explore the demo** on the production sign-in page and signs in to one shared demo account. They see a simulated 2026 Toyota bZ with about four weeks of drives, a saved Frederick → Toronto road trip matched to its drive, and analytics, and they can plan new trips live. Your own account works as before and never sees the banner.
 
-In demo mode the API:
+For the demo account (`DEMO_USER_ID`) the API:
 
-- **Refuses to start** if `SMARTCAR_CLIENT_SECRET` or `SMARTCAR_MANAGEMENT_TOKEN` is set. No real car can be connected and no webhook can be verified.
-- **Is read-only except planning.** Every write answers `403 FORBIDDEN` with `details.reason = "DEMO_READ_ONLY"`, except `POST /routes/plan`, `POST /routes/directions` and `POST /stations/along-route`. Because the account is shared, one visitor can't delete trips, change preferences or delete the account for the next one.
-- **Serves nothing while the database holds a real vehicle.** Every signed-in request gets `503 DEMO_MODE_UNSAFE` and an error is logged. Turning demo mode on against the production database exposes nothing.
-- **Shares the planner rate limit** across all visitors, because they're one user (30 plans an hour by default, P6-F4).
+- **Is read-only except planning.** Every write answers `403 FORBIDDEN` with `details.reason = "DEMO_READ_ONLY"`, except `POST /routes/plan`, `POST /routes/directions` and `POST /stations/along-route`. Because the account is shared, one visitor can't delete trips, change preferences or delete the account for the next one. Connecting a car (`POST /vehicles/connect`) and Refresh are writes too, so no real car can be attached to it.
+- **Only ever returns its own rows**, like any account: every query is scoped to the caller, and another account's IDs answer `404`. Everything the seed writes is `is_simulated = true`.
+- **Serves nothing if the demo account itself owns a real vehicle.** Its requests get `503 DEMO_MODE_UNSAFE` and an error is logged. Other accounts aren't affected.
+- **Shares the planner rate limit** across all visitors, because they're one user (30 plans an hour by default, P6-F4). Their plans use the production Mapbox and AFDC quotas.
 
 Setup, all by hand:
 
-1. **Database and Auth.** Create a second Supabase project for the demo, as in §2. Never use the production one. Then:
-   - Under Authentication → Providers → Email, turn off **Allow new users to sign up**, and keep **Secure email change** on.
-   - "Secure password change" alone does **not** protect the shared account. Supabase lets a session created in the last 24 hours change its password without reauthentication, and every visitor's session is new. The seed (step 3) locks the account instead.
-   - Create the demo user under Authentication → Users → **Add user**. Use an address on a domain you don't use for anything else, and a throwaway password. Note its **User UID**.
-2. **Migrate** the demo database, from `services/api/` with the URL set explicitly:
+1. **Create the demo user** in the **production** Supabase project: Authentication → Users → **Add user**. Use an address on a domain you don't use for anything else, and a throwaway password (it becomes public). Tick **Auto Confirm User**. Note its **User UID**. Don't add it to `LIVE_ALLOWED_USER_IDS`: the API refuses to start if `DEMO_USER_ID` is in that list.
+   - Keep **Secure email change** on (Authentication → Providers → Email).
+   - "Secure password change" alone does **not** protect the shared account. Supabase lets a session created in the last 24 hours change its password without reauthentication, and every visitor's session is new. The seed (step 2) locks the account instead.
+2. **Seed it** from a full checkout, in `services/api/` (the seed reads the recorded fixtures in the repository's `fixtures/` folder). Use the production session-pooler URL (the same value as `DATABASE_URL` on Render). The seed only reads the process environment, never `services/api/.env`. It refuses unless `DEMO_USER_ID` is set and equals `--user-id`, `--target` repeats the database URL's `host/database`, and the demo account owns no real (`is_simulated = false`) vehicle, telemetry or observed trip. It only deletes and writes the demo account's rows:
 
    ```bash
-   DATABASE_URL='<demo session-pooler URL>' uv run alembic upgrade head
+   DEMO_USER_ID=<demo User UID> DATABASE_URL='<production session-pooler URL>' uv run python scripts/seed_demo.py --user-id <demo User UID> --target aws-0-<region>.pooler.supabase.com/postgres
    ```
 
-3. **Seed it** from a full checkout (the seed reads the recorded fixtures in the repository's `fixtures/` folder). The seed only reads the process environment, never `services/api/.env`. It refuses unless `APP_PUBLIC_DEMO_MODE=true` is set, `--target` repeats the database URL's `host/database`, and the database has no real (`is_simulated = false`) row:
-
-   ```bash
-   APP_PUBLIC_DEMO_MODE=true DATABASE_URL='<demo session-pooler URL>' uv run python scripts/seed_demo.py --user-id <demo User UID> --target aws-0-<region>.pooler.supabase.com/postgres
-   ```
-
-   On a Supabase database the seed also installs `chargewaze_demo_auth_guard`, a `BEFORE UPDATE` trigger on `auth.users` (function `public.chargewaze_demo_auth_guard`). It refuses any change to the demo user's password, email or phone, so a visitor holding the shared credentials can't lock everyone else out: Supabase answers their `updateUser` with an error. The seed refuses to write anything if `--user-id` isn't an auth user or the trigger can't be created. Its output says "Auth guard installed on auth.users". To rotate the demo password yourself:
+   On a Supabase database the seed also installs `chargewaze_demo_auth_guard`, a `BEFORE UPDATE` trigger on `auth.users` (function `public.chargewaze_demo_auth_guard`). It refuses any change to the demo user's password, email or phone, so a visitor holding the shared credentials can't lock everyone else out: Supabase answers their `updateUser` with an error. It only matches the demo user's ID; every other account can change its details as before. The seed refuses to write anything if `--user-id` isn't an auth user or the trigger can't be created. Its output says "Auth guard installed on auth.users". To rotate the demo password yourself:
 
    ```sql
    DROP TRIGGER chargewaze_demo_auth_guard ON auth.users;
    ```
 
-   Then change the password in the dashboard and run the seed again, which re-creates the trigger. What the guard doesn't stop: a visitor can sign the shared account out everywhere (other visitors just click **Explore the demo** again) or enroll an MFA factor (sign-in still gives the AAL1 session the app uses).
+   Then change the password in the dashboard, update `NEXT_PUBLIC_DEMO_PASSWORD` (step 3), and run the seed again, which re-creates the trigger. What the guard doesn't stop: a visitor can sign the shared account out everywhere (other visitors just click **Explore the demo** again) or enroll an MFA factor (sign-in still gives the AAL1 session the app uses).
 
    Re-running replaces the demo account's data with a fresh four weeks ending now. Run it daily if you want the demo to keep looking recent; scheduling it is up to you. The car's last reading goes stale 15 minutes after a seed, so the planner asks for a starting SoC. That's expected.
-4. **API.** Create a second Render web service from the same repository (Docker, `services/api/Dockerfile`), or a copy of the Blueprint with a different `name`. Set:
-   - `APP_ENV=production` and `APP_PUBLIC_DEMO_MODE=true`.
-   - The demo database URL, and the demo Supabase project's `SUPABASE_URL` and `SUPABASE_JWKS_URL`.
-   - `MAPBOX_SECRET_TOKEN`, `AFDC_API_KEY`, `STATIONS_CURSOR_SECRET`, and `ALLOWED_ORIGINS` set to the demo web URL.
-
-   Leave every `SMARTCAR_*` secret unset. `LIVE_ALLOWED_USER_IDS` isn't used in demo mode. The deploy workflow only deploys the production service, so deploy the demo service from the Render dashboard (or turn on its auto-deploy).
-5. **Web.** Create a second Vercel project from the repository with the same settings as §4, pointed at the demo API and the demo Supabase project. Set `NEXT_PUBLIC_DEMO_MODE=true`, `NEXT_PUBLIC_DEMO_EMAIL` and `NEXT_PUBLIC_DEMO_PASSWORD` (the demo user's). The sign-in page then shows **Explore the demo**, every app page shows the demo banner, and Analytics includes simulated data by default.
-6. **Check it.** Open the demo URL, click **Explore the demo**, then:
-   - The Dashboard shows the simulated bZ.
+3. **Turn it on.**
+   - **Render** (`chargewise-api` → Environment): set `DEMO_USER_ID` to the demo User UID. Render restarts the service.
+   - **Vercel** (production environment): set `NEXT_PUBLIC_DEMO_EMAIL` and `NEXT_PUBLIC_DEMO_PASSWORD` to the demo user's, then redeploy (the deploy workflow pulls them at build time, §1 and §4). The sign-in page then shows **Explore the demo**. While the demo account is signed in, every app page shows the demo banner and Analytics includes simulated data by default.
+4. **Check it.** Open `https://chargewaze.vercel.app/sign-in`, click **Explore the demo**, then:
+   - The Dashboard shows the simulated bZ and the "Public demo" banner.
    - Saved trips → Frederick → Toronto shows planned vs actual.
    - Analytics shows about four weeks.
    - Planning a new trip works.
-   - Any other action (for example deleting a trip) shows "The public demo is read-only".
+   - Any other action (for example deleting a trip) is refused (the API answers `403 DEMO_READ_ONLY`; the web app shows a generic error for now).
+   - Sign out and sign in with your own account: no banner, your real car, everything writable.
+
+To turn the demo off, unset `DEMO_USER_ID` on Render (the demo account then gets `403 LIVE_ACCESS_RESTRICTED`) and the two `NEXT_PUBLIC_DEMO_*` variables on Vercel.
 
 ## 14. Retention workflow (P6-F5, M-16)
 

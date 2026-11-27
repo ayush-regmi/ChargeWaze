@@ -5,6 +5,7 @@ import {
   analyticsSearch,
   parseAnalyticsParams,
 } from "@/components/analytics/params";
+import { isDemoEmail } from "@/lib/demo";
 import { env } from "@/lib/env";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 
@@ -16,25 +17,27 @@ import { createClient as createSupabaseClient } from "@/lib/supabase/server";
  * with a message, never to a raw JSON error.
  */
 export async function GET(request: NextRequest) {
+  const supabase = await createSupabaseClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const viewer = { demo: isDemoEmail(session?.user.email) };
   const params = parseAnalyticsParams(
     Object.fromEntries(request.nextUrl.searchParams),
+    viewer,
   );
   const back = (error: string) => {
     const url = new URL(
-      `/analytics${analyticsSearch(params)}`,
+      `/analytics${analyticsSearch(params, viewer)}`,
       request.nextUrl.origin,
     );
     url.searchParams.set("export_error", error);
     return NextResponse.redirect(url, 303);
   };
 
-  const supabase = await createSupabaseClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
   if (!session) {
     const url = new URL("/sign-in", request.nextUrl.origin);
-    url.searchParams.set("next", `/analytics${analyticsSearch(params)}`);
+    url.searchParams.set("next", `/analytics${analyticsSearch(params, viewer)}`);
     return NextResponse.redirect(url, 303);
   }
   if (!params.vehicleId) return back("failed");

@@ -516,7 +516,7 @@ The public demo depends on being able to seed convincing plans without touching 
 
 - Seeded rows land in the same tables with `is_simulated = true`.
 - All default analytics, ML training, and `/api/v1/analytics/consumption` queries filter `is_simulated = false`.
-- The seed script lives in `services/api/scripts/seed_demo.py` (to be created in Phase 6) and must never run against a database that contains real telemetry.
+- The seed script is `services/api/scripts/seed_demo.py`. The demo is one account in the production database ([ADR 0012](adr/0012-demo-account-in-production.md)), so the seed only ever deletes and writes rows of `DEMO_USER_ID`, and refuses if that account owns any real vehicle, telemetry or observed trip.
 
 ## 6. Location and privacy
 

@@ -2,7 +2,7 @@
 
 The seed writes only simulated rows, builds its legs, plan match and
 backtests through the real pipeline, replaces the demo account on a re-run,
-and refuses to touch a database that holds real data.
+never touches another account, and refuses an account that holds real data.
 """
 
 from __future__ import annotations
@@ -19,11 +19,17 @@ from app.modules.trips.observed_models import ObservedTrip, PredictionResult
 from app.modules.users.models import Profile, UserPreferences
 from app.modules.users.privacy_models import AccountDeletion
 from app.modules.vehicles.models import Vehicle, VehicleTelemetry
-from tests.demo.conftest import DEMO_USER_ID, SEED_NOW, load_seed_module, make_settings
+from tests.demo.conftest import (
+    DEMO_USER_ID,
+    REAL_USER_ID,
+    SEED_NOW,
+    load_seed_module,
+    make_settings,
+)
 from tests.demo.test_access import _add_real_vehicle
 
 seed_demo = load_seed_module()
-DEMO_SETTINGS = make_settings(app_public_demo_mode=True)
+DEMO_SETTINGS = make_settings(demo_user_id=DEMO_USER_ID)
 
 
 def _seed(db: Session, **kwargs: Any) -> Any:
@@ -135,16 +141,51 @@ def test_seed_is_repeatable_and_replaces_the_account(db_session: Session) -> Non
     assert profile is not None and profile.display_name == "Demo Driver"
 
 
-def test_seed_refuses_a_database_with_real_data(db_session: Session) -> None:
-    _add_real_vehicle(db_session)
+def test_seed_leaves_other_accounts_alone(db_session: Session) -> None:
+    real = _add_real_vehicle(db_session)
+    real_telemetry = db_session.execute(
+        text("SELECT count(*) FROM vehicle_telemetry WHERE vehicle_id = :v"), {"v": real.id}
+    ).scalar_one()
+
+    _seed(db_session)
+    _seed(db_session)  # a re-run deletes only the demo account's rows
+
+    db_session.expire_all()
+    kept = db_session.get(Vehicle, real.id)
+    assert kept is not None and kept.user_id == REAL_USER_ID and not kept.is_simulated
+    assert db_session.get(UserPreferences, REAL_USER_ID) is not None
+    assert db_session.get(Profile, REAL_USER_ID) is not None
+    assert (
+        db_session.execute(
+            text("SELECT count(*) FROM vehicle_telemetry WHERE vehicle_id = :v"), {"v": real.id}
+        ).scalar_one()
+        == real_telemetry
+    )
+    demo_vehicles = db_session.execute(
+        select(Vehicle).where(Vehicle.user_id == DEMO_USER_ID)
+    ).scalars()
+    assert all(v.is_simulated for v in demo_vehicles)
+
+
+def test_seed_refuses_an_account_with_real_data(db_session: Session) -> None:
+    _add_real_vehicle(db_session, user_id=DEMO_USER_ID)
     with pytest.raises(seed_demo.SeedRefused, match="real"):
         _seed(db_session)
-    assert db_session.get(Profile, DEMO_USER_ID) is None
+    assert (
+        db_session.execute(
+            text("SELECT count(*) FROM vehicles WHERE user_id = :u AND is_simulated"),
+            {"u": DEMO_USER_ID},
+        ).scalar_one()
+        == 0
+    )
 
 
-def test_seed_refuses_outside_demo_mode(db_session: Session) -> None:
-    with pytest.raises(seed_demo.SeedRefused, match="APP_PUBLIC_DEMO_MODE"):
+def test_seed_refuses_any_account_but_the_demo_one(db_session: Session) -> None:
+    with pytest.raises(seed_demo.SeedRefused, match="DEMO_USER_ID is not set"):
         seed_demo.seed(db_session, user_id=DEMO_USER_ID, settings=make_settings(), now=SEED_NOW)
+    with pytest.raises(seed_demo.SeedRefused, match="isn't DEMO_USER_ID"):
+        seed_demo.seed(db_session, user_id=REAL_USER_ID, settings=DEMO_SETTINGS, now=SEED_NOW)
+    assert db_session.get(Profile, REAL_USER_ID) is None
 
 
 def test_target_must_name_the_database() -> None:
@@ -159,10 +200,10 @@ def test_cli_refuses_before_connecting(capsys: pytest.CaptureFixture[str]) -> No
     args = ["--user-id", str(DEMO_USER_ID), "--target", "localhost/chargewaze_demo"]
     live = make_settings(database_url="postgresql+psycopg://u:p@localhost:1/chargewaze_demo")
     assert seed_demo.main(args, settings_factory=lambda: live) == 2
-    assert "APP_PUBLIC_DEMO_MODE" in capsys.readouterr().err
+    assert "DEMO_USER_ID" in capsys.readouterr().err
 
     demo = make_settings(
-        app_public_demo_mode=True,
+        demo_user_id=DEMO_USER_ID,
         database_url="postgresql+psycopg://u:p@hosted.example.com:5432/postgres",
     )
     assert seed_demo.main(args, settings_factory=lambda: demo) == 2

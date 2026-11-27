@@ -35,11 +35,10 @@ export const env = {
       "true"
     );
   },
-  /** Public demo deployment (P6-F2): banner, demo sign-in, simulated analytics. */
-  get demoMode() {
-    return (process.env.NEXT_PUBLIC_DEMO_MODE ?? "false").toLowerCase() === "true";
-  },
-  /** The shared demo account; public on purpose (only simulated data). */
+  /**
+   * The shared public demo account (P6-F2, ADR 0012); public on purpose (it
+   * only ever sees simulated data). When set, sign-in shows "Explore the demo".
+   */
   get demoCredentials(): { email: string; password: string } | null {
     const email = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? "";
     const password = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? "";

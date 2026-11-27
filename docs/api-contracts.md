@@ -8,9 +8,9 @@ This document defines the public REST surface the FastAPI backend exposes to the
 
 - **Base URL:** all endpoints live under `/api/v1`. Breaking changes land under a new major version (`/api/v2`), never in place.
 - **Authentication:** `Authorization: Bearer <Supabase JWT>`. The `auth` module validates the JWT and resolves the ChargeWaze user. The one exception is `POST /api/v1/webhooks/smartcar`, which authenticates via Smartcar's signed webhook payload.
-- **Deployment mode (P6-F2, architecture §7.2):** after the JWT verifies, every authenticated endpoint applies the deployment's gate.
-  - **Live mode:** a caller not in `LIVE_ALLOWED_USER_IDS` gets `403 FORBIDDEN` with `details.reason = "LIVE_ACCESS_RESTRICTED"`. An empty list allows everyone in development/test and nobody under `APP_ENV=production`.
-  - **Public demo mode:** every non-`GET` request except `POST /routes/plan`, `POST /routes/directions` and `POST /stations/along-route` gets `403 FORBIDDEN` with `details.reason = "DEMO_READ_ONLY"`. While the database holds any real (`is_simulated = false`) vehicle, every request gets `503 DEMO_MODE_UNSAFE`.
+- **Access gate (P6-F2, ADR 0012, architecture §7.2):** after the JWT verifies, every authenticated endpoint applies the gate.
+  - **Live accounts:** a caller not in `LIVE_ALLOWED_USER_IDS` (and not the demo account) gets `403 FORBIDDEN` with `details.reason = "LIVE_ACCESS_RESTRICTED"`. An empty list allows everyone in development/test and nobody under `APP_ENV=production`.
+  - **Public demo account** (`DEMO_USER_ID`): every non-`GET` request except `POST /routes/plan`, `POST /routes/directions` and `POST /stations/along-route` gets `403 FORBIDDEN` with `details.reason = "DEMO_READ_ONLY"`. If the demo account owns any real (`is_simulated = false`) vehicle, its every request gets `503 DEMO_MODE_UNSAFE`.
   - The webhook and `/health` aren't gated.
 - **Content type:** request and response bodies are JSON (`application/json`).
 - **Timestamps:** ISO-8601 in UTC with a `Z` suffix (`2026-11-06T19:00:00Z`).
@@ -39,7 +39,7 @@ Reserved codes (grow this list as the API grows):
 | Code | HTTP | Meaning |
 |---|---|---|
 | `UNAUTHENTICATED` | 401 | Missing or invalid Supabase JWT. |
-| `FORBIDDEN` | 403 | Authenticated but not allowed. `details.reason` is `LIVE_ACCESS_RESTRICTED` (not on the live allowlist) or `DEMO_READ_ONLY` (a write in the public demo); see §1 "Deployment mode". |
+| `FORBIDDEN` | 403 | Authenticated but not allowed. `details.reason` is `LIVE_ACCESS_RESTRICTED` (not on the live allowlist) or `DEMO_READ_ONLY` (a write by the public demo account); see §1 "Access gate". |
 | `NOT_FOUND` | 404 | Resource does not exist for the caller. |
 | `VALIDATION_ERROR` | 422 | Request body failed Pydantic validation. |
 | `CONFLICT` | 409 | Already-saved trip, etc. (not used for vehicle connect; see §3.3). |
@@ -48,7 +48,7 @@ Reserved codes (grow this list as the API grows):
 | `SMARTCAR_RATE_LIMITED` | 429 | Smartcar throttled the request (`429` of type `RATE_LIMIT`, per vehicle or app-wide). `details.retry_after_seconds` and a `Retry-After` header when Smartcar said how long to wait. |
 | `RATE_LIMITED` | 429 | One of ChargeWaze's own limits: the per-vehicle refresh limit (§3.5a; `details.next_refresh_at`) or the per-user limit on `/routes/plan` and `/places/suggest` (§3.7, §3.13; `details.limit` is `plan` or `suggest`). Always `details.retry_after_seconds` and a `Retry-After` header. |
 | `VEHICLE_NOT_CONNECTED` | 409 | The action needs a connected, real (non-simulated) vehicle (§3.5a). |
-| `DEMO_MODE_UNSAFE` | 503 | Public demo mode, but the database holds a real (non-simulated) vehicle; nothing is served (§1 "Deployment mode"). |
+| `DEMO_MODE_UNSAFE` | 503 | The public demo account owns a real (non-simulated) vehicle; nothing is served to it (§1 "Access gate"). |
 | `SMARTCAR_NOT_CONFIGURED` | 503 | Smartcar credentials, application ID or state secret are not set on the server. |
 | `MAPBOX_UNREACHABLE` | 502/504 | Mapbox failed or timed out. |
 | `MAPBOX_ERROR` | 502 | Mapbox rejected the request or returned an unexpected response; Mapbox's error code (if any) is in `details`. |

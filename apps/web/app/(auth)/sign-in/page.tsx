@@ -6,7 +6,7 @@ import { DemoSignIn } from "@/components/demo/demo-sign-in";
 import { env } from "@/lib/env";
 
 export default function SignInPage() {
-  const demo = env.demoMode ? env.demoCredentials : null;
+  const demo = env.demoCredentials;
   return (
     <div className="space-y-8">
       <div className="space-y-1">

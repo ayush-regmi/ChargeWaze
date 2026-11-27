@@ -1,6 +1,6 @@
 # ChargeWaze — Development Roadmap
 
-Status: **MVP code complete (Phases 1–6); production live; real-car checks and the public demo deployment (M-18) pending** · Last updated: 2026-11-21
+Status: **MVP code complete (Phases 1–6); production live; real-car checks and switching on the public demo account (M-18) pending** · Last updated: 2026-11-27
 
 Delivery plan for ChargeWaze. Estimates assume part-time development with Claude Code / Cursor and real testing. They are planning estimates, not deadlines.
 
@@ -126,10 +126,10 @@ Status: **code complete; awaiting the real-car check (M-11)**. F0–F8 merged (#
 
 ### Phase 6 — Production and portfolio (Week 12)
 
-Status: **code complete; awaiting the public demo deployment (M-18)**. P6-F1 to P6-F5 merged (#46, #73, #55, #67, #69); P6-F6 adds the README, architecture diagram, screenshots ([`images/`](images/)) and [`demo-script.md`](demo-script.md). The project was renamed to ChargeWaze on the new domain ([ADR 0011](adr/0011-rename-to-chargewaze.md)).
+Status: **code complete; awaiting the public demo account on production (M-18)**. The demo is now an account in the production deployment, not a second deployment ([ADR 0012](adr/0012-demo-account-in-production.md)). P6-F1 to P6-F5 merged (#46, #73, #55, #67, #69); P6-F6 adds the README, architecture diagram, screenshots ([`images/`](images/)) and [`demo-script.md`](demo-script.md). The project was renamed to ChargeWaze on the new domain ([ADR 0011](adr/0011-rename-to-chargewaze.md)).
 
 - **Second completion criterion (smoke tests in production): met.** Production is live at `https://chargewaze.vercel.app`; the deploy run and the smoke run were green on 2026-11-21 ([M-14](manual-test-log.md#m-14--production-setup-and-first-deploy-p6-f3-p6-f4)). M-14 still lists connecting the car and setting up alerts.
-- **First completion criterion (a recruiter runs the demo without a car): needs [M-18](manual-test-log.md#m-18--public-demo-deployment-p6-f2).** The demo script was checked on a local demo-mode run seeded with `seed_demo.py` on 2026-11-21. The demo URL goes into the script and the README once M-18 passes.
+- **First completion criterion (a recruiter runs the demo without a car): needs [M-18](manual-test-log.md#m-18--public-demo-account-on-production-p6-f2-adr-0012).** The demo script was checked on a local demo-mode run seeded with `seed_demo.py` on 2026-11-21. The demo runs on the production URL once M-18 passes.
 - **Known gap for the demo:** the web app shows generic errors for the demo's read-only `403` (`DEMO_READ_ONLY`), for example on Delete and Refresh. It's a P6-F2 follow-up in the web write actions.
 
 **Scope**

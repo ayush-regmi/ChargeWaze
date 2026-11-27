@@ -1,16 +1,15 @@
 # ChargeWaze demo script
 
-Status: **written against demo mode; the public demo URL is pending ([M-18](manual-test-log.md#m-18--public-demo-deployment-p6-f2))** · Last updated: 2026-11-21
+Status: **written against the demo account; switching it on in production is pending ([M-18](manual-test-log.md#m-18--public-demo-account-on-production-p6-f2-adr-0012))** · Last updated: 2026-11-21
 
-This is what a recruiter or reviewer sees and clicks in the public demo, in about five minutes, and what each step shows about how ChargeWaze is built. It follows the check in [`deployment.md`](deployment.md) §13.2 step 6.
+This is what a recruiter or reviewer sees and clicks in the public demo, in about five minutes, and what each step shows about how ChargeWaze is built. It follows the check in [`deployment.md`](deployment.md) §13.2 step 4.
 
 ## Before you start
 
 | | |
 |---|---|
-| **Demo URL** | *Pending M-18.* The demo is a separate deployment (its own Supabase project, Render service and Vercel project, [`deployment.md`](deployment.md) §13.2). Add its URL here and to the README once M-18 passes. |
-| **Production URL** | [chargewaze.vercel.app](https://chargewaze.vercel.app). Sign-in is limited to an allowlist, so visitors can't use it. |
-| **Account** | None needed. The demo's sign-in page has **Explore the demo**, which signs in to one shared, seeded account. |
+| **Demo URL** | [chargewaze.vercel.app](https://chargewaze.vercel.app), the production site ([ADR 0012](adr/0012-demo-account-in-production.md)). The **Explore the demo** button appears once M-18 is done ([`deployment.md`](deployment.md) §13.2). |
+| **Account** | None needed. The sign-in page has **Explore the demo**, which signs in to one shared, seeded account. Other sign-ins are limited to an allowlist. |
 | **Data** | Simulated: a 2026 Toyota bZ XLE AWD with about four weeks of drives and charging, written by [`seed_demo.py`](../services/api/scripts/seed_demo.py). Routes and stations come from recorded Mapbox and AFDC responses in `fixtures/`, so the road trip is real geography. Every page shows a "Public demo" banner. |
 | **First load** | The API runs on Render's free plan and spins down when idle. If the first page takes a while, it's the API starting up. |
 
@@ -95,7 +94,7 @@ Back on the saved trip, click **Delete** and confirm.
 
 | Item | Closes with |
 |---|---|
-| Public demo URL in this script and the README | [M-18](manual-test-log.md#m-18--public-demo-deployment-p6-f2), [`deployment.md`](deployment.md) §13.2 steps 1–6 |
-| The same walkthrough checked on the deployed demo (this script was checked on a local demo-mode run) | M-18 step 6 |
+| The demo account switched on in production | [M-18](manual-test-log.md#m-18--public-demo-account-on-production-p6-f2-adr-0012), [`deployment.md`](deployment.md) §13.2 steps 1–3 |
+| The same walkthrough checked on production (this script was checked on a local demo-mode run) | M-18, §13.2 step 4 |
 | Real-car data, which only production shows | M-01, M-02, M-11 in [`manual-test-log.md`](manual-test-log.md) |
 | "The public demo is read-only" message in the web app (Delete, Refresh and other writes show generic errors today) | Follow-up to P6-F2 (web write actions) |
