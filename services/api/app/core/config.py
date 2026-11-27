@@ -36,7 +36,6 @@ class Settings(BaseSettings):
 
     # ---- App ----
     app_env: AppEnv = "development"
-    app_public_demo_mode: bool = False
     allowed_origins: str = "http://localhost:3000"
 
     # ---- Database ----
@@ -137,14 +136,15 @@ class Settings(BaseSettings):
     # D6: most rows in one CSV export; more is a 422, never a truncated file.
     analytics_export_max_rows: int = Field(default=10000, ge=1)
 
-    # ---- Demo mode (Phase 6 F2) ----
-    # APP_PUBLIC_DEMO_MODE (App block) turns a deployment into the public demo:
-    # simulated data only, read-only except trip planning, no Smartcar secrets
-    # (architecture.md §7.2, app/modules/auth/access.py).
-    # Live mode: Supabase user IDs (comma-separated UUIDs) allowed to use the
-    # API. Empty means no restriction in development/test, and nobody under
+    # ---- Access: live allowlist and the public demo account (P6-F2, ADR 0012) ----
+    # Supabase user IDs (comma-separated UUIDs) allowed to use the API. Empty
+    # means no restriction in development/test, and nobody under
     # APP_ENV=production (fails closed; set it before deploying).
     live_allowed_user_ids: str = ""
+    # DEMO_USER_ID: the shared, seeded demo account (scripts/seed_demo.py).
+    # It is read-only except trip planning and is never on the live allowlist
+    # (architecture.md §7.2, app/modules/auth/access.py). Unset: no demo.
+    demo_user_id: uuid.UUID | None = None
 
     @field_validator("live_allowed_user_ids")
     @classmethod
@@ -159,14 +159,19 @@ class Settings(BaseSettings):
                     ) from exc
         return value
 
+    @field_validator("demo_user_id", mode="before")
+    @classmethod
+    def _blank_demo_user_id_is_unset(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     @model_validator(mode="after")
-    def _demo_mode_loads_no_smartcar_secrets(self) -> Settings:
-        if self.app_public_demo_mode and (
-            self.smartcar_client_secret or self.smartcar_management_token
-        ):
+    def _demo_account_is_not_live(self) -> Settings:
+        if self.demo_user_id is not None and self.demo_user_id in self.live_allowlist:
             raise ValueError(
-                "APP_PUBLIC_DEMO_MODE=true must run without SMARTCAR_CLIENT_SECRET and "
-                "SMARTCAR_MANAGEMENT_TOKEN, so no real telemetry can reach the demo database."
+                "DEMO_USER_ID must not be in LIVE_ALLOWED_USER_IDS: the demo account's "
+                "credentials are public, so it only ever gets demo access."
             )
         return self
 

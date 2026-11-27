@@ -21,11 +21,13 @@ services:
       # ---- App ----
       - key: APP_ENV
         value: production
-      - key: APP_PUBLIC_DEMO_MODE
-        value: "false"
       # P6-F2: Supabase user IDs allowed in (comma-separated UUIDs). Under
       # APP_ENV=production an empty list locks EVERYONE out, the owner too.
       - key: LIVE_ALLOWED_USER_IDS
+        sync: false
+      # ADR 0012: the shared public demo account's Supabase user ID (optional;
+      # read-only except planning; must not be in LIVE_ALLOWED_USER_IDS).
+      - key: DEMO_USER_ID
         sync: false
       - key: ALLOWED_ORIGINS # the Vercel production URL, e.g. https://chargewaze.vercel.app
         sync: false

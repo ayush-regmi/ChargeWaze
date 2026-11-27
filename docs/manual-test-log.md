@@ -31,7 +31,7 @@ Last updated 2026-11-21 (production set up on `chargewaze.vercel.app`: M-14 chec
 | M-15 | Delete a test account on production; rows gone, Smartcar revoked, auth user gone (P6-F5) | M-14, a test account with a car | Nothing (confidence) | open |
 | M-16 | Retention workflow runs daily against production (P6-F5) | M-14, retention secrets in GitHub `production` | Retention promises in the privacy notice | open |
 | M-17 | Per-vehicle baseline on the real bZ changes the plan (P4-F8) | Real keys, connected vehicle | Nothing (confidence) | open |
-| M-18 | Public demo deployment seeded and reachable (P6-F2) | Second Render/Vercel/Supabase | P6-F6 screenshots and demo script | open |
+| M-18 | Public demo account seeded and reachable on production (P6-F2, ADR 0012) | M-14, production Supabase, Render, Vercel | P6-F6 demo script | open |
 
 
 ---
@@ -439,9 +439,9 @@ Needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` on Render. Use a **test** a
 |---|---|---|---|
 | | | | |
 
-### M-18 · Public demo deployment (P6-F2)
+### M-18 · Public demo account on production (P6-F2, ADR 0012)
 
-Follow [`deployment.md`](deployment.md) §13.2 steps 1–6: a second Supabase project (demo user, sign-ups off), migrations, `seed_demo.py` (it also installs the `chargewaze_demo_auth_guard` trigger), a second Render service with `APP_PUBLIC_DEMO_MODE=true` and no Smartcar secrets, and a second Vercel project with `NEXT_PUBLIC_DEMO_*`. Step 6 is the check.
+Follow [`deployment.md`](deployment.md) §13.2 steps 1–4: create the demo user in the production Supabase project, run `seed_demo.py` with `DEMO_USER_ID` against the production database (it also installs the `chargewaze_demo_auth_guard` trigger), set `DEMO_USER_ID` on Render and `NEXT_PUBLIC_DEMO_EMAIL` / `NEXT_PUBLIC_DEMO_PASSWORD` on Vercel, and redeploy. Step 4 is the check, including that your own account shows no banner and stays writable.
 
 | Date | Seeded | "Explore the demo" works | Writes blocked except planning | Notes |
 |---|---|---|---|---|

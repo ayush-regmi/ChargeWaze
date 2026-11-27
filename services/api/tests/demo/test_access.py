@@ -1,9 +1,10 @@
-"""The demo/live gate in ``get_current_user`` (P6-F2, architecture.md §7.2).
+"""The access gate in ``get_current_user`` (P6-F2, ADR 0012, architecture.md §7.2).
 
-Live mode: ``LIVE_ALLOWED_USER_IDS`` decides who gets in, and an empty list
-fails closed under ``APP_ENV=production``. Demo mode: read-only except
-planning, and nothing is served while the database holds a real vehicle, so
-no real row can come back.
+Everyone but the demo account: ``LIVE_ALLOWED_USER_IDS`` decides who gets in,
+and an empty list fails closed under ``APP_ENV=production``. The demo account
+(``DEMO_USER_ID``) shares the database with real accounts: it is read-only
+except planning, only ever sees its own simulated rows, and is refused
+outright if it ever owns a real vehicle.
 """
 
 from __future__ import annotations
@@ -55,12 +56,13 @@ def _concrete(path: str) -> str:
     return re.sub(r"\{[^}]+\}", lambda _m: str(uuid.uuid4()), path)
 
 
-def _add_real_vehicle(db: Session) -> Vehicle:
-    db.add(Profile(id=REAL_USER_ID, display_name="Real Owner"))
-    db.add(UserPreferences(user_id=REAL_USER_ID))
-    db.flush()
+def _add_real_vehicle(db: Session, user_id: uuid.UUID = REAL_USER_ID) -> Vehicle:
+    if db.get(Profile, user_id) is None:
+        db.add(Profile(id=user_id, display_name="Real Owner"))
+        db.add(UserPreferences(user_id=user_id))
+        db.flush()
     vehicle = Vehicle(
-        user_id=REAL_USER_ID,
+        user_id=user_id,
         smartcar_vehicle_id="real-smartcar-vehicle",
         smartcar_user_id="real-smartcar-user",
         make="TOYOTA",
@@ -94,7 +96,7 @@ def seeded(db_session: Session) -> Iterator[Any]:
     summary = seed_demo.seed(
         db_session,
         user_id=DEMO_USER_ID,
-        settings=make_settings(app_public_demo_mode=True),
+        settings=make_settings(demo_user_id=DEMO_USER_ID),
         now=SEED_NOW,
     )
     db_session.flush()
@@ -113,16 +115,32 @@ def test_allowlist_must_be_uuids() -> None:
     assert settings.live_allowlist == {DEMO_USER_ID, REAL_USER_ID}
 
 
-@pytest.mark.parametrize("secret", ["smartcar_client_secret", "smartcar_management_token"])
-def test_demo_mode_refuses_smartcar_secrets(secret: str) -> None:
-    with pytest.raises(ValidationError, match="APP_PUBLIC_DEMO_MODE"):
-        make_settings(app_public_demo_mode=True, **{secret: "a-real-secret"})
-    assert make_settings(app_public_demo_mode=False, **{secret: "a-real-secret"})
-    assert make_settings(app_public_demo_mode=True, smartcar_client_id="public-id")
+def test_demo_user_id_is_optional_and_never_live() -> None:
+    assert make_settings().demo_user_id is None
+    assert make_settings(demo_user_id="").demo_user_id is None
+    assert make_settings(demo_user_id=str(DEMO_USER_ID)).demo_user_id == DEMO_USER_ID
+    with pytest.raises(ValidationError):
+        make_settings(demo_user_id="demo@example.com")
+    with pytest.raises(ValidationError, match="DEMO_USER_ID must not be in LIVE_ALLOWED"):
+        make_settings(
+            demo_user_id=DEMO_USER_ID, live_allowed_user_ids=f"{REAL_USER_ID},{DEMO_USER_ID}"
+        )
+
+
+def test_demo_account_runs_alongside_smartcar_secrets() -> None:
+    """One deployment serves both: the demo account just can't connect a car."""
+
+    settings = make_settings(
+        demo_user_id=DEMO_USER_ID,
+        smartcar_client_secret="a-real-secret",
+        smartcar_management_token="a-real-token",
+    )
+    assert ("POST", "/api/v1/vehicles/connect") not in DEMO_WRITE_ALLOWED
+    assert settings.demo_user_id == DEMO_USER_ID
 
 
 # ---------------------------------------------------------------------------
-# Live mode
+# Live allowlist (everyone but the demo account)
 # ---------------------------------------------------------------------------
 
 
@@ -172,21 +190,40 @@ def test_live_mode_allows_writes(
 
 
 # ---------------------------------------------------------------------------
-# Demo mode: read-only except planning
+# Demo account: read-only except planning
 # ---------------------------------------------------------------------------
 
 
-def test_demo_mode_ignores_the_live_allowlist(
+def test_demo_account_gets_in_beside_the_live_allowlist(
     client: TestClient, use_settings: UseSettings, auth: Headers
 ) -> None:
-    use_settings(app_env="production", app_public_demo_mode=True)
+    use_settings(
+        app_env="production", demo_user_id=DEMO_USER_ID, live_allowed_user_ids=str(REAL_USER_ID)
+    )
     assert client.get("/api/v1/me", headers=auth(DEMO_USER_ID)).status_code == 200
+    assert client.get("/api/v1/me", headers=auth(REAL_USER_ID)).status_code == 200
+    stranger = client.get("/api/v1/me", headers=auth(uuid.uuid4()))
+    assert stranger.json()["error"]["details"]["reason"] == "LIVE_ACCESS_RESTRICTED"
 
 
-def test_demo_mode_blocks_every_write_except_planning(
+def test_demo_rules_apply_only_to_the_demo_account(
+    client: TestClient, use_settings: UseSettings, auth: Headers
+) -> None:
+    use_settings(
+        app_env="production", demo_user_id=DEMO_USER_ID, live_allowed_user_ids=str(REAL_USER_ID)
+    )
+    body = {"units": "metric"}
+    demo = client.patch("/api/v1/me/preferences", json=body, headers=auth(DEMO_USER_ID))
+    assert demo.status_code == 403
+    assert demo.json()["error"]["details"] == {"reason": "DEMO_READ_ONLY"}
+    real = client.patch("/api/v1/me/preferences", json=body, headers=auth(REAL_USER_ID))
+    assert real.status_code == 200, real.text
+
+
+def test_demo_account_blocks_every_write_except_planning(
     app_with_db: FastAPI, client: TestClient, use_settings: UseSettings, auth: Headers
 ) -> None:
-    use_settings(app_public_demo_mode=True)
+    use_settings(demo_user_id=DEMO_USER_ID)
     routes = _mutating_routes(app_with_db)
     assert set(DEMO_WRITE_ALLOWED) <= set(routes)
     assert len(routes) > len(DEMO_WRITE_ALLOWED) + 10  # the table really was walked
@@ -202,10 +239,10 @@ def test_demo_mode_blocks_every_write_except_planning(
             assert reason == {"reason": "DEMO_READ_ONLY"}, (method, path)
 
 
-def test_demo_mode_keeps_webhooks_ungated(client: TestClient, use_settings: UseSettings) -> None:
-    use_settings(app_public_demo_mode=True)
-    # No signing key is loaded in demo mode, so the webhook is refused by its
-    # own signature check, not by the demo gate.
+def test_webhooks_stay_ungated(client: TestClient, use_settings: UseSettings) -> None:
+    use_settings(demo_user_id=DEMO_USER_ID)
+    # No signing key is loaded in the test settings, so the webhook is refused
+    # by its own signature check, not by the access gate.
     response = client.post("/api/v1/webhooks/smartcar", json={})
     body = response.json()
     assert (body.get("error") or {}).get("details") != {"reason": "DEMO_READ_ONLY"}
@@ -216,7 +253,7 @@ def test_demo_user_can_plan_on_the_seeded_car(
 ) -> None:
     """The one write a visitor makes reaches the planner (it fails upstream here)."""
 
-    use_settings(app_public_demo_mode=True, rate_limit_enabled=False)
+    use_settings(demo_user_id=DEMO_USER_ID, rate_limit_enabled=False)
     response = client.post(
         "/api/v1/routes/plan",
         json={
@@ -233,7 +270,7 @@ def test_demo_user_can_plan_on_the_seeded_car(
 
 
 # ---------------------------------------------------------------------------
-# Demo mode: no real row is ever returned
+# Demo account: no real row is ever returned
 # ---------------------------------------------------------------------------
 
 
@@ -266,32 +303,59 @@ def _uuids(value: Any) -> set[str]:
     return set()
 
 
-def test_demo_mode_refuses_everything_while_a_real_vehicle_exists(
+def test_demo_account_never_reads_a_real_account(
     client: TestClient,
     use_settings: UseSettings,
     auth: Headers,
     db_session: Session,
     seeded: Any,
 ) -> None:
-    real = _add_real_vehicle(db_session)
-    use_settings(app_public_demo_mode=True)
+    """Same database, but every ID-addressed route answers 404 for another account's rows."""
 
-    reads = [
-        *_demo_reads(seeded),
+    real = _add_real_vehicle(db_session)
+    use_settings(demo_user_id=DEMO_USER_ID)
+
+    for path in (
         f"/api/v1/vehicles/{real.id}",
         f"/api/v1/vehicles/{real.id}/state",
         f"/api/v1/observed-trips?vehicle_id={real.id}",
-    ]
-    for user in (DEMO_USER_ID, REAL_USER_ID):
-        for path in reads:
-            response = client.get(path, headers=auth(user))
-            assert response.status_code == 503, (user, path, response.text)
-            assert response.json() == {
-                "error": {"code": "DEMO_MODE_UNSAFE", "message": "The public demo is unavailable."}
-            }
-            assert str(real.id) not in response.text
-        planned = client.post("/api/v1/routes/plan", json={}, headers=auth(user))
-        assert planned.status_code == 503
+        f"/api/v1/analytics/trips?vehicle_id={real.id}&from=2026-10-20&to=2026-11-20"
+        "&tz=America/New_York&include_simulated=true",
+    ):
+        response = client.get(path, headers=auth(DEMO_USER_ID))
+        assert response.status_code == 404, (path, response.text)
+        assert "real-smartcar" not in response.text
+    for path in _demo_reads(seeded):
+        response = client.get(path, headers=auth(DEMO_USER_ID))
+        assert response.status_code == 200, (path, response.text)
+        assert str(real.id) not in response.text, path
+        assert "real-smartcar" not in response.text, path
+
+    # The real owner's own reads are untouched by the demo account's rules.
+    mine = client.get(f"/api/v1/vehicles/{real.id}", headers=auth(REAL_USER_ID))
+    assert mine.status_code == 200, mine.text
+
+
+def test_demo_account_with_a_real_vehicle_is_refused(
+    client: TestClient,
+    use_settings: UseSettings,
+    auth: Headers,
+    db_session: Session,
+    seeded: Any,
+) -> None:
+    real = _add_real_vehicle(db_session, user_id=DEMO_USER_ID)
+    use_settings(demo_user_id=DEMO_USER_ID)
+
+    for path in [*_demo_reads(seeded), f"/api/v1/vehicles/{real.id}"]:
+        response = client.get(path, headers=auth(DEMO_USER_ID))
+        assert response.status_code == 503, (path, response.text)
+        assert response.json() == {
+            "error": {"code": "DEMO_MODE_UNSAFE", "message": "The public demo is unavailable."}
+        }
+    planned = client.post("/api/v1/routes/plan", json={}, headers=auth(DEMO_USER_ID))
+    assert planned.status_code == 503
+    # Only the demo account is refused.
+    assert client.get("/api/v1/me", headers=auth(REAL_USER_ID)).status_code == 200
 
 
 def test_demo_reads_return_only_simulated_rows(
@@ -301,7 +365,7 @@ def test_demo_reads_return_only_simulated_rows(
     db_session: Session,
     seeded: Any,
 ) -> None:
-    use_settings(app_public_demo_mode=True)
+    use_settings(demo_user_id=DEMO_USER_ID)
     tables = ("vehicles", "planned_trips", "observed_trips", "prediction_results")
     returned_rows = 0
     for path in _demo_reads(seeded):

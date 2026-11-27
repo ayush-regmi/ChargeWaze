@@ -1,13 +1,18 @@
 import { FlaskConical } from "lucide-react";
 
-import { env } from "@/lib/env";
+import { sessionIsDemo } from "@/lib/session-api";
 
 /**
- * Persistent notice on every app page of the public demo (P6-F2,
- * architecture.md §7.2): the data is simulated, and the shared demo account
- * is read-only except for planning trips. Renders nothing on a live deployment.
+ * Persistent notice on every app page while the public demo account is
+ * signed in (P6-F2, ADR 0012, architecture.md §7.2): the data is simulated,
+ * and the shared account is read-only except for planning trips.
  */
-export function DemoBanner({ enabled = env.demoMode }: { enabled?: boolean }) {
+export async function DemoAccountBanner() {
+  return <DemoBanner enabled={await sessionIsDemo()} />;
+}
+
+/** The banner itself; renders nothing unless `enabled`. */
+export function DemoBanner({ enabled }: { enabled: boolean }) {
   if (!enabled) return null;
   return (
     <div

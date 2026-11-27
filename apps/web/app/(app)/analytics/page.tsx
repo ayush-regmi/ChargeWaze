@@ -15,7 +15,7 @@ import { SimulatedNotice } from "@/components/analytics/simulated-notice";
 import { SummaryCards } from "@/components/analytics/summary-cards";
 import { TripsTable } from "@/components/analytics/trips-table";
 import { TzSync } from "@/components/analytics/tz-sync";
-import { requireSessionApi } from "@/lib/session-api";
+import { requireSessionApi, sessionIsDemo } from "@/lib/session-api";
 import type { UnitSystem } from "@/lib/units";
 import { pickDashboardVehicle, vehicleTitle } from "@/lib/vehicles";
 
@@ -57,8 +57,10 @@ export default function AnalyticsPage({
 async function Analytics({ searchParams }: { searchParams: SearchParams }) {
   await connection();
   const raw = await searchParams;
-  const params = parseAnalyticsParams(raw);
-  const api = await requireSessionApi(`/analytics${analyticsSearch(params)}`);
+  const demo = await sessionIsDemo();
+  const search = (p: Partial<AnalyticsParams>) => analyticsSearch(p, { demo });
+  const params = parseAnalyticsParams(raw, { demo });
+  const api = await requireSessionApi(`/analytics${search(params)}`);
 
   const [{ data: me }, { data: vehicles }] = await Promise.all([
     api.GET("/api/v1/me"),
@@ -91,7 +93,7 @@ async function Analytics({ searchParams }: { searchParams: SearchParams }) {
     }),
   ]);
 
-  const reset = `/analytics${analyticsSearch({ vehicleId: vehicle.id })}`;
+  const reset = `/analytics${search({ vehicleId: vehicle.id })}`;
   if (!consumption.data) {
     const message =
       consumption.response.status === 422
@@ -121,7 +123,7 @@ async function Analytics({ searchParams }: { searchParams: SearchParams }) {
         >
           That page link has expired.{" "}
           <Link
-            href={`/analytics${analyticsSearch({ ...params, cursor: null })}`}
+            href={`/analytics${search({ ...params, cursor: null })}`}
             className={LINK}
           >
             Go to the newest drives
@@ -142,7 +144,7 @@ async function Analytics({ searchParams }: { searchParams: SearchParams }) {
     to: data.range.to,
     cursor: null,
   };
-  const csvHref = `/analytics/trips.csv${analyticsSearch({ ...view, groupBy: "week" })}`;
+  const csvHref = `/analytics/trips.csv${search({ ...view, groupBy: "week" })}`;
   const nextCursor = trips.data.next_cursor;
   const items = trips.data.items;
   const exportError =
@@ -166,8 +168,8 @@ async function Analytics({ searchParams }: { searchParams: SearchParams }) {
       <SimulatedNotice
         includesSimulated={data.includes_simulated}
         excludedSimulatedTrips={data.excluded_simulated_trips}
-        includeHref={`/analytics${analyticsSearch({ ...view, includeSimulated: true })}`}
-        excludeHref={`/analytics${analyticsSearch({ ...view, includeSimulated: false })}`}
+        includeHref={`/analytics${search({ ...view, includeSimulated: true })}`}
+        excludeHref={`/analytics${search({ ...view, includeSimulated: false })}`}
       />
       {exportError ? (
         <p role="alert" className="text-sm text-destructive">
@@ -213,7 +215,7 @@ async function Analytics({ searchParams }: { searchParams: SearchParams }) {
               <nav aria-label="Drive pages" className="flex gap-4 text-sm">
                 {params.cursor ? (
                   <Link
-                    href={`/analytics${analyticsSearch(view)}`}
+                    href={`/analytics${search(view)}`}
                     className={LINK}
                   >
                     ← Newest drives
@@ -221,7 +223,7 @@ async function Analytics({ searchParams }: { searchParams: SearchParams }) {
                 ) : null}
                 {nextCursor ? (
                   <Link
-                    href={`/analytics${analyticsSearch({ ...view, cursor: nextCursor })}`}
+                    href={`/analytics${search({ ...view, cursor: nextCursor })}`}
                     className={LINK}
                   >
                     Older drives →

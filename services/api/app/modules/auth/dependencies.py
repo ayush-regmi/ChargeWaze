@@ -136,7 +136,7 @@ def get_current_user(
     """The verified caller, after the demo/live gate (``access.enforce_access``).
 
     ``db`` is the request's shared session (FastAPI caches dependencies per
-    request); it opens a connection only in demo mode.
+    request); it opens a connection only for the demo account.
     """
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise ApiError(

@@ -5,13 +5,14 @@
  *
  * Params: `vehicle`, `from`, `to` (YYYY-MM-DD), `group_by` (day|week|month,
  * default week), `simulated=1|0` (include simulated data or not; the default
- * is on only in the public demo), `tz` (IANA zone from
+ * is on only for the public demo account), `tz` (IANA zone from
  * the browser) and `cursor` (the trips table page).
  */
 
-import { env } from "@/lib/env";
-
 import type { GroupBy } from "./format";
+
+/** Who is looking: the public demo account (ADR 0012) defaults to simulated data. */
+export type ViewerOptions = { demo?: boolean };
 
 export type AnalyticsParams = {
   vehicleId: string | null;
@@ -49,16 +50,19 @@ export function isValidTimeZone(value: string): boolean {
 
 /**
  * `simulated=1` includes simulated data and `simulated=0` leaves it out. With
- * neither, the public demo (P6-F2) includes it, because all its data is
- * simulated; a live deployment leaves it out (phase5_plan D11).
+ * neither, the public demo account (P6-F2) includes it, because all its data
+ * is simulated; any other account leaves it out (phase5_plan D11).
  */
-function parseSimulated(value: string | undefined): boolean {
+function parseSimulated(value: string | undefined, demo: boolean): boolean {
   if (value === "1") return true;
   if (value === "0") return false;
-  return env.demoMode;
+  return demo;
 }
 
-export function parseAnalyticsParams(raw: RawParams): AnalyticsParams {
+export function parseAnalyticsParams(
+  raw: RawParams,
+  { demo = false }: ViewerOptions = {},
+): AnalyticsParams {
   const vehicle = first(raw.vehicle);
   const from = first(raw.from);
   const to = first(raw.to);
@@ -70,14 +74,17 @@ export function parseAnalyticsParams(raw: RawParams): AnalyticsParams {
     from: from && isRealDate(from) ? from : null,
     to: to && isRealDate(to) ? to : null,
     groupBy: groupBy === "day" || groupBy === "month" ? groupBy : "week",
-    includeSimulated: parseSimulated(first(raw.simulated)),
+    includeSimulated: parseSimulated(first(raw.simulated), demo),
     tz: tz && isValidTimeZone(tz) ? tz : null,
     cursor: cursor && CURSOR_RE.test(cursor) ? cursor : null,
   };
 }
 
 /** The page's query string for `params` (default values left out), with a leading `?` or "". */
-export function analyticsSearch(params: Partial<AnalyticsParams>): string {
+export function analyticsSearch(
+  params: Partial<AnalyticsParams>,
+  { demo = false }: ViewerOptions = {},
+): string {
   const q = new URLSearchParams();
   if (params.vehicleId) q.set("vehicle", params.vehicleId);
   if (params.from) q.set("from", params.from);
@@ -86,7 +93,7 @@ export function analyticsSearch(params: Partial<AnalyticsParams>): string {
     q.set("group_by", params.groupBy);
   if (
     params.includeSimulated !== undefined &&
-    params.includeSimulated !== env.demoMode
+    params.includeSimulated !== demo
   )
     q.set("simulated", params.includeSimulated ? "1" : "0");
   if (params.tz) q.set("tz", params.tz);

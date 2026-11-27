@@ -267,18 +267,19 @@ The deployed app runs in two modes gated by configuration:
 The two modes **never** share records. Analytics and ML training sets exclude `is_simulated = true` by default.
 
 As built (P6-F2):
-- **One setting picks the mode.** `APP_PUBLIC_DEMO_MODE` chooses it per deployment, and each mode has its own database. The gate (`app/modules/auth/access.py`) runs inside `get_current_user`, so every signed-in route is covered without router changes.
-- **Live mode.** Only the Supabase user IDs in `LIVE_ALLOWED_USER_IDS` are served. Under `APP_ENV=production` an empty list fails closed.
-- **Demo mode.**
-  - The API refuses to start with Smartcar secrets.
-  - It is read-only except trip planning, because recruiters share one seeded account.
-  - It serves nothing (503) if the database holds any real vehicle, so no real row can be returned.
+- **The demo is an account, not a deployment** ([ADR 0012](adr/0012-demo-account-in-production.md), which replaced P6-F2's separate demo deployment with its own database). `DEMO_USER_ID` names one shared, seeded account in the production deployment. The gate (`app/modules/auth/access.py`) runs inside `get_current_user`, so every signed-in route is covered without router changes.
+- **Live accounts.** Only the Supabase user IDs in `LIVE_ALLOWED_USER_IDS` are served. Under `APP_ENV=production` an empty list fails closed. `DEMO_USER_ID` may not be in the list.
+- **Demo account.**
+  - It shares the database with real accounts and never shares records: every query is scoped to the caller, so it only sees its own `is_simulated = true` rows, and another account's IDs answer 404.
+  - It is read-only except trip planning, because recruiters share one seeded account. That also stops it connecting a car.
+  - It is refused (503) if it ever owns a real vehicle itself.
+  - The web app shows the demo banner and includes simulated analytics by default only while it is signed in.
 - **Seed data.** `scripts/seed_demo.py` fills the demo account with a simulated 2026 Toyota bZ:
   - About four weeks of telemetry.
   - A Frederick → Toronto plan, made by the real planner from recorded fixtures.
   - The legs, plan match and backtests, produced by the real Phase 5 pipeline.
 
-  It refuses to run against a database that has real rows. Setup: [`deployment.md`](deployment.md) §13.
+  It only deletes and writes the demo account's rows, and refuses an account that owns real data. Setup: [`deployment.md`](deployment.md) §13.
 
 ## 8. Testing strategy
 
